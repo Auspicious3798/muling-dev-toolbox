@@ -12,8 +12,11 @@
     "electron:build": "vite build && electron-builder"
   },
   "dependencies": {
+    "adm-zip": "^0.5.16",
+    "axios": "^1.6.7",
+    "mitt": "^3.0.1",
     "vue": "^3.5.30",
-    "axios": "^1.6.7"
+    "vue-router": "^5.0.4"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.4",
@@ -26,5 +29,24 @@
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"
+  },
+  "build": {
+    "appId": "com.muling.dev-toolbox",
+    "productName": "沐柠开发工具箱",
+    "directories": {
+      "output": "dist_electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    }
   }
 }
