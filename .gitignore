@@ -6,11 +6,12 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+app_protocol.log   # 添加这行，忽略我们调试用的协议日志
 
 node_modules
 .DS_Store
 dist
-dist-ssr
+dist_electron
 coverage
 *.local
 
