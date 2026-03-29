@@ -1,5 +1,6 @@
 const {contextBridge, ipcRenderer, shell} = require('electron');
 console.log('✅ Preload script loaded with Python API');
+
 contextBridge.exposeInMainWorld('electronAPI', {
     // JDK API
     installJDK: (version) => ipcRenderer.invoke('install-jdk', version),
@@ -13,8 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onJDKChanged: (callback) => ipcRenderer.on('jdk-changed', callback),
 
     // Python API
-    installPython: (version) => ipcRenderer.invoke('install-python', version),
-    installFromLocalPython: (version) => ipcRenderer.invoke('install-from-local-python', version),
+    installPython: (version, mirror) => ipcRenderer.invoke('install-python', version, mirror),
+    installFromLocalPython: (version, mirror) => ipcRenderer.invoke('install-from-local-python', version, mirror),
     importLocalPython: (filePath) => ipcRenderer.invoke('import-local-python', filePath),
     checkPython: () => ipcRenderer.invoke('check-python'),
     switchPython: (version) => ipcRenderer.invoke('switch-python', version),

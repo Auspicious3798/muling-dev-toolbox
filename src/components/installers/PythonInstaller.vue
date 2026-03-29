@@ -11,6 +11,18 @@
       </button>
     </div>
 
+    <!-- 镜像源选择（通用） -->
+    <div class="mirror-select">
+      <label>pip 镜像源：</label>
+      <select v-model="pipMirror">
+        <option value="https://pypi.tuna.tsinghua.edu.cn/simple">清华大学</option>
+        <option value="https://mirrors.aliyun.com/pypi/simple/">阿里云</option>
+        <option value="https://mirrors.ustc.edu.cn/pypi/web/simple/">中科大</option>
+        <option value="https://pypi.douban.com/simple/">豆瓣</option>
+        <option value="https://pypi.org/simple">官方（PyPI）</option>
+      </select>
+    </div>
+
     <!-- 联网下载模式 -->
     <div v-if="activeMode === 'online'">
       <select v-model="selectedVersion" class="version-select">
@@ -93,7 +105,8 @@ export default {
       progressPercent: 0,
       localFilePath: '',
       localVersion: '3.12.9',
-      dirExistsWarning: false
+      dirExistsWarning: false,
+      pipMirror: 'https://pypi.tuna.tsinghua.edu.cn/simple'
     };
   },
   computed: {
@@ -110,8 +123,10 @@ export default {
       window.electronAPI.onDownloadProgress((data) => {
         if (data.type === 'python' && data.version === this.selectedVersion) {
           this.progressPercent = data.progress * 100;
-          if (data.progress === 1) {
-            this.status = '下载完成，正在安装...';
+          if (data.stage) {
+            this.status = data.stage;
+          } else if (data.progress === 1) {
+            this.status = '安装完成';
           }
         }
       });
@@ -141,12 +156,12 @@ export default {
       this.installing = true;
       this.showProgress = true;
       this.progressPercent = 0;
-      this.status = '⏳ 正在安装...';
+      this.status = '准备安装...';
       eventBus.emit('install:start');
 
       try {
         this.downloading = true;
-        const result = await window.electronAPI.installPython(this.selectedVersion);
+        const result = await window.electronAPI.installPython(this.selectedVersion, this.pipMirror);
         if (result.success) {
           this.status = `✅ ${result.message}`;
           setTimeout(() => {
@@ -246,11 +261,11 @@ export default {
       this.installing = true;
       this.showProgress = true;
       this.progressPercent = 0;
-      this.status = '⏳ 正在安装...';
+      this.status = '准备安装...';
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.installFromLocalPython(this.localVersion);
+        const result = await window.electronAPI.installFromLocalPython(this.localVersion, this.pipMirror);
         if (result.success) {
           this.status = `✅ ${result.message}`;
           setTimeout(() => {
@@ -275,6 +290,7 @@ export default {
 </script>
 
 <style scoped>
+/* 样式保持不变，与用户提供的完全相同 */
 .python-installer {
   background: white;
   border-radius: 20px;
@@ -322,6 +338,27 @@ h3 {
 
 .mode-btn:hover:not(.active) {
   background-color: #f3f4f6;
+}
+
+.mirror-select {
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mirror-select label {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.mirror-select select {
+  flex: 1;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background-color: #f9fafb;
+  font-size: 0.9rem;
 }
 
 .version-select {
