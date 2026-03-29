@@ -52,13 +52,28 @@ export default {
       return map[this.type] || this.type.toUpperCase();
     },
     checkMethod() {
-      return `check${this.type.toUpperCase()}`;
+      const methodMap = {
+        jdk: 'checkJDK',
+        python: 'checkPython',
+        mysql: 'checkMySQL'
+      };
+      return methodMap[this.type];
     },
     switchMethod() {
-      return `switch${this.type.toUpperCase()}`;
+      const methodMap = {
+        jdk: 'switchJDK',
+        python: 'switchPython',
+        mysql: 'switchMySQL'
+      };
+      return methodMap[this.type];
     },
     deleteMethod() {
-      return `delete${this.type.toUpperCase()}`;
+      const methodMap = {
+        jdk: 'deleteJDK',
+        python: 'deletePython',
+        mysql: 'deleteMySQL'
+      };
+      return methodMap[this.type];
     }
   },
   watch: {
@@ -69,8 +84,14 @@ export default {
   mounted() {
     this.refresh();
     if (window.electronAPI) {
-      window.electronAPI.onJDKChanged(() => {
+      window.electronAPI.onJDKChanged?.(() => {
         if (this.type === 'jdk') this.refresh();
+      });
+      window.electronAPI.onPythonChanged?.(() => {
+        if (this.type === 'python') this.refresh();
+      });
+      window.electronAPI.onMySQLChanged?.(() => {
+        if (this.type === 'mysql') this.refresh();
       });
     }
   },
@@ -88,8 +109,8 @@ export default {
           return;
         }
         const result = await api();
-        this.detectedVersions = result.versions;
-        this.defaultVersion = result.default;
+        this.detectedVersions = result.versions || [];
+        this.defaultVersion = result.default || null;
       } catch (err) {
         console.error(`${this.typeLabel} 检测失败`, err);
         if (err.message && err.message.includes('is not a function')) {

@@ -2,6 +2,7 @@ const {app, BrowserWindow, ipcMain, protocol, dialog, Menu} = require('electron'
 const path = require('path');
 const fs = require('fs');
 const registerJDKHandlers = require('./handlers/jdk.cjs');
+const registerPythonHandlers = require('./handlers/python.cjs');
 
 let mainWindow;
 
@@ -25,13 +26,12 @@ protocol.registerSchemesAsPrivileged([
     }
 ]);
 
-Menu.setApplicationMenu(null);
+// Menu.setApplicationMenu(null);
 
 function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1100,
         height: 600,
-        menu: null,
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -86,6 +86,7 @@ app.whenReady().then(() => {
 
     createWindow();
     registerJDKHandlers(mainWindow, app.getPath('userData'));
+    registerPythonHandlers(mainWindow, app.getPath('userData'));
 
     ipcMain.on('select-install-path', async (event) => {
         const result = await dialog.showOpenDialog(mainWindow, {
