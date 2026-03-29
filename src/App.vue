@@ -3,10 +3,7 @@
     <NavMenu :active="activeMenu" @select="activeMenu = $event"/>
     <div class="content-panel">
       <JDKInstaller v-if="activeMenu === 'jdk'"/>
-      <div v-else-if="activeMenu === 'python'" class="coming-soon">
-        <h3>🐍 Python 一键安装</h3>
-        <p>即将支持，敬请期待</p>
-      </div>
+      <PythonInstaller v-else-if="activeMenu === 'python'"/>
       <div v-else-if="activeMenu === 'mysql'" class="coming-soon">
         <h3>🗄️ MySQL 一键安装</h3>
         <p>即将支持，敬请期待</p>
@@ -21,6 +18,7 @@
 <script>
 import NavMenu from './components/NavMenu.vue';
 import JDKInstaller from './components/installers/JDKInstaller.vue';
+import PythonInstaller from './components/installers/PythonInstaller.vue';
 import EnvironmentPanel from './components/EnvironmentPanel.vue';
 
 export default {
@@ -28,6 +26,7 @@ export default {
   components: {
     NavMenu,
     JDKInstaller,
+    PythonInstaller,
     EnvironmentPanel
   },
   data() {
