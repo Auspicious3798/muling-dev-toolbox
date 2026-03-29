@@ -1,10 +1,10 @@
-const {ipcMain} = require('electron');
+const { ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const {exec} = require('child_process');
+const { exec } = require('child_process');
 const axios = require('axios');
 const AdmZip = require('adm-zip');
-const {promisify} = require('util');
+const { promisify } = require('util');
 const execPromise = promisify(exec);
 
 const jdkSources = {
@@ -80,7 +80,7 @@ const jdkSources = {
 
 module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
-    if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
+    if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, { recursive: true });
 
     const logFile = path.join(userDataPath, 'jdk_install.log');
 
@@ -124,10 +124,10 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         return new Promise((resolve, reject) => {
             try {
                 if (fs.existsSync(installDir)) {
-                    fs.rmSync(installDir, {recursive: true, force: true});
+                    fs.rmSync(installDir, { recursive: true, force: true });
                     logToFile(`已删除旧目录: ${installDir}`);
                 }
-                fs.mkdirSync(installDir, {recursive: true});
+                fs.mkdirSync(installDir, { recursive: true });
                 const zip = new AdmZip(zipPath);
                 zip.extractAllTo(installDir, true);
                 logToFile(`解压成功: ${zipPath} -> ${installDir}`);
@@ -139,17 +139,42 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         });
     }
 
+    function refreshCurrentProcessEnv() {
+        return new Promise((resolve, reject) => {
+            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
+            exec(regCmd, { windowsHide: true }, (error, stdout) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
+                if (match && match[1]) {
+                    let newPath = match[1].trim();
+                    newPath = newPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
+                    process.env.Path = newPath;
+                    resolve();
+                } else {
+                    reject(new Error('无法获取系统 PATH'));
+                }
+            });
+        });
+    }
+
     function setSystemEnvVariable(name, value) {
         return new Promise((resolve, reject) => {
             const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
             logToFile(`执行 setx: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (error, stdout, stderr) => {
+            exec(setxCmd, { windowsHide: true }, (error, stdout, stderr) => {
                 if (error) {
                     logToFile(`setx 失败: ${stderr || error.message}`);
                     reject(new Error(`设置系统变量失败: ${stderr || error.message}`));
                 } else {
                     logToFile(`setx 成功: ${name}=${value}`);
-                    resolve();
+                    const psRefresh = `$env:${name} = "${value}"`;
+                    exec(`powershell -NoProfile -Command "${psRefresh.replace(/"/g, '\\"')}"`, (err) => {
+                        if (err) logToFile(`刷新当前进程 ${name} 失败: ${err.message}`);
+                        resolve();
+                    });
                 }
             });
         });
@@ -158,7 +183,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     function removeSystemEnvVariable(name) {
         return new Promise((resolve, reject) => {
             const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" ""`;
-            exec(setxCmd, {windowsHide: true}, (error) => {
+            exec(setxCmd, { windowsHide: true }, (error) => {
                 if (error) reject(error);
                 else resolve();
             });
@@ -180,7 +205,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                 }
                 const regCmd = `${regPaths[index]} query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
                 logToFile(`执行 reg: ${regCmd}`);
-                exec(regCmd, {windowsHide: true}, (error, stdout) => {
+                exec(regCmd, { windowsHide: true }, (error, stdout) => {
                     if (error) {
                         parseError = error.message;
                         tryNext(index + 1);
@@ -201,13 +226,15 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                         const newPath = newParts.join(';');
                         const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
                         logToFile(`执行 setx PATH: ${setxCmd}`);
-                        exec(setxCmd, {windowsHide: true}, (err, stdout, stderr) => {
+                        exec(setxCmd, { windowsHide: true }, (err, stdout, stderr) => {
                             if (err) {
                                 logToFile(`setx PATH 失败: ${stderr || err.message}`);
                                 reject(new Error(`设置 PATH 失败: ${stderr || err.message}`));
                             } else {
                                 logToFile(`setx PATH 成功: ${newPath}`);
-                                resolve();
+                                refreshCurrentProcessEnv()
+                                    .then(() => resolve())
+                                    .catch(err => reject(err));
                             }
                         });
                     } else {
@@ -215,13 +242,15 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                         const newPath = targetEntry;
                         const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
                         logToFile(`执行 setx PATH (新建): ${setxCmd}`);
-                        exec(setxCmd, {windowsHide: true}, (err, stdout, stderr) => {
+                        exec(setxCmd, { windowsHide: true }, (err, stdout, stderr) => {
                             if (err) {
                                 logToFile(`setx PATH 失败: ${stderr || err.message}`);
                                 reject(new Error(`设置 PATH 失败: ${stderr || err.message}`));
                             } else {
                                 logToFile(`setx PATH 成功: ${newPath}`);
-                                resolve();
+                                refreshCurrentProcessEnv()
+                                    .then(() => resolve())
+                                    .catch(err => reject(err));
                             }
                         });
                     }
@@ -233,9 +262,15 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
 
     async function getCurrentDefaultVersion() {
         try {
-            const {stdout} = await execPromise('java -version 2>&1');
-            const match = stdout.match(/version "([0-9]+)/);
-            if (match && match[1]) return match[1];
+            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
+            const { stdout } = await execPromise(regCmd);
+            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
+            if (!match || !match[1]) return null;
+            const currentPath = match[1].trim();
+            const versionMatch = currentPath.match(/%JAVA_HOME(\d+)%\\bin/);
+            if (versionMatch && versionMatch[1]) {
+                return versionMatch[1];
+            }
             return null;
         } catch (err) {
             return null;
@@ -248,13 +283,12 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
             const psScript = `
                 Get-ChildItem Env: | Where-Object { $_.Name -match '^JAVA_HOME\\d+$' } | ForEach-Object { $_.Name -replace 'JAVA_HOME', '' }
             `;
-            const {stdout} = await execPromise(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`);
+            const { stdout } = await execPromise(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`);
             const lines = stdout.trim().split('\r\n').filter(l => l);
             for (const line of lines) {
                 versions.add(line.trim());
             }
-        } catch (err) {
-        }
+        } catch (err) {}
         const knownDirs = [
             'C:\\Program Files\\Java',
             'C:\\Program Files\\Eclipse Adoptium',
@@ -273,8 +307,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                             if (match && match[1]) {
                                 versions.add(match[1]);
                             }
-                        } catch (e) {
-                        }
+                        } catch (e) {}
                     }
                 }
             }
@@ -285,13 +318,12 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     async function findJDKHome(version) {
         const varName = `JAVA_HOME${version}`;
         try {
-            const {stdout} = await execPromise(`echo %${varName}%`);
+            const { stdout } = await execPromise(`echo %${varName}%`);
             const home = stdout.trim();
             if (home && fs.existsSync(home)) {
                 return home;
             }
-        } catch (err) {
-        }
+        } catch (err) {}
         const knownDirs = [
             'C:\\Program Files\\Java',
             'C:\\Program Files\\Eclipse Adoptium',
@@ -325,21 +357,21 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('import-local-jdk', async (event, filePath) => {
         const ext = path.extname(filePath).toLowerCase();
-        if (ext !== '.zip') return {success: false, message: '只支持 .zip 文件'};
+        if (ext !== '.zip') return { success: false, message: '只支持 .zip 文件' };
         const fileName = path.basename(filePath);
         const destPath = path.join(downloadDir, fileName);
         fs.copyFileSync(filePath, destPath);
         pendingLocalFile = destPath;
-        return {success: true, message: 'JDK 安装包已导入，点击“开始安装”完成配置'};
+        return { success: true, message: 'JDK 安装包已导入，点击“开始安装”完成配置' };
     });
 
     ipcMain.handle('install-from-local', async (event, version) => {
-        if (!pendingLocalFile) return {success: false, message: '没有已导入的 JDK 安装包，请先导入'};
-        if (!version) return {success: false, message: '未指定 JDK 版本'};
+        if (!pendingLocalFile) return { success: false, message: '没有已导入的 JDK 安装包，请先导入' };
+        if (!version) return { success: false, message: '未指定 JDK 版本' };
         const zipPath = pendingLocalFile;
         const installPath = `C:\\Program Files\\Java\\jdk-${version}`;
         const sendProgress = (progress) => {
-            mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress});
+            mainWindow.webContents.send('download-progress', { type: 'jdk', version, progress });
         };
         try {
             sendProgress(0);
@@ -351,15 +383,12 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
             await setSystemEnvVariable(`JAVA_HOME${version}`, jdkRoot);
             await setPathForVersion(version);
             mainWindow.webContents.send('jdk-changed');
-            return {success: true, message: 'JDK 安装成功'};
+            return { success: true, message: 'JDK 安装成功' };
         } catch (err) {
-            return {success: false, message: `安装失败: ${err.message}`};
+            return { success: false, message: `安装失败: ${err.message}` };
         } finally {
             if (fs.existsSync(zipPath)) {
-                try {
-                    fs.unlinkSync(zipPath);
-                } catch (e) {
-                }
+                try { fs.unlinkSync(zipPath); } catch (e) {}
             }
             pendingLocalFile = null;
         }
@@ -367,13 +396,13 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('install-jdk', async (event, version) => {
         const source = jdkSources[version];
-        if (!source) return {success: false, message: `不支持的 JDK 版本: ${version}`};
-        const {url} = source;
+        if (!source) return { success: false, message: `不支持的 JDK 版本: ${version}` };
+        const { url } = source;
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
         const installPath = `C:\\Program Files\\Java\\jdk-${version}`;
         const sendProgress = (progress) => {
-            mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress});
+            mainWindow.webContents.send('download-progress', { type: 'jdk', version, progress });
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
@@ -392,21 +421,18 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
             await setSystemEnvVariable(`JAVA_HOME${version}`, jdkRoot);
             await setPathForVersion(version);
             mainWindow.webContents.send('jdk-changed');
-            return {success: true, message: 'JDK 安装成功'};
+            return { success: true, message: 'JDK 安装成功' };
         } catch (err) {
             if (err.message === '下载已取消') {
-                return {success: false, message: '下载已取消'};
+                return { success: false, message: '下载已取消' };
             }
-            return {success: false, message: `安装失败: ${err.message}`};
+            return { success: false, message: `安装失败: ${err.message}` };
         } finally {
             if (currentAbortController === abortController) {
                 currentAbortController = null;
             }
             if (fs.existsSync(installerPath)) {
-                try {
-                    fs.unlinkSync(installerPath);
-                } catch (e) {
-                }
+                try { fs.unlinkSync(installerPath); } catch (e) {}
             }
         }
     });
@@ -415,9 +441,9 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         try {
             const versions = await getAllInstalledVersions();
             const defaultVersion = await getCurrentDefaultVersion();
-            return {versions, default: defaultVersion};
+            return { versions, default: defaultVersion };
         } catch (err) {
-            return {versions: [], default: null};
+            return { versions: [], default: null };
         }
     });
 
@@ -427,9 +453,9 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
             if (!home) throw new Error(`未找到 JDK ${version} 的安装目录`);
             await setPathForVersion(version);
             mainWindow.webContents.send('jdk-changed');
-            return {success: true, message: `已切换到 JDK ${version}`};
+            return { success: true, message: `已切换到 JDK ${version}` };
         } catch (err) {
-            return {success: false, message: err.message};
+            return { success: false, message: err.message };
         }
     });
 
@@ -445,7 +471,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                     await setPathForVersion(other);
                 } else {
                     const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-                    exec(regCmd, {windowsHide: true}, (error, stdout) => {
+                    exec(regCmd, { windowsHide: true }, (error, stdout) => {
                         if (!error) {
                             const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
                             if (match && match[1]) {
@@ -459,18 +485,18 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
                                 }
                                 const newPath = newParts.join(';');
                                 const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-                                exec(setxCmd, {windowsHide: true});
+                                exec(setxCmd, { windowsHide: true });
                             }
                         }
                     });
                 }
             }
             await removeSystemEnvVariable(`JAVA_HOME${version}`);
-            fs.rmSync(home, {recursive: true, force: true});
+            fs.rmSync(home, { recursive: true, force: true });
             mainWindow.webContents.send('jdk-changed');
-            return {success: true, message: `已删除 JDK ${version}`};
+            return { success: true, message: `已删除 JDK ${version}` };
         } catch (err) {
-            return {success: false, message: err.message};
+            return { success: false, message: err.message };
         }
     });
 };
