@@ -335,6 +335,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('install-from-local', async (event, version) => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 JDK 安装包，请先导入'};
+        if (!version) return {success: false, message: '未指定 JDK 版本'};
         const zipPath = pendingLocalFile;
         const installPath = `C:\\Program Files\\Java\\jdk-${version}`;
         const sendProgress = (progress) => {

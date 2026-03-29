@@ -12,18 +12,23 @@
         <p>即将支持，敬请期待</p>
       </div>
     </div>
+    <div class="right-panel">
+      <EnvironmentPanel :type="activeMenu"/>
+    </div>
   </div>
 </template>
 
 <script>
 import NavMenu from './components/NavMenu.vue';
 import JDKInstaller from './components/installers/JDKInstaller.vue';
+import EnvironmentPanel from './components/EnvironmentPanel.vue';
 
 export default {
   name: 'App',
   components: {
     NavMenu,
     JDKInstaller,
+    EnvironmentPanel
   },
   data() {
     return {
@@ -54,6 +59,14 @@ body {
 .content-panel {
   flex: 1;
   background: #f0f2f5;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.right-panel {
+  width: 400px;
+  background: white;
+  border-left: 1px solid #e2e8f0;
   padding: 20px;
   overflow-y: auto;
 }

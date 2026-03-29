@@ -12,5 +12,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onJDKChanged: (callback) => ipcRenderer.on('jdk-changed', callback),
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
-    openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options)
+    openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
+    checkPathExists: (path) => ipcRenderer.invoke('check-path-exists', path)
 });

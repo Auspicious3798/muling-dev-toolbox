@@ -1,59 +1,80 @@
 <template>
   <div class="jdk-installer">
-    <h3>☕ JDK</h3>
-    <div class="detect-area">
-      <button @click="checkJDK" class="detect-btn" :disabled="checking">
-        {{ checking ? '检测中...' : '环境检测' }}
+    <h3>☕ JDK 安装</h3>
+
+    <div class="mode-switch">
+      <button :class="['mode-btn', { active: activeMode === 'online' }]" @click="switchMode('online')">
+        🌐 联网下载
       </button>
-      <div v-if="detectedVersions.length" class="detected-list">
-        <div class="default-version" v-if="defaultVersion">
-          <span>当前默认 JDK：</span>
-          <span class="version-badge">{{ defaultVersion }}</span>
+      <button :class="['mode-btn', { active: activeMode === 'local' }]" @click="switchMode('local')">
+        📁 手动导入
+      </button>
+    </div>
+
+    <!-- 联网下载模式 -->
+    <div v-if="activeMode === 'online'">
+      <select v-model="selectedVersion" class="version-select">
+        <option value="26">JDK 26</option>
+        <option value="25">JDK 25</option>
+        <option value="24">JDK 24</option>
+        <option value="23">JDK 23</option>
+        <option value="22">JDK 22</option>
+        <option value="21">JDK 21 (LTS)</option>
+        <option value="20">JDK 20</option>
+        <option value="19">JDK 19</option>
+        <option value="18">JDK 18</option>
+        <option value="17">JDK 17 (LTS)</option>
+        <option value="16">JDK 16</option>
+        <option value="15">JDK 15</option>
+        <option value="14">JDK 14</option>
+        <option value="13">JDK 13</option>
+        <option value="12">JDK 12</option>
+        <option value="11">JDK 11 (LTS)</option>
+        <option value="8">JDK 8 (LTS)</option>
+      </select>
+      <div class="install-path">
+        <span class="path-label">安装目录：</span>
+        <span class="path-display">{{ installPath }}</span>
+      </div>
+      <div class="button-group">
+        <button @click="installJDK" :disabled="installing" class="install-btn">
+          {{ installing ? '安装中...' : '开始安装' }}
+        </button>
+        <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
+          取消下载
+        </button>
+      </div>
+    </div>
+
+    <!-- 手动导入模式 -->
+    <div v-else>
+      <div class="import-area">
+        <button @click="importLocalJDK" class="import-btn">📁 选择 JDK 压缩包</button>
+        <div v-if="localFilePath" class="import-path">
+          <span class="path-label">已选择：</span>
+          <span class="path-display">{{ localFilePath }}</span>
         </div>
-        <div v-for="v in detectedVersions" :key="v" class="version-card">
-          <span class="version-number">JDK {{ v }}</span>
-          <div class="card-actions">
-            <button @click="switchToVersion(v)" class="switch-btn" title="设为默认">🔄 切换</button>
-            <button @click="deleteVersion(v)" class="delete-btn" title="卸载">🗑️ 卸载</button>
-          </div>
+        <div class="version-input">
+          <label>JDK 大版本号：</label>
+          <input type="number" v-model.number="localVersion" min="8" max="26" step="1" class="version-number-input"/>
+          <button @click="validateLocalVersion" class="validate-btn">验证目录</button>
+        </div>
+        <div v-if="dirExistsWarning" class="warning-message">
+          ⚠️ 安装目录已存在文件！请删除或选择其他版本。
+        </div>
+        <div class="install-path">
+          <span class="path-label">安装目录：</span>
+          <span class="path-display">{{ localInstallPath }}</span>
         </div>
       </div>
-      <div v-else-if="!checking" class="no-version">
-        未检测到 JDK
+      <div class="button-group">
+        <button @click="installFromLocal" :disabled="installing || !localFilePath || dirExistsWarning"
+                class="install-btn">
+          {{ installing ? '安装中...' : '开始安装' }}
+        </button>
       </div>
     </div>
-    <select v-model="selectedVersion" class="version-select">
-      <option value="26">JDK 26</option>
-      <option value="25">JDK 25</option>
-      <option value="24">JDK 24</option>
-      <option value="23">JDK 23</option>
-      <option value="22">JDK 22</option>
-      <option value="21">JDK 21 (LTS)</option>
-      <option value="20">JDK 20</option>
-      <option value="19">JDK 19</option>
-      <option value="18">JDK 18</option>
-      <option value="17">JDK 17 (LTS)</option>
-      <option value="16">JDK 16</option>
-      <option value="15">JDK 15</option>
-      <option value="14">JDK 14</option>
-      <option value="13">JDK 13</option>
-      <option value="12">JDK 12</option>
-      <option value="11">JDK 11 (LTS)</option>
-      <option value="8">JDK 8 (LTS)</option>
-    </select>
-    <div class="install-path">
-      <span class="path-label">安装目录：</span>
-      <span class="path-display">{{ installPath }}</span>
-    </div>
-    <button @click="importLocalJDK" class="import-btn">📁 手动导入 JDK</button>
-    <div class="button-group">
-      <button @click="installJDK" :disabled="installing" class="install-btn">
-        {{ installing ? '安装中...' : '开始安装' }}
-      </button>
-      <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
-        取消下载
-      </button>
-    </div>
+
     <div class="status" :class="{ 'status-success': status.includes('✅'), 'status-error': status.includes('❌') }">
       {{ status }}
     </div>
@@ -70,23 +91,24 @@ export default {
   name: 'JDKInstaller',
   data() {
     return {
+      activeMode: 'online',
       selectedVersion: '21',
       installing: false,
       downloading: false,
       status: '未安装',
       showProgress: false,
       progressPercent: 0,
-      checking: false,
-      detectedVersions: [],
-      defaultVersion: null,
-      switching: false,
-      deleting: false,
-      pendingLocalImport: false
+      localFilePath: '',
+      localVersion: 21,
+      dirExistsWarning: false
     };
   },
   computed: {
     installPath() {
       return `C:\\Program Files\\Java\\jdk-${this.selectedVersion}`;
+    },
+    localInstallPath() {
+      return `C:\\Program Files\\Java\\jdk-${this.localVersion}`;
     }
   },
   mounted() {
@@ -99,33 +121,17 @@ export default {
           }
         }
       });
-      this.checkJDK();
-      window.electronAPI.onJDKChanged(() => {
-        this.checkJDK();
-      });
     } else {
       this.status = '错误：未连接到主进程';
     }
   },
-  watch: {
-    selectedVersion() {
-      this.pendingLocalImport = false;
-    }
-  },
   methods: {
-    async checkJDK() {
-      if (this.checking) return;
-      this.checking = true;
-      this.detectedVersions = [];
-      this.defaultVersion = null;
-      try {
-        const result = await window.electronAPI.checkJDK();
-        this.detectedVersions = result.versions;
-        this.defaultVersion = result.default;
-      } catch (err) {
-        console.error('检测失败', err);
-      } finally {
-        this.checking = false;
+    switchMode(mode) {
+      this.activeMode = mode;
+      if (mode === 'local') {
+        this.localFilePath = '';
+        this.localVersion = 21;
+        this.dirExistsWarning = false;
       }
     },
     cancelDownload() {
@@ -145,14 +151,8 @@ export default {
       eventBus.emit('install:start');
 
       try {
-        let result;
-        if (this.pendingLocalImport) {
-          result = await window.electronAPI.installFromLocal();
-          this.pendingLocalImport = false;
-        } else {
-          this.downloading = true;
-          result = await window.electronAPI.installJDK(this.selectedVersion);
-        }
+        this.downloading = true;
+        const result = await window.electronAPI.installJDK(this.selectedVersion);
         if (result.success) {
           this.status = `✅ ${result.message}`;
           setTimeout(() => {
@@ -185,14 +185,13 @@ export default {
       });
       if (!filePath) return;
 
-      const version = window.prompt('请输入 JDK 大版本号（例如 8、11、17、21 等）:', '21');
-      if (!version || !/^\d+$/.test(version)) {
-        this.status = '❌ 导入失败：版本号无效，请重新导入。';
-        return;
-      }
-      const versionNum = parseInt(version, 10);
-      if (versionNum < 8 || versionNum > 26) {
+      this.localFilePath = filePath;
+      this.status = `✅ 已选择文件：${filePath}`;
+
+      const version = this.localVersion;
+      if (!version || version < 8 || version > 26) {
         this.status = '❌ 导入失败：版本号应在 8 到 26 之间。';
+        this.localFilePath = '';
         return;
       }
 
@@ -202,52 +201,71 @@ export default {
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.importLocalJDK(filePath, version);
+        const result = await window.electronAPI.importLocalJDK(filePath);
         if (result.success) {
           this.status = `✅ ${result.message}，请点击“开始安装”完成配置。`;
-          this.pendingLocalImport = true;
-          this.selectedVersion = version;
+          await this.validateLocalVersion();
         } else {
           this.status = `❌ 导入失败：${result.message}`;
+          this.localFilePath = '';
         }
       } catch (err) {
         this.status = `❌ 导入失败：${err.message}`;
+        this.localFilePath = '';
       } finally {
         this.installing = false;
         eventBus.emit('install:end');
       }
     },
-    async switchToVersion(version) {
-      if (this.switching) return;
-      this.switching = true;
+    async validateLocalVersion() {
+      if (!this.localFilePath) {
+        this.status = '请先选择 JDK 安装包。';
+        return;
+      }
       try {
-        const result = await window.electronAPI.switchJDK(version);
-        if (result.success) {
-          this.status = `✅ 已切换到 JDK ${version}`;
+        const exists = await window.electronAPI.checkPathExists(this.localInstallPath);
+        this.dirExistsWarning = exists;
+        if (exists) {
+          this.status = '⚠️ 安装目录已存在文件，请删除或选择其他版本。';
         } else {
-          this.status = `❌ 切换失败：${result.message}`;
+          this.status = '✅ 安装目录可用。';
         }
       } catch (err) {
-        this.status = `❌ 切换失败：${err.message}`;
-      } finally {
-        this.switching = false;
+        console.error('检查目录失败', err);
+        this.dirExistsWarning = false;
       }
     },
-    async deleteVersion(version) {
-      if (this.deleting) return;
-      if (!confirm(`确定要卸载 JDK ${version} 吗？此操作不可撤销。`)) return;
-      this.deleting = true;
+    async installFromLocal() {
+      if (this.installing) return;
+      if (this.dirExistsWarning) {
+        this.status = '❌ 安装目录已存在文件，请删除或选择其他版本。';
+        return;
+      }
+      this.installing = true;
+      this.showProgress = true;
+      this.progressPercent = 0;
+      this.status = '⏳ 正在安装...';
+      eventBus.emit('install:start');
+
       try {
-        const result = await window.electronAPI.deleteJDK(version);
+        const result = await window.electronAPI.installFromLocal(this.localVersion);
         if (result.success) {
-          this.status = `✅ 已卸载 JDK ${version}`;
+          this.status = `✅ ${result.message}`;
+          setTimeout(() => {
+            this.showProgress = false;
+          }, 2000);
+          this.localFilePath = '';
+          this.dirExistsWarning = false;
         } else {
-          this.status = `❌ 卸载失败：${result.message}`;
+          this.status = `❌ 安装失败：${result.message}`;
+          this.showProgress = false;
         }
       } catch (err) {
-        this.status = `❌ 卸载失败：${err.message}`;
+        this.status = `❌ 安装失败：${err.message}`;
+        this.showProgress = false;
       } finally {
-        this.deleting = false;
+        this.installing = false;
+        eventBus.emit('install:end');
       }
     }
   }
@@ -255,28 +273,6 @@ export default {
 </script>
 
 <style scoped>
-.install-path {
-  margin: 1rem 0;
-  padding: 0.6rem;
-  background-color: #f9fafb;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.path-label {
-  font-weight: 500;
-  color: #4b5563;
-}
-
-.path-display {
-  font-family: monospace;
-  color: #1f2937;
-  word-break: break-all;
-}
-
 .jdk-installer {
   background: white;
   border-radius: 20px;
@@ -296,124 +292,34 @@ h3 {
   color: #1f2937;
 }
 
-.detect-area {
-  margin-bottom: 1rem;
-}
-
-.detect-btn {
-  background-color: #3b82f6;
-  color: white;
-  border: none;
-  padding: 0.4rem 1rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease, transform 0.1s ease;
-  margin-bottom: 12px;
-}
-
-.detect-btn:hover:not(:disabled) {
-  background-color: #2563eb;
-  transform: scale(0.98);
-}
-
-.detect-btn:disabled {
-  background-color: #9ca3af;
-  cursor: not-allowed;
-}
-
-.detected-list {
+.mode-switch {
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-top: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-  padding-right: 4px;
+  gap: 12px;
+  margin-bottom: 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 12px;
 }
 
-.default-version {
-  background-color: #e0f2fe;
-  border-radius: 12px;
-  padding: 8px 12px;
-  margin-bottom: 8px;
-  font-size: 0.9rem;
-  color: #0369a1;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.version-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background-color: #f9fafb;
-  border-radius: 12px;
-  padding: 8px 12px;
-  transition: all 0.2s ease;
-  border: 1px solid #e5e7eb;
-}
-
-.version-card:hover {
-  background-color: #f3f4f6;
-  border-color: #d1d5db;
-  transform: translateX(2px);
-}
-
-.version-number {
-  font-weight: 600;
-  font-size: 0.9rem;
-  color: #1f2937;
-  background: #e5e7eb;
-  padding: 2px 8px;
-  border-radius: 20px;
-}
-
-.card-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.switch-btn, .delete-btn {
+.mode-btn {
+  flex: 1;
   background: none;
   border: none;
-  cursor: pointer;
-  font-size: 0.8rem;
-  padding: 4px 8px;
-  border-radius: 20px;
-  transition: all 0.2s;
+  padding: 8px 12px;
+  font-size: 1rem;
   font-weight: 500;
-}
-
-.switch-btn {
-  color: #3b82f6;
-  background-color: #eff6ff;
-}
-
-.switch-btn:hover {
-  background-color: #dbeafe;
-  transform: scale(0.95);
-}
-
-.delete-btn {
-  color: #ef4444;
-  background-color: #fee2e2;
-}
-
-.delete-btn:hover {
-  background-color: #fecaca;
-  transform: scale(0.95);
-}
-
-.no-version {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: all 0.2s;
   color: #6b7280;
-  font-size: 0.85rem;
-  text-align: center;
-  padding: 12px;
-  background: #f9fafb;
-  border-radius: 12px;
-  margin-top: 8px;
+}
+
+.mode-btn.active {
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.mode-btn:hover:not(.active) {
+  background-color: #f3f4f6;
 }
 
 .version-select {
@@ -434,41 +340,79 @@ h3 {
 }
 
 .install-path {
-  display: flex;
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-.path-input {
-  flex: 1;
-  padding: 0.6rem 1rem;
+  margin: 1rem 0;
+  padding: 0.6rem;
+  background-color: #f9fafb;
   border-radius: 12px;
   border: 1px solid #e2e8f0;
-  background-color: #f9fafb;
-  font-size: 0.9rem;
-  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.path-input:focus {
-  outline: none;
-  border-color: #2c7a4d;
-  box-shadow: 0 0 0 3px rgba(44, 122, 77, 0.1);
+.import-path {
+  margin: 0.5rem 0;
+  padding: 0.6rem;
+  background-color: #f0fdf4;
+  border-radius: 12px;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.select-path-btn {
-  background-color: #4b5563;
+.path-label {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.path-display {
+  font-family: monospace;
+  color: #1f2937;
+  word-break: break-all;
+}
+
+.version-input {
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.version-number-input {
+  width: 100px;
+  padding: 6px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 1rem;
+}
+
+.validate-btn {
+  background-color: #6b7280;
   color: white;
   border: none;
-  padding: 0 1rem;
-  border-radius: 12px;
+  padding: 4px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  font-weight: 500;
-  transition: background-color 0.2s ease, transform 0.1s ease;
+  font-size: 0.8rem;
+  transition: background 0.2s;
 }
 
-.select-path-btn:hover {
-  background-color: #374151;
-  transform: scale(0.98);
+.validate-btn:hover {
+  background-color: #4b5563;
+}
+
+.warning-message {
+  margin-top: 8px;
+  padding: 8px;
+  background-color: #fee2e2;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 0.8rem;
+}
+
+.import-area {
+  margin-bottom: 1rem;
 }
 
 .import-btn {
@@ -564,7 +508,7 @@ h3 {
 .progress-fill {
   height: 100%;
   background-color: #2c7a4d;
-  width: 0;
+  width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
   animation: shimmer 1.2s infinite linear;
