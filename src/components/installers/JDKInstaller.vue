@@ -25,14 +25,25 @@
     <select v-model="selectedVersion" class="version-select">
       <option value="26">JDK 26</option>
       <option value="25">JDK 25</option>
+      <option value="24">JDK 24</option>
+      <option value="23">JDK 23</option>
+      <option value="22">JDK 22</option>
       <option value="21">JDK 21 (LTS)</option>
+      <option value="20">JDK 20</option>
+      <option value="19">JDK 19</option>
+      <option value="18">JDK 18</option>
       <option value="17">JDK 17 (LTS)</option>
+      <option value="16">JDK 16</option>
+      <option value="15">JDK 15</option>
+      <option value="14">JDK 14</option>
+      <option value="13">JDK 13</option>
+      <option value="12">JDK 12</option>
       <option value="11">JDK 11 (LTS)</option>
       <option value="8">JDK 8 (LTS)</option>
     </select>
     <div class="install-path">
-      <input type="text" v-model="installPath" readonly placeholder="安装路径" class="path-input"/>
-      <button @click="selectInstallPath" class="select-path-btn">选择目录</button>
+      <span class="path-label">安装目录：</span>
+      <span class="path-display">{{ installPath }}</span>
     </div>
     <button @click="importLocalJDK" class="import-btn">📁 手动导入 JDK</button>
     <div class="button-group">
@@ -60,7 +71,6 @@ export default {
   data() {
     return {
       selectedVersion: '21',
-      installPath: 'C:\\Program Files\\Java\\jdk-21',
       installing: false,
       downloading: false,
       status: '未安装',
@@ -70,8 +80,14 @@ export default {
       detectedVersions: [],
       defaultVersion: null,
       switching: false,
-      deleting: false
+      deleting: false,
+      pendingLocalImport: false
     };
+  },
+  computed: {
+    installPath() {
+      return `C:\\Program Files\\Java\\jdk-${this.selectedVersion}`;
+    }
   },
   mounted() {
     if (window.electronAPI) {
@@ -83,25 +99,20 @@ export default {
           }
         }
       });
-      window.electronAPI.onSelectPath((path) => {
-        if (path) this.installPath = path;
-      });
       this.checkJDK();
+      window.electronAPI.onJDKChanged(() => {
+        this.checkJDK();
+      });
     } else {
       this.status = '错误：未连接到主进程';
     }
   },
   watch: {
-    selectedVersion(newVersion) {
-      this.installPath = `C:\\Program Files\\Java\\jdk-${newVersion}`;
+    selectedVersion() {
+      this.pendingLocalImport = false;
     }
   },
   methods: {
-    selectInstallPath() {
-      if (window.electronAPI && window.electronAPI.selectPath) {
-        window.electronAPI.selectPath();
-      }
-    },
     async checkJDK() {
       if (this.checking) return;
       this.checking = true;
@@ -128,20 +139,25 @@ export default {
     async installJDK() {
       if (this.installing) return;
       this.installing = true;
-      this.downloading = true;
       this.showProgress = true;
       this.progressPercent = 0;
-      this.status = '⏳ 正在下载安装...';
+      this.status = '⏳ 正在安装...';
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.installJDK(this.selectedVersion, this.installPath);
+        let result;
+        if (this.pendingLocalImport) {
+          result = await window.electronAPI.installFromLocal();
+          this.pendingLocalImport = false;
+        } else {
+          this.downloading = true;
+          result = await window.electronAPI.installJDK(this.selectedVersion);
+        }
         if (result.success) {
           this.status = `✅ ${result.message}`;
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);
-          await this.checkJDK();
         } else {
           this.status = `❌ 安装失败：${result.message}`;
           this.showProgress = false;
@@ -163,26 +179,34 @@ export default {
       const filePath = await window.electronAPI.openFileDialog({
         title: '选择 JDK 安装包',
         filters: [
-          {name: 'JDK 安装包', extensions: ['msi', 'exe', 'zip']},
+          {name: 'JDK 安装包', extensions: ['zip']},
           {name: '所有文件', extensions: ['*']}
         ]
       });
       if (!filePath) return;
 
+      const version = window.prompt('请输入 JDK 大版本号（例如 8、11、17、21 等）:', '21');
+      if (!version || !/^\d+$/.test(version)) {
+        this.status = '❌ 导入失败：版本号无效，请重新导入。';
+        return;
+      }
+      const versionNum = parseInt(version, 10);
+      if (versionNum < 8 || versionNum > 26) {
+        this.status = '❌ 导入失败：版本号应在 8 到 26 之间。';
+        return;
+      }
+
       this.installing = true;
-      this.downloading = false;
       this.showProgress = false;
-      this.status = '⏳ 正在导入并安装 JDK...';
+      this.status = '⏳ 正在导入 JDK 安装包...';
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.importLocalJDK(filePath, this.installPath);
+        const result = await window.electronAPI.importLocalJDK(filePath, version);
         if (result.success) {
-          this.status = `✅ ${result.message}`;
-          await this.checkJDK();
-          setTimeout(() => {
-            this.showProgress = false;
-          }, 2000);
+          this.status = `✅ ${result.message}，请点击“开始安装”完成配置。`;
+          this.pendingLocalImport = true;
+          this.selectedVersion = version;
         } else {
           this.status = `❌ 导入失败：${result.message}`;
         }
@@ -200,7 +224,6 @@ export default {
         const result = await window.electronAPI.switchJDK(version);
         if (result.success) {
           this.status = `✅ 已切换到 JDK ${version}`;
-          await this.checkJDK();
         } else {
           this.status = `❌ 切换失败：${result.message}`;
         }
@@ -218,7 +241,6 @@ export default {
         const result = await window.electronAPI.deleteJDK(version);
         if (result.success) {
           this.status = `✅ 已卸载 JDK ${version}`;
-          await this.checkJDK();
         } else {
           this.status = `❌ 卸载失败：${result.message}`;
         }
@@ -233,6 +255,28 @@ export default {
 </script>
 
 <style scoped>
+.install-path {
+  margin: 1rem 0;
+  padding: 0.6rem;
+  background-color: #f9fafb;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.path-label {
+  font-weight: 500;
+  color: #4b5563;
+}
+
+.path-display {
+  font-family: monospace;
+  color: #1f2937;
+  word-break: break-all;
+}
+
 .jdk-installer {
   background: white;
   border-radius: 20px;
@@ -520,7 +564,7 @@ h3 {
 .progress-fill {
   height: 100%;
   background-color: #2c7a4d;
-  width: 0%;
+  width: 0;
   transition: width 0.2s linear;
   border-radius: 999px;
   animation: shimmer 1.2s infinite linear;
