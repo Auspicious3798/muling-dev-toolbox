@@ -106,12 +106,38 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     }
 
     async function installPip(pythonExe, installDir, mirror) {
+        const pythonPipVersionMap = {
+            '3.5': '20.3.4',
+            '3.6': '21.3.1',
+            '3.7': '24.0',
+            '3.8': '24.2',
+            '3.9': 'latest',
+            '3.10': 'latest',
+            '3.11': 'latest',
+            '3.12': 'latest',
+            '3.13': 'latest',
+            '3.14': 'latest'
+        };
+        let pythonVersionKey = '';
+        let targetPipVersion = '';
+
         try {
             const {stdout, stderr} = await execPromise(`"${pythonExe}" -m ensurepip --upgrade`);
             logToFile(`ensurepip 输出: ${stdout} ${stderr}`);
         } catch (err) {
             logToFile(`ensurepip 失败: ${err.message}，尝试 get-pip.py`);
-            const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
+
+            const versionOutput = await execPromise(`"${pythonExe}" -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"`);
+            pythonVersionKey = versionOutput.stdout.trim();
+            targetPipVersion = pythonPipVersionMap[pythonVersionKey] || 'latest';
+
+            let getPipUrl = '';
+            if (['3.5', '3.6', '3.7', '3.8'].includes(pythonVersionKey)) {
+                getPipUrl = 'https://mirrors.aliyun.com/pypi/get-pip.py';
+            } else {
+                getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
+            }
+
             const getPipPath = path.join(installDir, 'get-pip.py');
             const writer = fs.createWriteStream(getPipPath);
             const response = await axios({
@@ -125,12 +151,20 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
                 writer.on('finish', resolve);
                 writer.on('error', reject);
             });
-            await execPromise(`"${pythonExe}" "${getPipPath}" --no-user`);
+
+            const installCmd = targetPipVersion === 'latest'
+                ? `"${pythonExe}" "${getPipPath}"`
+                : `"${pythonExe}" "${getPipPath}" pip==${targetPipVersion}`;
+
+            await execPromise(installCmd);
             fs.unlinkSync(getPipPath);
         }
 
         try {
-            await execPromise(`"${pythonExe}" -m pip install --upgrade pip --index-url ${mirror}`);
+            const upgradeCmd = targetPipVersion === 'latest'
+                ? `"${pythonExe}" -m pip install --upgrade pip --index-url ${mirror}`
+                : `"${pythonExe}" -m pip install pip==${targetPipVersion} --index-url ${mirror}`;
+            await execPromise(upgradeCmd);
         } catch (err) {
             logToFile(`升级 pip 失败: ${err.message}`);
         }
