@@ -105,6 +105,68 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
         });
     }
 
+    async function installPip(pythonExe, installDir, mirror) {
+        try {
+            const {stdout, stderr} = await execPromise(`"${pythonExe}" -m ensurepip --upgrade`);
+            logToFile(`ensurepip 输出: ${stdout} ${stderr}`);
+        } catch (err) {
+            logToFile(`ensurepip 失败: ${err.message}，尝试 get-pip.py`);
+            const getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
+            const getPipPath = path.join(installDir, 'get-pip.py');
+            const writer = fs.createWriteStream(getPipPath);
+            const response = await axios({
+                method: 'GET',
+                url: getPipUrl,
+                responseType: 'stream',
+                timeout: 30000
+            });
+            response.data.pipe(writer);
+            await new Promise((resolve, reject) => {
+                writer.on('finish', resolve);
+                writer.on('error', reject);
+            });
+            await execPromise(`"${pythonExe}" "${getPipPath}" --no-user`);
+            fs.unlinkSync(getPipPath);
+        }
+
+        try {
+            await execPromise(`"${pythonExe}" -m pip install --upgrade pip --index-url ${mirror}`);
+        } catch (err) {
+            logToFile(`升级 pip 失败: ${err.message}`);
+        }
+
+        const versionMatch = installDir.match(/python-(\d+\.\d+\.\d+)/);
+        let majorMinor = '';
+        if (versionMatch) {
+            const parts = versionMatch[1].split('.');
+            majorMinor = parts[0] + parts[1];
+        } else {
+            const {stdout} = await execPromise(`"${pythonExe}" -c "import sys; print(sys.version_info.major, sys.version_info.minor)"`);
+            const [major, minor] = stdout.trim().split(' ');
+            majorMinor = major + minor;
+        }
+        const pthFile = path.join(installDir, `python${majorMinor}._pth`);
+        if (fs.existsSync(pthFile)) {
+            let content = fs.readFileSync(pthFile, 'utf8');
+            if (content.includes('#import site')) {
+                content = content.replace(/#import site/g, 'import site');
+                fs.writeFileSync(pthFile, content, 'utf8');
+                logToFile(`已修改 ${pthFile}，启用 import site`);
+            } else if (!content.includes('import site')) {
+                content += '\nimport site\n';
+                fs.writeFileSync(pthFile, content, 'utf8');
+                logToFile(`已添加 import site 到 ${pthFile}`);
+            }
+        } else {
+            logToFile(`警告：未找到 ._pth 文件 ${pthFile}`);
+        }
+
+        const pipConfigDir = path.join(installDir, 'pip.ini');
+        const pipConfigContent = `[global]\nindex-url = ${mirror}\n[install]\ntrusted-host = ${new URL(mirror).hostname}\n`;
+        fs.writeFileSync(pipConfigDir, pipConfigContent);
+        logToFile(`pip 镜像源配置完成: ${mirror}`);
+    }
+
     function setSystemEnvVariable(name, value) {
         return new Promise((resolve, reject) => {
             const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
@@ -138,6 +200,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             const versionKey = version.replace(/\./g, '');
             const targetVar = `PYTHON_HOME${versionKey}`;
             const targetEntry = `%${targetVar}%`;
+            const scriptsEntry = `%${targetVar}%\\Scripts`;
             const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
             exec(regCmd, {windowsHide: true}, (error, stdout) => {
                 if (error) return reject(new Error('读取 PATH 失败'));
@@ -145,8 +208,9 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
                 if (!match) return reject(new Error('无法解析 PATH'));
                 let currentPath = match[1].trim();
                 const parts = currentPath.split(';');
-                const newParts = parts.filter(p => !/^%PYTHON_HOME\d+%$/i.test(p));
+                const newParts = parts.filter(p => !/^%PYTHON_HOME\d+%$/i.test(p) && !/^%PYTHON_HOME\d+%\\Scripts$/i.test(p));
                 newParts.unshift(targetEntry);
+                newParts.unshift(scriptsEntry);
                 const newPath = newParts.join(';');
                 const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
                 exec(setxCmd, {windowsHide: true}, (err) => {
@@ -391,26 +455,29 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
         return {success: true, message: 'Python 安装包已导入，点击“开始安装”完成配置'};
     });
 
-    ipcMain.handle('install-from-local-python', async (event, version) => {
+    ipcMain.handle('install-from-local-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 Python 安装包，请先导入'};
         if (!version) return {success: false, message: '未指定 Python 版本'};
         const zipPath = pendingLocalFile;
         const installPath = `C:\\Program Files\\Python\\python-${version}`;
-        const sendProgress = (progress) => {
-            mainWindow.webContents.send('download-progress', {type: 'python', version, progress});
+        const sendProgress = (progress, stage = '') => {
+            mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
         };
         try {
-            sendProgress(0);
+            sendProgress(0, '解压中');
             await installZip(zipPath, installPath);
-            sendProgress(1);
+            sendProgress(0.5, '安装 pip 中');
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
             if (!fs.existsSync(pythonExe)) throw new Error('解压后未找到 python.exe');
+            await installPip(pythonExe, pythonRoot, mirror);
+            sendProgress(0.8, '配置环境变量');
             const versionKey = version.replace(/\./g, '');
             await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
             await setPathForVersion(version);
+            sendProgress(1, '安装完成');
             mainWindow.webContents.send('python-changed');
-            return {success: true, message: 'Python 安装成功'};
+            return {success: true, message: 'Python 安装成功，pip 已配置'};
         } catch (err) {
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
@@ -419,33 +486,39 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
         }
     });
 
-    ipcMain.handle('install-python', async (event, version) => {
+    ipcMain.handle('install-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
         const source = pythonSources[version];
         if (!source) return {success: false, message: `不支持的 Python 版本: ${version}`};
         const {url} = source;
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
         const installPath = `C:\\Program Files\\Python\\python-${version}`;
-        const sendProgress = (progress) => {
-            mainWindow.webContents.send('download-progress', {type: 'python', version, progress});
+        const sendProgress = (progress, stage = '') => {
+            mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
         try {
             if (!fs.existsSync(installerPath)) {
-                sendProgress(0);
-                await downloadFile(url, installerPath, sendProgress, abortController.signal);
-                sendProgress(1);
-            } else sendProgress(1);
+                sendProgress(0, '下载安装包');
+                await downloadFile(url, installerPath, (p) => sendProgress(p, '下载安装包'), abortController.signal);
+                sendProgress(0.3, '解压中');
+            } else {
+                sendProgress(0.3, '解压中');
+            }
             await installZip(installerPath, installPath);
+            sendProgress(0.5, '安装 pip 中');
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
             if (!fs.existsSync(pythonExe)) throw new Error('解压后未找到 python.exe');
+            await installPip(pythonExe, pythonRoot, mirror);
+            sendProgress(0.8, '配置环境变量');
             const versionKey = version.replace(/\./g, '');
             await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
             await setPathForVersion(version);
+            sendProgress(1, '安装完成');
             mainWindow.webContents.send('python-changed');
-            return {success: true, message: 'Python 安装成功'};
+            return {success: true, message: 'Python 安装成功，pip 已配置'};
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
             return {success: false, message: `安装失败: ${err.message}`};
