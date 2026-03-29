@@ -29,7 +29,7 @@ Menu.setApplicationMenu(null);
 
 function createWindow() {
     mainWindow = new BrowserWindow({
-        width: 900,
+        width: 1100,
         height: 600,
         menu: null,
         webPreferences: {
@@ -101,6 +101,17 @@ app.whenReady().then(() => {
         const result = await dialog.showOpenDialog(mainWindow, options);
         if (result.canceled) return null;
         return result.filePaths[0];
+    });
+
+    ipcMain.handle('check-path-exists', async (event, dirPath) => {
+        try {
+            const fs = require('fs');
+            if (!fs.existsSync(dirPath)) return false;
+            const files = fs.readdirSync(dirPath);
+            return files.length > 0;
+        } catch (err) {
+            return false;
+        }
     });
 
     ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
