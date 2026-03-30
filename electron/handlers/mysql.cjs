@@ -1,4 +1,5 @@
-const {ipcMain, spawn} = require('electron');
+const {ipcMain} = require('electron');
+const {spawn} = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const {exec} = require('child_process');
@@ -159,8 +160,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     async function refreshCurrentProcessEnv() {
         try {
             const systemPath = await getSystemPath();
-            let expanded = systemPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            process.env.Path = expanded;
+            process.env.Path = systemPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
         } catch (err) {
             logToFile(`刷新环境变量失败: ${err.message}`);
         }
@@ -189,7 +189,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         });
     }
 
-    async function generateMyCnf(installDir, port, suffix) {
+    async function generateMyCnf(installDir, port) {
         const myCnfPath = path.join(installDir, 'my.ini');
         const content = `[mysqld]\nbasedir=${installDir.replace(/\\/g, '\\\\')}\ndatadir=${installDir.replace(/\\/g, '\\\\')}\\\\data\nport=${port}\n`;
         fs.writeFileSync(myCnfPath, content, 'utf8');
@@ -197,32 +197,32 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         return myCnfPath;
     }
 
-    async function initializeDataDir(installDir, password) {
+    async function initializeDataDir(installDir) {
         const mysqldPath = path.join(installDir, 'bin', 'mysqld.exe');
         if (!fs.existsSync(mysqldPath)) throw new Error('未找到 mysqld.exe');
         const initCmd = `"${mysqldPath}" --initialize-insecure --basedir="${installDir}" --datadir="${installDir}\\data"`;
         logToFile(`初始化数据目录: ${initCmd}`);
         await execPromise(initCmd);
-        logToFile(`数据目录初始化完成`);
-        if (password && password !== '') {
-            const tempPort = 33060;
-            const myCnfTemp = path.join(installDir, 'my-temp.ini');
-            const tempContent = `[mysqld]\nbasedir=${installDir.replace(/\\/g, '\\\\')}\ndatadir=${installDir.replace(/\\/g, '\\\\')}\\\\data\nport=${tempPort}\n`;
-            fs.writeFileSync(myCnfTemp, tempContent, 'utf8');
-            const startCmd = `"${mysqldPath}" --defaults-file="${myCnfTemp}" --console`;
-            const proc = spawn(startCmd, {shell: true, detached: true});
-            await new Promise((resolve) => setTimeout(resolve, 3000));
-            const updateCmd = `"${path.join(installDir, 'bin', 'mysqladmin.exe')}" -u root -h 127.0.0.1 -P ${tempPort} password "${password}"`;
-            try {
-                await execPromise(updateCmd);
-                logToFile(`初始密码设置成功`);
-            } catch (err) {
-                logToFile(`设置密码失败: ${err.message}`);
-            }
-            exec(`taskkill /F /IM mysqld.exe`, {windowsHide: true}, () => {
-            });
-            fs.unlinkSync(myCnfTemp);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+        logToFile(`数据目录初始化完成（root 密码为空）`);
+    }
+
+    async function setRootPassword(installDir, password, port) {
+        if (!password || password.trim() === '') return;
+        logToFile(`准备设置 root 密码，端口: ${port}`);
+        const mysqladminPath = path.join(installDir, 'bin', 'mysqladmin.exe');
+        if (!fs.existsSync(mysqladminPath)) throw new Error('未找到 mysqladmin.exe');
+        // 由于初始化后 root 密码为空，直接执行 mysqladmin -u root password "新密码"
+        const changeCmd = `"${mysqladminPath}" -u root -P ${port} password "${password}"`;
+        try {
+            await execPromise(changeCmd);
+            logToFile(`root 密码设置成功`);
+        } catch (err) {
+            logToFile(`mysqladmin 设置密码失败: ${err.message}，尝试 SQL 方式`);
+            const mysqlPath = path.join(installDir, 'bin', 'mysql.exe');
+            const sqlCmd = `ALTER USER 'root'@'localhost' IDENTIFIED BY '${password}'; FLUSH PRIVILEGES;`;
+            const fullCmd = `"${mysqlPath}" -u root -P ${port} -e "${sqlCmd}"`;
+            await execPromise(fullCmd);
+            logToFile(`SQL 方式设置密码成功`);
         }
     }
 
@@ -446,11 +446,15 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
             await installZip(installerPath, installPath);
             sendProgress(0.5, '初始化配置');
             const availablePort = await findAvailablePort(defaultPort);
-            await generateMyCnf(installPath, availablePort, suffix);
-            await initializeDataDir(installPath, password);
+            await generateMyCnf(installPath, availablePort);
+            await initializeDataDir(installPath);
             sendProgress(0.7, '安装服务');
             const serviceName = await installService(installPath, suffix);
             await startService(serviceName);
+            // 服务启动后设置密码（如果提供了密码）
+            if (password && password.trim() !== '') {
+                await setRootPassword(installPath, password, availablePort);
+            }
             sendProgress(0.9, '配置环境变量');
             await setSystemEnvVariable(`MYSQL_HOME${suffix}`, installPath);
             await setPathForMySQL(suffix);
@@ -488,11 +492,14 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
             await installZip(zipPath, installPath);
             sendProgress(0.5, '初始化配置');
             const availablePort = await findAvailablePort(defaultPort);
-            await generateMyCnf(installPath, availablePort, suffix);
-            await initializeDataDir(installPath, password);
+            await generateMyCnf(installPath, availablePort);
+            await initializeDataDir(installPath);
             sendProgress(0.7, '安装服务');
             const serviceName = await installService(installPath, suffix);
             await startService(serviceName);
+            if (password && password.trim() !== '') {
+                await setRootPassword(installPath, password, availablePort);
+            }
             sendProgress(0.9, '配置环境变量');
             await setSystemEnvVariable(`MYSQL_HOME${suffix}`, installPath);
             await setPathForMySQL(suffix);
@@ -527,9 +534,9 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('switch-mysql', async (event, version) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
-            if (!home) throw new Error(`未找到 MySQL ${version} 的安装目录`);
+            if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             await setPathForMySQL(cfg.suffix);
             await refreshCurrentProcessEnv();
             mainWindow.webContents.send('mysql-changed');
@@ -542,9 +549,9 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('delete-mysql', async (event, version) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
-            if (!home) throw new Error(`未找到 MySQL ${version} 的安装目录`);
+            if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             const serviceName = `MySQL${cfg.suffix}`;
             const status = await getServiceStatus(serviceName);
             if (status === 'running') {
@@ -581,7 +588,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('start-mysql-service', async (event, version) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = `MySQL${cfg.suffix}`;
             await startService(serviceName);
             return {success: true, message: `MySQL ${version} 服务已启动`};
@@ -593,7 +600,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('stop-mysql-service', async (event, version) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = `MySQL${cfg.suffix}`;
             await stopService(serviceName);
             return {success: true, message: `MySQL ${version} 服务已停止`};
@@ -605,7 +612,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('restart-mysql-service', async (event, version) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = `MySQL${cfg.suffix}`;
             await stopService(serviceName);
             await startService(serviceName);
@@ -630,11 +637,14 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     ipcMain.handle('change-mysql-password', async (event, version, oldPassword, newPassword) => {
         try {
             const cfg = mysqlVersions[version];
-            if (!cfg) throw new Error(`不支持的版本: ${version}`);
+            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
-            if (!home) throw new Error(`未找到 MySQL ${version} 的安装目录`);
+            if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             const mysqladminPath = path.join(home, 'bin', 'mysqladmin.exe');
-            if (!fs.existsSync(mysqladminPath)) throw new Error('未找到 mysqladmin.exe');
+            if (!fs.existsSync(mysqladminPath)) return {
+                success: false,
+                message: `未找到 MySQL ${version} 的 mysqladmin.exe`
+            }
             const portCmd = `"${path.join(home, 'bin', 'mysql.exe')}" -N -s -e "SELECT @@port"`;
             let port = 3306;
             try {

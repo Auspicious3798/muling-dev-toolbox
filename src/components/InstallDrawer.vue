@@ -1,0 +1,121 @@
+<template>
+  <Transition name="drawer">
+    <div v-if="visible" class="drawer-overlay" @click.self="close">
+      <div class="drawer-container">
+        <div class="drawer-header">
+          <h3>安装 {{ toolLabel }}</h3>
+          <button class="close-btn" @click="close">✕</button>
+        </div>
+        <div class="drawer-body">
+          <component
+              :is="installerComponent"
+              ref="installerRef"
+              @installed="onInstalled"
+          />
+        </div>
+      </div>
+    </div>
+  </Transition>
+</template>
+
+<script>
+import JDKInstaller from './installers/JDKInstaller.vue';
+import PythonInstaller from './installers/PythonInstaller.vue';
+import MySQLInstaller from './installers/MysqlInstaller.vue';
+
+export default {
+  name: 'InstallDrawer',
+  components: {
+    JDKInstaller,
+    PythonInstaller,
+    MySQLInstaller,
+  },
+  props: {
+    visible: Boolean,
+    tool: String,
+  },
+  computed: {
+    toolLabel() {
+      const map = {jdk: 'JDK', python: 'Python', mysql: 'MySQL'};
+      return map[this.tool] || this.tool.toUpperCase();
+    },
+    installerComponent() {
+      const components = {
+        jdk: 'JDKInstaller',
+        python: 'PythonInstaller',
+        mysql: 'MySQLInstaller',
+      };
+      return components[this.tool];
+    },
+  },
+  methods: {
+    close() {
+      this.$emit('update:visible', false);
+    },
+    onInstalled() {
+      this.$emit('installed');
+    },
+  },
+};
+</script>
+
+<style scoped>
+.drawer-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 1000;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.drawer-container {
+  width: 500px;
+  height: 100%;
+  background: white;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  flex-direction: column;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.drawer-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+}
+</style>

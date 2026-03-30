@@ -11,7 +11,6 @@
       </button>
     </div>
 
-    <!-- 联网下载模式 -->
     <div v-if="activeMode === 'online'">
       <select v-model="selectedVersion" class="version-select">
         <option value="5.7">MySQL 5.7</option>
@@ -36,7 +35,6 @@
       </div>
     </div>
 
-    <!-- 手动导入模式 -->
     <div v-else>
       <div class="import-area">
         <button @click="importLocalMySQL" class="import-btn">📁 选择 MySQL 压缩包</button>
@@ -73,7 +71,6 @@
       </div>
     </div>
 
-    <!-- 服务管理面板（仅当安装完成后显示） -->
     <div v-if="currentVersion && serviceStatus" class="service-panel">
       <h4>📡 服务管理 - MySQL {{ currentVersion }}</h4>
       <div class="service-status">
@@ -95,7 +92,6 @@
       <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
     </div>
 
-    <!-- 修改密码弹窗 -->
     <div v-if="showChangePasswordModal" class="modal-overlay" @click.self="closeModal">
       <div class="modal">
         <h4>修改 MySQL root 密码</h4>
@@ -214,6 +210,7 @@ export default {
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.currentVersion = this.selectedVersion;
+          this.$emit('installed');
           await this.refreshServiceStatus();
           setTimeout(() => {
             this.showProgress = false;
@@ -311,6 +308,7 @@ export default {
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.currentVersion = this.localVersion;
+          this.$emit('installed');
           await this.refreshServiceStatus();
           setTimeout(() => {
             this.showProgress = false;

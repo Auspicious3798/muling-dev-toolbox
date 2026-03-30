@@ -9,43 +9,43 @@ const execPromise = promisify(exec);
 
 const pythonSources = {
     '3.14.3': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.14.3.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.14.3.zip',
         type: 'zip'
     },
     '3.13.12': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.13.12.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.13.12.zip',
         type: 'zip'
     },
     '3.12.9': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.12.9.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.12.9.zip',
         type: 'zip'
     },
     '3.11.9': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.11.9.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.11.9.zip',
         type: 'zip'
     },
     '3.10.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.10.10.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.10.10.zip',
         type: 'zip'
     },
     '3.9.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.9.10.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.9.10.zip',
         type: 'zip'
     },
     '3.8.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.8.10.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.8.10.zip',
         type: 'zip'
     },
     '3.7.8': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.7.8.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.7.8.zip',
         type: 'zip'
     },
     '3.6.8': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.6.8.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.6.8.zip',
         type: 'zip'
     },
     '3.5.3': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/V2.0.0/python-3.5.3.zip',
+        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.5.3.zip',
         type: 'zip'
     }
 };
@@ -131,7 +131,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             pythonVersionKey = versionOutput.stdout.trim();
             targetPipVersion = pythonPipVersionMap[pythonVersionKey] || 'latest';
 
-            let getPipUrl = '';
+            let getPipUrl;
             if (['3.5', '3.6', '3.7', '3.8'].includes(pythonVersionKey)) {
                 getPipUrl = 'https://mirrors.aliyun.com/pypi/get-pip.py';
             } else {
@@ -170,7 +170,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
         }
 
         const versionMatch = installDir.match(/python-(\d+\.\d+\.\d+)/);
-        let majorMinor = '';
+        let majorMinor;
         if (versionMatch) {
             const parts = versionMatch[1].split('.');
             majorMinor = parts[0] + parts[1];
@@ -503,7 +503,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             sendProgress(0.5, '安装 pip 中');
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
-            if (!fs.existsSync(pythonExe)) throw new Error('解压后未找到 python.exe');
+            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
             await installPip(pythonExe, pythonRoot, mirror);
             sendProgress(0.8, '配置环境变量');
             const versionKey = version.replace(/\./g, '');
@@ -544,8 +544,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             sendProgress(0.5, '安装 pip 中');
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
-            if (!fs.existsSync(pythonExe)) throw new Error('解压后未找到 python.exe');
-            await installPip(pythonExe, pythonRoot, mirror);
+            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
             sendProgress(0.8, '配置环境变量');
             const versionKey = version.replace(/\./g, '');
             await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
@@ -575,7 +574,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     ipcMain.handle('switch-python', async (event, version) => {
         try {
             const home = await findPythonHome(version);
-            if (!home) throw new Error(`未找到 Python ${version} 的安装目录`);
+            if (!home) return {success: false, message: `未找到 Python${version} 安装目录`};
             await setPathForVersion(version);
             mainWindow.webContents.send('python-changed');
             return {success: true, message: `已切换到 Python ${version}`};
@@ -587,7 +586,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     ipcMain.handle('delete-python', async (event, version) => {
         try {
             const home = await findPythonHome(version);
-            if (!home) throw new Error(`未找到 Python ${version} 的安装目录`);
+            if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
             const currentDefault = await getCurrentDefaultVersion();
             if (currentDefault === version) {
                 const allVersions = await getAllInstalledVersions();

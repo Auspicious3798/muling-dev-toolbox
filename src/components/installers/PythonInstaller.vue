@@ -11,7 +11,6 @@
       </button>
     </div>
 
-    <!-- 镜像源选择（通用） -->
     <div class="mirror-select">
       <label>pip 镜像源：</label>
       <select v-model="pipMirror">
@@ -23,7 +22,6 @@
       </select>
     </div>
 
-    <!-- 联网下载模式 -->
     <div v-if="activeMode === 'online'">
       <select v-model="selectedVersion" class="version-select">
         <option value="3.14.3">Python 3.14.3</option>
@@ -51,7 +49,6 @@
       </div>
     </div>
 
-    <!-- 手动导入模式 -->
     <div v-else>
       <div class="import-area">
         <button @click="importLocalPython" class="import-btn">📁 选择 Python 压缩包</button>
@@ -164,6 +161,7 @@ export default {
         const result = await window.electronAPI.installPython(this.selectedVersion, this.pipMirror);
         if (result.success) {
           this.status = `✅ ${result.message}`;
+          this.$emit('installed');
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);
@@ -268,6 +266,7 @@ export default {
         const result = await window.electronAPI.installFromLocalPython(this.localVersion, this.pipMirror);
         if (result.success) {
           this.status = `✅ ${result.message}`;
+          this.$emit('installed');
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);
@@ -290,7 +289,6 @@ export default {
 </script>
 
 <style scoped>
-/* 样式保持不变，与用户提供的完全相同 */
 .python-installer {
   background: white;
   border-radius: 20px;
