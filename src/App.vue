@@ -4,9 +4,10 @@
     <div class="content-panel">
       <JDKInstaller v-if="activeMenu === 'jdk'"/>
       <PythonInstaller v-else-if="activeMenu === 'python'"/>
-      <div v-else-if="activeMenu === 'mysql'" class="coming-soon">
-        <h3>🗄️ MySQL 一键安装</h3>
-        <p>即将支持，敬请期待</p>
+      <MySQLInstaller v-else-if="activeMenu === 'mysql'"/>
+      <div v-else class="empty-content">
+        <h3>请选择要安装的工具</h3>
+        <p>点击左侧菜单选择 JDK、Python 或 MySQL</p>
       </div>
     </div>
     <div class="right-panel">
@@ -19,6 +20,7 @@
 import NavMenu from './components/NavMenu.vue';
 import JDKInstaller from './components/installers/JDKInstaller.vue';
 import PythonInstaller from './components/installers/PythonInstaller.vue';
+import MySQLInstaller from './components/installers/MysqlInstaller.vue';
 import EnvironmentPanel from './components/EnvironmentPanel.vue';
 
 export default {
@@ -27,6 +29,7 @@ export default {
     NavMenu,
     JDKInstaller,
     PythonInstaller,
+    MySQLInstaller, // ✅ 新增注册
     EnvironmentPanel
   },
   data() {
@@ -70,7 +73,7 @@ body {
   overflow-y: auto;
 }
 
-.coming-soon {
+.empty-content {
   background: white;
   border-radius: 16px;
   padding: 24px;
@@ -78,14 +81,15 @@ body {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   max-width: 600px;
   margin: 0 auto;
+  color: #5a6e7a;
 }
 
-.coming-soon h3 {
+.empty-content h3 {
   margin-bottom: 12px;
   color: #1e2a3a;
 }
 
-.coming-soon p {
-  color: #5a6e7a;
+.coming-soon {
+  display: none; /* 隐藏不再需要的提示 */
 }
 </style>
