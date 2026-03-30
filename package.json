@@ -32,7 +32,7 @@
   },
   "build": {
     "appId": "com.muling.dev-toolbox",
-    "productName": "沐柠开发工具箱",
+    "productName": "沐柠环境盒",
     "directories": {
       "output": "dist_electron"
     },

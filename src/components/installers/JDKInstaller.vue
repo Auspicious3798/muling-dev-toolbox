@@ -11,7 +11,6 @@
       </button>
     </div>
 
-    <!-- 联网下载模式 -->
     <div v-if="activeMode === 'online'">
       <select v-model="selectedVersion" class="version-select">
         <option value="26">JDK 26</option>
@@ -46,7 +45,6 @@
       </div>
     </div>
 
-    <!-- 手动导入模式 -->
     <div v-else>
       <div class="import-area">
         <button @click="importLocalJDK" class="import-btn">📁 选择 JDK 压缩包</button>
@@ -155,6 +153,7 @@ export default {
         const result = await window.electronAPI.installJDK(this.selectedVersion);
         if (result.success) {
           this.status = `✅ ${result.message}`;
+          this.$emit('installed');
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);
@@ -251,6 +250,7 @@ export default {
         const result = await window.electronAPI.installFromLocal(this.localVersion);
         if (result.success) {
           this.status = `✅ ${result.message}`;
+          this.$emit('installed');
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);

@@ -1,41 +1,49 @@
 <template>
   <div class="app-layout">
-    <NavMenu :active="activeMenu" @select="activeMenu = $event"/>
-    <div class="content-panel">
-      <JDKInstaller v-if="activeMenu === 'jdk'"/>
-      <PythonInstaller v-else-if="activeMenu === 'python'"/>
-      <MySQLInstaller v-else-if="activeMenu === 'mysql'"/>
-      <div v-else class="empty-content">
-        <h3>请选择要安装的工具</h3>
-        <p>点击左侧菜单选择 JDK、Python 或 MySQL</p>
-      </div>
-    </div>
+    <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
-      <EnvironmentPanel :type="activeMenu"/>
+      <EnvironmentPanel ref="envPanel" :tool="activeTool" @install="openDrawer"/>
     </div>
+    <InstallDrawer
+        v-model:visible="drawerVisible"
+        :tool="activeTool"
+        @installed="onInstalled"
+    />
   </div>
 </template>
 
 <script>
 import NavMenu from './components/NavMenu.vue';
-import JDKInstaller from './components/installers/JDKInstaller.vue';
-import PythonInstaller from './components/installers/PythonInstaller.vue';
-import MySQLInstaller from './components/installers/MysqlInstaller.vue';
 import EnvironmentPanel from './components/EnvironmentPanel.vue';
+import InstallDrawer from './components/InstallDrawer.vue';
 
 export default {
   name: 'App',
   components: {
     NavMenu,
-    JDKInstaller,
-    PythonInstaller,
-    MySQLInstaller, // ✅ 新增注册
-    EnvironmentPanel
+    EnvironmentPanel,
+    InstallDrawer,
   },
   data() {
     return {
-      activeMenu: 'jdk',
+      activeTool: 'jdk',
+      drawerVisible: false,
     };
+  },
+  methods: {
+    handleToolSelect(toolId) {
+      this.activeTool = toolId;
+      this.drawerVisible = false;
+    },
+    openDrawer() {
+      this.drawerVisible = true;
+    },
+    onInstalled() {
+      this.$refs.envPanel?.refresh();
+      setTimeout(() => {
+        this.drawerVisible = false;
+      }, 1000);
+    },
   },
 };
 </script>
@@ -56,40 +64,12 @@ body {
   display: flex;
   height: 100vh;
   width: 100vw;
-}
-
-.content-panel {
-  flex: 1;
   background: #f0f2f5;
-  padding: 20px;
-  overflow-y: auto;
 }
 
 .right-panel {
-  width: 400px;
-  background: white;
-  border-left: 1px solid #e2e8f0;
-  padding: 20px;
+  flex: 1;
   overflow-y: auto;
-}
-
-.empty-content {
-  background: white;
-  border-radius: 16px;
-  padding: 24px;
-  text-align: center;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  max-width: 600px;
-  margin: 0 auto;
-  color: #5a6e7a;
-}
-
-.empty-content h3 {
-  margin-bottom: 12px;
-  color: #1e2a3a;
-}
-
-.coming-soon {
-  display: none; /* 隐藏不再需要的提示 */
+  padding: 20px;
 }
 </style>
