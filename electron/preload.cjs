@@ -23,6 +23,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelPythonDownload: () => ipcRenderer.send('cancel-python-download'),
     onPythonChanged: (callback) => ipcRenderer.on('python-changed', callback),
 
+    // MySQL API
+    installMySQL: (version, password) => ipcRenderer.invoke('install-mysql', version, password),
+    installFromLocalMySQL: (version, password) => ipcRenderer.invoke('install-from-local-mysql', version, password),
+    importLocalMySQL: (filePath) => ipcRenderer.invoke('import-local-mysql', filePath),
+    checkMySQL: () => ipcRenderer.invoke('check-mysql'),
+    switchMySQL: (version) => ipcRenderer.invoke('switch-mysql', version),
+    deleteMySQL: (version) => ipcRenderer.invoke('delete-mysql', version),
+    startMySQLService: (version) => ipcRenderer.invoke('start-mysql-service', version),
+    stopMySQLService: (version) => ipcRenderer.invoke('stop-mysql-service', version),
+    restartMySQLService: (version) => ipcRenderer.invoke('restart-mysql-service', version),
+    getMySQLServiceStatus: (version) => ipcRenderer.invoke('get-mysql-service-status', version),
+    changeMySQLPassword: (version, oldPassword, newPassword) => ipcRenderer.invoke('change-mysql-password', version, oldPassword, newPassword),
+    cancelMySQLDownload: () => ipcRenderer.send('cancel-mysql-download'),
+    onMySQLProgress: (callback) => ipcRenderer.on('mysql-progress', (_, data) => callback(data)),
+    onMySQLChanged: (callback) => ipcRenderer.on('mysql-changed', callback),
+
     // Common utilities
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
