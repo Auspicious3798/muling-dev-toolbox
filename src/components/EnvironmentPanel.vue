@@ -28,7 +28,7 @@
           <span v-if="v === defaultVersion" class="default-tag">默认</span>
         </div>
         <div class="card-body">
-          <div v-if="tool === 'mysql'" class="service-status-row">
+          <div v-if="['mysql', 'redis'].includes(tool)" class="service-status-row">
             <span class="status-label">服务状态：</span>
             <span v-if="serviceStatus[v]" class="service-status" :class="serviceStatus[v]">
               <span class="status-dot"></span>
@@ -40,11 +40,17 @@
           <button v-if="v !== defaultVersion" @click="switchVersion(v)" class="action-switch" :disabled="actionLoading">
             <span class="action-icon">⇄</span> 切换
           </button>
-          <button v-if="tool === 'mysql'" @click="startService(v)" class="action-start" :disabled="actionLoading">
+          <button v-if="['mysql', 'redis'].includes(tool)" @click="startService(v)" class="action-start"
+                  :disabled="actionLoading">
             <span class="action-icon">▶</span> 启动
           </button>
-          <button v-if="tool === 'mysql'" @click="stopService(v)" class="action-stop" :disabled="actionLoading">
+          <button v-if="['mysql', 'redis'].includes(tool)" @click="stopService(v)" class="action-stop"
+                  :disabled="actionLoading">
             <span class="action-icon">■</span> 停止
+          </button>
+          <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password"
+                  :disabled="actionLoading">
+            <span class="action-icon">🔑</span> 修改密码
           </button>
           <button @click="uninstallVersion(v)" class="action-delete" :disabled="actionLoading">
             <span class="action-icon">🗑</span> 卸载
@@ -55,6 +61,24 @@
 
     <div v-if="apiMissing" class="warning-message">
       <span class="warning-icon">⚠️</span> 当前工具暂未支持检测，敬请期待。
+    </div>
+
+    <div v-if="showPasswordModal" class="modal-overlay" @click.self="closePasswordModal">
+      <div class="modal">
+        <h4>修改 Redis 密码</h4>
+        <div class="modal-field">
+          <label>旧密码（若无则留空）：</label>
+          <input type="password" v-model="oldRedisPassword"/>
+        </div>
+        <div class="modal-field">
+          <label>新密码：</label>
+          <input type="password" v-model="newRedisPassword"/>
+        </div>
+        <div class="modal-buttons">
+          <button @click="changeRedisPassword" :disabled="passwordChanging" class="modal-btn confirm">确认修改</button>
+          <button @click="closePasswordModal" class="modal-btn cancel">取消</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -75,7 +99,12 @@ export default {
       defaultVersion: null,
       serviceStatus: {},
       actionLoading: false,
-      apiMissing: false
+      apiMissing: false,
+      showPasswordModal: false,
+      currentVersionForPassword: null,
+      oldRedisPassword: '',
+      newRedisPassword: '',
+      passwordChanging: false
     };
   },
   computed: {
@@ -84,9 +113,9 @@ export default {
         jdk: 'JDK',
         python: 'Python',
         mysql: 'MySQL',
+        redis: 'Redis',
         maven: 'Maven',
         gradle: 'Gradle',
-        redis: 'Redis',
         nacos: 'Nacos',
         sentinel: 'Sentinel',
         rabbitmq: 'RabbitMQ',
@@ -109,9 +138,9 @@ export default {
         jdk: '☕',
         python: '🐍',
         mysql: '🐬',
+        redis: '🔴',
         maven: '📦',
         gradle: '🔄',
-        redis: '🔴',
         nacos: '⚙️',
         sentinel: '🛡️',
         rabbitmq: '🐇',
@@ -133,7 +162,8 @@ export default {
       const methodMap = {
         jdk: 'checkJDK',
         python: 'checkPython',
-        mysql: 'checkMySQL'
+        mysql: 'checkMySQL',
+        redis: 'checkRedis'
       };
       return methodMap[this.tool];
     },
@@ -141,7 +171,8 @@ export default {
       const methodMap = {
         jdk: 'switchJDK',
         python: 'switchPython',
-        mysql: 'switchMySQL'
+        mysql: 'switchMySQL',
+        redis: 'switchRedis'
       };
       return methodMap[this.tool];
     },
@@ -149,9 +180,22 @@ export default {
       const methodMap = {
         jdk: 'deleteJDK',
         python: 'deletePython',
-        mysql: 'deleteMySQL'
+        mysql: 'deleteMySQL',
+        redis: 'deleteRedis'
       };
       return methodMap[this.tool];
+    },
+    startServiceMethod() {
+      return this.tool === 'mysql' ? 'startMySQLService' : 'startRedisService';
+    },
+    stopServiceMethod() {
+      return this.tool === 'mysql' ? 'stopMySQLService' : 'stopRedisService';
+    },
+    getServiceStatusMethod() {
+      return this.tool === 'mysql' ? 'getMySQLServiceStatus' : 'getRedisServiceStatus';
+    },
+    changePasswordMethod() {
+      return this.tool === 'mysql' ? 'changeMySQLPassword' : 'changeRedisPassword';
     }
   },
   watch: {
@@ -173,6 +217,9 @@ export default {
       window.electronAPI.onMySQLChanged?.(() => {
         if (this.tool === 'mysql') this.refresh();
       });
+      window.electronAPI.onRedisChanged?.(() => {
+        if (this.tool === 'redis') this.refresh();
+      });
     }
   },
   methods: {
@@ -189,7 +236,7 @@ export default {
         const result = await api();
         this.versions = result.versions || [];
         this.defaultVersion = result.default || null;
-        if (this.tool === 'mysql') {
+        if (['mysql', 'redis'].includes(this.tool)) {
           await this.refreshAllServiceStatus();
         }
       } catch (err) {
@@ -202,10 +249,12 @@ export default {
       }
     },
     async refreshAllServiceStatus() {
-      if (this.tool !== 'mysql') return;
+      if (!['mysql', 'redis'].includes(this.tool)) return;
+      const getStatusApi = window.electronAPI[this.getServiceStatusMethod];
+      if (!getStatusApi) return;
       for (const v of this.versions) {
         try {
-          const res = await window.electronAPI.getMySQLServiceStatus(v);
+          const res = await getStatusApi(v);
           if (res.success) {
             this.serviceStatus[v] = res.status;
           } else {
@@ -265,7 +314,12 @@ export default {
       if (this.actionLoading) return;
       this.actionLoading = true;
       try {
-        const result = await window.electronAPI.startMySQLService(version);
+        const api = window.electronAPI[this.startServiceMethod];
+        if (!api) {
+          this.$emit('status', `❌ 启动功能暂未支持`);
+          return;
+        }
+        const result = await api(version);
         if (result.success) {
           this.$emit('status', `✅ ${result.message}`);
           await this.refreshAllServiceStatus();
@@ -282,7 +336,12 @@ export default {
       if (this.actionLoading) return;
       this.actionLoading = true;
       try {
-        const result = await window.electronAPI.stopMySQLService(version);
+        const api = window.electronAPI[this.stopServiceMethod];
+        if (!api) {
+          this.$emit('status', `❌ 停止功能暂未支持`);
+          return;
+        }
+        const result = await api(version);
         if (result.success) {
           this.$emit('status', `✅ ${result.message}`);
           await this.refreshAllServiceStatus();
@@ -293,6 +352,39 @@ export default {
         this.$emit('status', `❌ 停止失败：${err.message}`);
       } finally {
         this.actionLoading = false;
+      }
+    },
+    openPasswordModal(version) {
+      this.currentVersionForPassword = version;
+      this.oldRedisPassword = '';
+      this.newRedisPassword = '';
+      this.showPasswordModal = true;
+    },
+    closePasswordModal() {
+      this.showPasswordModal = false;
+      this.currentVersionForPassword = null;
+    },
+    async changeRedisPassword() {
+      if (this.passwordChanging) return;
+      this.passwordChanging = true;
+      try {
+        const api = window.electronAPI[this.changePasswordMethod];
+        if (!api) {
+          this.$emit('status', `❌ 修改密码功能暂未支持`);
+          return;
+        }
+        const result = await api(this.currentVersionForPassword, this.oldRedisPassword, this.newRedisPassword);
+        if (result.success) {
+          this.$emit('status', `✅ ${result.message}`);
+          this.closePasswordModal();
+          await this.refreshAllServiceStatus();
+        } else {
+          this.$emit('status', `❌ 修改密码失败：${result.message}`);
+        }
+      } catch (err) {
+        this.$emit('status', `❌ 修改密码失败：${err.message}`);
+      } finally {
+        this.passwordChanging = false;
       }
     }
   }
@@ -585,6 +677,16 @@ export default {
   transform: scale(0.96);
 }
 
+.action-password {
+  background-color: #e9d5ff;
+  color: #6b21a5;
+}
+
+.action-password:hover:not(:disabled) {
+  background-color: #d8b4fe;
+  transform: scale(0.96);
+}
+
 .card-actions button:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -606,5 +708,72 @@ export default {
 
 .warning-icon {
   font-size: 1.1rem;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: white;
+  padding: 24px;
+  border-radius: 20px;
+  width: 400px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+}
+
+.modal h4 {
+  margin-bottom: 16px;
+}
+
+.modal-field {
+  margin-bottom: 12px;
+}
+
+.modal-field label {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 500;
+}
+
+.modal-field input {
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.modal-buttons {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.modal-btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.modal-btn.confirm {
+  background-color: #2c7a4d;
+  color: white;
+}
+
+.modal-btn.cancel {
+  background-color: #ef4444;
+  color: white;
 }
 </style>

@@ -39,6 +39,22 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMySQLProgress: (callback) => ipcRenderer.on('mysql-progress', (_, data) => callback(data)),
     onMySQLChanged: (callback) => ipcRenderer.on('mysql-changed', callback),
 
+    // Redis API
+    installRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-redis', version, password, maxmemory),
+    installFromLocalRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-from-local-redis', version, password, maxmemory),
+    importLocalRedis: (filePath) => ipcRenderer.invoke('import-local-redis', filePath),
+    checkRedis: () => ipcRenderer.invoke('check-redis'),
+    switchRedis: (version) => ipcRenderer.invoke('switch-redis', version),
+    deleteRedis: (version) => ipcRenderer.invoke('delete-redis', version),
+    startRedisService: (version) => ipcRenderer.invoke('start-redis-service', version),
+    stopRedisService: (version) => ipcRenderer.invoke('stop-redis-service', version),
+    restartRedisService: (version) => ipcRenderer.invoke('restart-redis-service', version),
+    getRedisServiceStatus: (version) => ipcRenderer.invoke('get-redis-service-status', version),
+    changeRedisPassword: (version, oldPassword, newPassword) => ipcRenderer.invoke('change-redis-password', version, oldPassword, newPassword),
+    cancelRedisDownload: () => ipcRenderer.send('cancel-redis-download'),
+    onRedisProgress: (callback) => ipcRenderer.on('redis-progress', (_, data) => callback(data)),
+    onRedisChanged: (callback) => ipcRenderer.on('redis-changed', callback),
+
     // Common utilities
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
