@@ -1,5 +1,4 @@
 const {contextBridge, ipcRenderer, shell} = require('electron');
-console.log('✅ Preload script loaded with Python API');
 
 contextBridge.exposeInMainWorld('electronAPI', {
     installJDK: (version) => ipcRenderer.invoke('install-jdk', version),
@@ -36,8 +35,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMySQLProgress: (callback) => ipcRenderer.on('mysql-progress', (_, data) => callback(data)),
     onMySQLChanged: (callback) => ipcRenderer.on('mysql-changed', callback),
 
-    installRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-redis', version, password, maxmemory),
-    installFromLocalRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-from-local-redis', version, password, maxmemory),
+    installRedis: (version, password, maxmemory, customPort) => ipcRenderer.invoke('install-redis', version, password, maxmemory, customPort),
+    installFromLocalRedis: (version, password, maxmemory, customPort) => ipcRenderer.invoke('install-from-local-redis', version, password, maxmemory, customPort),
     importLocalRedis: (filePath) => ipcRenderer.invoke('import-local-redis', filePath),
     checkRedis: () => ipcRenderer.invoke('check-redis'),
     switchRedis: (version) => ipcRenderer.invoke('switch-redis', version),
@@ -51,6 +50,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelRedisDownload: () => ipcRenderer.send('cancel-redis-download'),
     onRedisProgress: (callback) => ipcRenderer.on('redis-progress', (_, data) => callback(data)),
     onRedisChanged: (callback) => ipcRenderer.on('redis-changed', callback),
+
+    checkPort: (port) => ipcRenderer.invoke('check-port', port),
 
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),

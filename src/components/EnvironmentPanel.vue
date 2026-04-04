@@ -114,9 +114,9 @@ import PythonIcon from '@/assets/icons/Python.svg?url';
 import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg?url';
 import RedisIcon from '@/assets/icons/Redis.svg?url';
 import SentinelIcon from '@/assets/icons/sentinel.svg?url';
-import DashboardIcon from '@/assets/icons/仪表板.svg?url';
-import LemonIcon from '@/assets/icons/柠檬.svg?url';
-import SettingsIcon from '@/assets/icons/设置.svg?url';
+import DashboardIcon from '@/assets/icons/Dashboard.svg?url';
+import LemonIcon from '@/assets/icons/lemon.svg?url';
+import SettingsIcon from '@/assets/icons/setting.svg?url';
 
 export default {
   name: 'EnvironmentPanel',

@@ -34,6 +34,13 @@
         <span class="path-display">{{ installPath }}</span>
       </div>
       <div class="config-input">
+        <label>端口（可选）：</label>
+        <input type="number" v-model.number="port" placeholder="留空则自动分配" @blur="checkPort"/>
+        <span v-if="portChecking" class="port-checking">检查中...</span>
+        <span v-else-if="portAvailable === true" class="port-available">✓ 端口可用</span>
+        <span v-else-if="portAvailable === false" class="port-unavailable">✗ 端口已被占用</span>
+      </div>
+      <div class="config-input">
         <label>密码（可选）：</label>
         <input type="password" v-model="password" placeholder="留空则无密码"/>
       </div>
@@ -42,7 +49,7 @@
         <input type="number" v-model.number="maxmemory" placeholder="例如 256"/>
       </div>
       <div class="button-group">
-        <button @click="installRedis" :disabled="installing" class="install-btn">
+        <button @click="installRedis" :disabled="installing || portAvailable === false" class="install-btn">
           {{ installing ? '安装中...' : '开始安装' }}
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
@@ -80,6 +87,13 @@
           ⚠️ 安装目录已存在文件！请删除或选择其他版本。
         </div>
         <div class="config-input">
+          <label>端口（可选）：</label>
+          <input type="number" v-model.number="localPort" placeholder="留空则自动分配" @blur="checkLocalPort"/>
+          <span v-if="localPortChecking" class="port-checking">检查中...</span>
+          <span v-else-if="localPortAvailable === true" class="port-available">✓ 端口可用</span>
+          <span v-else-if="localPortAvailable === false" class="port-unavailable">✗ 端口已被占用</span>
+        </div>
+        <div class="config-input">
           <label>密码（可选）：</label>
           <input type="password" v-model="localPassword" placeholder="留空则无密码"/>
         </div>
@@ -93,7 +107,8 @@
         </div>
       </div>
       <div class="button-group">
-        <button @click="installFromLocal" :disabled="installing || !localFilePath || dirExistsWarning"
+        <button @click="installFromLocal"
+                :disabled="installing || !localFilePath || dirExistsWarning || localPortAvailable === false"
                 class="install-btn">
           {{ installing ? '安装中...' : '开始安装' }}
         </button>
@@ -129,7 +144,15 @@ export default {
       password: '',
       maxmemory: null,
       localPassword: '',
-      localMaxmemory: null
+      localMaxmemory: null,
+      port: null,
+      localPort: null,
+      portChecking: false,
+      localPortChecking: false,
+      portAvailable: null,
+      localPortAvailable: null,
+      checkTimer: null,
+      localCheckTimer: null
     };
   },
   computed: {
@@ -156,7 +179,6 @@ export default {
         }
       });
       window.electronAPI.onRedisChanged(() => {
-        // 安装完成后可刷新环境面板
       });
     }
   },
@@ -169,9 +191,13 @@ export default {
         this.dirExistsWarning = false;
         this.localPassword = '';
         this.localMaxmemory = null;
+        this.localPort = null;
+        this.localPortAvailable = null;
       } else {
         this.password = '';
         this.maxmemory = null;
+        this.port = null;
+        this.portAvailable = null;
       }
     },
     cancelDownload() {
@@ -180,6 +206,44 @@ export default {
         this.status = '⏸️ 已取消下载';
         this.downloading = false;
         this.showProgress = false;
+      }
+    },
+    async checkPort() {
+      if (!this.port) {
+        this.portAvailable = null;
+        return;
+      }
+      if (this.port < 1 || this.port > 65535) {
+        this.portAvailable = false;
+        return;
+      }
+      this.portChecking = true;
+      try {
+        const result = await window.electronAPI.checkPort(this.port);
+        this.portAvailable = result.available;
+      } catch (err) {
+        this.portAvailable = false;
+      } finally {
+        this.portChecking = false;
+      }
+    },
+    async checkLocalPort() {
+      if (!this.localPort) {
+        this.localPortAvailable = null;
+        return;
+      }
+      if (this.localPort < 1 || this.localPort > 65535) {
+        this.localPortAvailable = false;
+        return;
+      }
+      this.localPortChecking = true;
+      try {
+        const result = await window.electronAPI.checkPort(this.localPort);
+        this.localPortAvailable = result.available;
+      } catch (err) {
+        this.localPortAvailable = false;
+      } finally {
+        this.localPortChecking = false;
       }
     },
     async installRedis() {
@@ -192,7 +256,12 @@ export default {
 
       try {
         this.downloading = true;
-        const result = await window.electronAPI.installRedis(this.selectedVersion, this.password, this.maxmemory || 0);
+        const result = await window.electronAPI.installRedis(
+            this.selectedVersion,
+            this.password,
+            this.maxmemory || 0,
+            this.port || null
+        );
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.$emit('installed');
@@ -291,7 +360,8 @@ export default {
         const result = await window.electronAPI.installFromLocalRedis(
             this.localVersion,
             this.localPassword,
-            this.localMaxmemory || 0
+            this.localMaxmemory || 0,
+            this.localPort || null
         );
         if (result.success) {
           this.status = `✅ ${result.message}`;
@@ -519,5 +589,23 @@ h3 {
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
+}
+
+.port-checking {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin-left: 8px;
+}
+
+.port-available {
+  font-size: 0.8rem;
+  color: #16a34a;
+  margin-left: 8px;
+}
+
+.port-unavailable {
+  font-size: 0.8rem;
+  color: #dc2626;
+  margin-left: 8px;
 }
 </style>

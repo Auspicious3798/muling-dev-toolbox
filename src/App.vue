@@ -2,7 +2,8 @@
   <div class="app-layout">
     <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
-      <EnvironmentPanel ref="envPanel" :tool="activeTool" @install="openDrawer"/>
+      <AboutLemon v-if="activeTool === 'about'"/>
+      <EnvironmentPanel v-else ref="envPanel" :tool="activeTool" @install="openDrawer"/>
     </div>
     <InstallDrawer
         v-model:visible="drawerVisible"
@@ -16,6 +17,7 @@
 import NavMenu from './components/NavMenu.vue';
 import EnvironmentPanel from './components/EnvironmentPanel.vue';
 import InstallDrawer from './components/InstallDrawer.vue';
+import AboutLemon from './components/AboutLemon.vue';
 
 export default {
   name: 'App',
@@ -23,6 +25,7 @@ export default {
     NavMenu,
     EnvironmentPanel,
     InstallDrawer,
+    AboutLemon,
   },
   data() {
     return {
