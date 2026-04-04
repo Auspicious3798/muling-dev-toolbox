@@ -53,6 +53,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     checkPort: (port) => ipcRenderer.invoke('check-port', port),
 
+    // Maven API
+    installMaven: (useLocal) => ipcRenderer.invoke('install-maven', useLocal),
+    importLocalMaven: (filePath) => ipcRenderer.invoke('import-local-maven', filePath),
+    checkMaven: () => ipcRenderer.invoke('check-maven'),
+    uninstallMaven: () => ipcRenderer.invoke('uninstall-maven'),
+    cancelMavenDownload: () => ipcRenderer.send('cancel-maven-download'),
+    onMavenProgress: (callback) => ipcRenderer.on('maven-progress', (_, data) => callback(data)),
+    onMavenChanged: (callback) => ipcRenderer.on('maven-changed', callback),
+
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),

@@ -23,6 +23,7 @@ import JDKInstaller from './installers/JDKInstaller.vue';
 import PythonInstaller from './installers/PythonInstaller.vue';
 import MySQLInstaller from './installers/MysqlInstaller.vue';
 import RedisInstaller from './installers/RedisInstaller.vue';
+import MavenInstaller from './installers/MavenInstaller.vue';
 
 export default {
   name: 'InstallDrawer',
@@ -31,6 +32,7 @@ export default {
     PythonInstaller,
     MySQLInstaller,
     RedisInstaller,
+    MavenInstaller,
   },
   props: {
     visible: Boolean,
@@ -38,7 +40,7 @@ export default {
   },
   computed: {
     toolLabel() {
-      const map = {jdk: 'JDK', python: 'Python', mysql: 'MySQL', redis: 'Redis'};
+      const map = {jdk: 'JDK', python: 'Python', mysql: 'MySQL', redis: 'Redis', maven: 'Maven'};
       return map[this.tool] || this.tool.toUpperCase();
     },
     installerComponent() {
@@ -47,6 +49,7 @@ export default {
         python: 'PythonInstaller',
         mysql: 'MySQLInstaller',
         redis: 'RedisInstaller',
+        maven: 'MavenInstaller',
       };
       return components[this.tool];
     },
