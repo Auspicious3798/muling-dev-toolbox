@@ -2,7 +2,7 @@
   <div class="environment-panel">
     <div class="panel-header">
       <div class="title-section">
-        <img v-if="toolIconPath" :src="toolIconPath" class="tool-icon-img" alt="" />
+        <img v-if="toolIconPath" :src="toolIconPath" class="tool-icon-img" alt=""/>
         <span v-else class="tool-icon-emoji">{{ toolIconEmoji }}</span>
         <h3>{{ toolLabel }}</h3>
       </div>
@@ -17,12 +17,34 @@
       </button>
     </div>
 
-    <div v-if="versions.length === 0 && !loading" class="empty-state">
+    <!-- Maven 简单卡片 -->
+    <div v-if="tool === 'maven'">
+      <div v-if="mavenInstalled && !loading" class="version-card maven-card">
+        <div class="card-header">
+          <span class="version-badge">Maven {{ mavenVersion }}</span>
+        </div>
+        <div class="card-actions">
+          <button @click="uninstallMaven" class="action-delete" :disabled="actionLoading">
+            <span class="action-icon">🗑</span> 卸载
+          </button>
+        </div>
+      </div>
+      <div v-else-if="!loading" class="empty-state">
+        <div class="empty-icon">📦</div>
+        <p>未检测到已安装的 Maven</p>
+      </div>
+      <div v-if="apiMissing" class="warning-message">
+        <span class="warning-icon">⚠️</span> 当前工具暂未支持检测，敬请期待。
+      </div>
+    </div>
+
+    <!-- 多版本工具 -->
+    <div v-else-if="versions.length === 0 && !loading" class="empty-state">
       <div class="empty-icon">📦</div>
       <p>未检测到已安装的 {{ toolLabel }}</p>
     </div>
 
-    <div v-else class="versions-grid">
+    <div v-else-if="tool !== 'maven'" class="versions-grid">
       <div v-for="v in versions" :key="v" class="version-card" :class="{ 'is-default': v === defaultVersion }">
         <div class="card-header">
           <span class="version-badge">{{ toolLabel }} {{ v }}</span>
@@ -55,11 +77,13 @@
               <span class="action-icon">■</span> 停止
             </button>
           </template>
-          <button v-if="tool === 'redis'" @click="toggleService(v)" :class="serviceStatus[v] === 'running' ? 'action-stop' : 'action-start'" :disabled="actionLoading">
+          <button v-if="tool === 'redis'" @click="toggleService(v)"
+                  :class="serviceStatus[v] === 'running' ? 'action-stop' : 'action-start'" :disabled="actionLoading">
             <span class="action-icon">{{ serviceStatus[v] === 'running' ? '■' : '▶' }}</span>
             {{ serviceStatus[v] === 'running' ? '停止' : '启动' }}
           </button>
-          <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password" :disabled="actionLoading">
+          <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password"
+                  :disabled="actionLoading">
             <span class="action-icon">🔑</span> 修改密码
           </button>
           <button @click="uninstallVersion(v)" class="action-delete" :disabled="actionLoading">
@@ -69,20 +93,21 @@
       </div>
     </div>
 
-    <div v-if="apiMissing" class="warning-message">
+    <div v-if="apiMissing && tool !== 'maven'" class="warning-message">
       <span class="warning-icon">⚠️</span> 当前工具暂未支持检测，敬请期待。
     </div>
 
+    <!-- 修改 Redis 密码弹窗 -->
     <div v-if="showPasswordModal" class="modal-overlay" @click.self="closePasswordModal">
       <div class="modal">
         <h4>修改 Redis 密码</h4>
         <div class="modal-field">
           <label>旧密码（若无则留空）：</label>
-          <input type="password" v-model="oldRedisPassword" />
+          <input type="password" v-model="oldRedisPassword"/>
         </div>
         <div class="modal-field">
           <label>新密码：</label>
-          <input type="password" v-model="newRedisPassword" />
+          <input type="password" v-model="newRedisPassword"/>
         </div>
         <div class="modal-buttons">
           <button @click="changeRedisPassword" :disabled="passwordChanging" class="modal-btn confirm">确认修改</button>
@@ -139,7 +164,9 @@ export default {
       currentVersionForPassword: null,
       oldRedisPassword: '',
       newRedisPassword: '',
-      passwordChanging: false
+      passwordChanging: false,
+      mavenInstalled: false,
+      mavenVersion: ''
     };
   },
   computed: {
@@ -227,7 +254,8 @@ export default {
         jdk: 'checkJDK',
         python: 'checkPython',
         mysql: 'checkMySQL',
-        redis: 'checkRedis'
+        redis: 'checkRedis',
+        maven: 'checkMaven'
       };
       return methodMap[this.tool];
     },
@@ -245,7 +273,8 @@ export default {
         jdk: 'deleteJDK',
         python: 'deletePython',
         mysql: 'deleteMySQL',
-        redis: 'deleteRedis'
+        redis: 'deleteRedis',
+        maven: 'uninstallMaven'
       };
       return methodMap[this.tool];
     },
@@ -284,6 +313,9 @@ export default {
       window.electronAPI.onRedisChanged?.(() => {
         if (this.tool === 'redis') this.refresh();
       });
+      window.electronAPI.onMavenChanged?.(() => {
+        if (this.tool === 'maven') this.refresh();
+      });
     }
   },
   methods: {
@@ -297,14 +329,20 @@ export default {
           this.apiMissing = true;
           return;
         }
-        const result = await api();
-        this.versions = result.versions || [];
-        this.defaultVersion = result.default || null;
-        if (['mysql', 'redis'].includes(this.tool)) {
-          await this.refreshAllServiceStatus();
-        }
-        if (this.tool === 'redis') {
-          await this.refreshRedisConfigs();
+        if (this.tool === 'maven') {
+          const result = await api();
+          this.mavenInstalled = result.installed;
+          if (result.version) this.mavenVersion = result.version;
+        } else {
+          const result = await api();
+          this.versions = result.versions || [];
+          this.defaultVersion = result.default || null;
+          if (['mysql', 'redis'].includes(this.tool)) {
+            await this.refreshAllServiceStatus();
+          }
+          if (this.tool === 'redis') {
+            await this.refreshRedisConfigs();
+          }
         }
       } catch (err) {
         console.error(`${this.toolLabel} 检测失败`, err);
@@ -338,12 +376,12 @@ export default {
         try {
           const res = await window.electronAPI.getRedisConfig(v);
           if (res.success) {
-            this.redisConfigs[v] = { port: res.port, hasPassword: res.hasPassword };
+            this.redisConfigs[v] = {port: res.port, hasPassword: res.hasPassword};
           } else {
-            this.redisConfigs[v] = { port: '未知', hasPassword: false };
+            this.redisConfigs[v] = {port: '未知', hasPassword: false};
           }
         } catch {
-          this.redisConfigs[v] = { port: '未知', hasPassword: false };
+          this.redisConfigs[v] = {port: '未知', hasPassword: false};
         }
       }
     },
@@ -382,6 +420,24 @@ export default {
         const result = await api(version);
         if (result.success) {
           this.$emit('status', `✅ 已卸载 ${this.toolLabel} ${version}`);
+          await this.refresh();
+        } else {
+          this.$emit('status', `❌ 卸载失败：${result.message}`);
+        }
+      } catch (err) {
+        this.$emit('status', `❌ 卸载失败：${err.message}`);
+      } finally {
+        this.actionLoading = false;
+      }
+    },
+    async uninstallMaven() {
+      if (this.actionLoading) return;
+      if (!confirm('确定要卸载 Maven 吗？此操作不可撤销。')) return;
+      this.actionLoading = true;
+      try {
+        const result = await window.electronAPI.uninstallMaven();
+        if (result.success) {
+          this.$emit('status', `✅ ${result.message}`);
           await this.refresh();
         } else {
           this.$emit('status', `❌ 卸载失败：${result.message}`);
@@ -633,6 +689,11 @@ export default {
   background: linear-gradient(135deg, #f0f9ff, #e6f4ff);
   border-left: 4px solid #2c7a4d;
   border-color: #b9e0f0;
+}
+
+.maven-card {
+  max-width: 400px;
+  margin: 0 auto;
 }
 
 .card-header {

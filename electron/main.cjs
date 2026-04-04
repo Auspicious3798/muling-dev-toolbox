@@ -5,6 +5,7 @@ const registerJDKHandlers = require('./handlers/jdk.cjs');
 const registerPythonHandlers = require('./handlers/python.cjs');
 const registerMysqlHandlers = require('./handlers/mysql.cjs');
 const registerRedisHandlers = require('./handlers/redis.cjs');
+const registerMavenHandlers = require('./handlers/maven.cjs');
 
 let mainWindow;
 
@@ -90,6 +91,7 @@ app.whenReady().then(() => {
     registerPythonHandlers(mainWindow, app.getPath('userData'));
     registerMysqlHandlers(mainWindow, app.getPath('userData'));
     registerRedisHandlers(mainWindow, app.getPath('userData'));
+    registerMavenHandlers(mainWindow, app.getPath('userData'));
 
     ipcMain.on('select-install-path', async (event) => {
         const result = await dialog.showOpenDialog(mainWindow, {
