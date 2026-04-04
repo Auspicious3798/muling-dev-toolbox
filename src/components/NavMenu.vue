@@ -37,9 +37,9 @@ import PythonIcon from '@/assets/icons/Python.svg';
 import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg';
 import RedisIcon from '@/assets/icons/Redis.svg';
 import SentinelIcon from '@/assets/icons/sentinel.svg';
-import DashboardIcon from '@/assets/icons/仪表板.svg';
-import LemonIcon from '@/assets/icons/柠檬.svg';
-import SettingsIcon from '@/assets/icons/设置.svg';
+import DashboardIcon from '@/assets/icons/Dashboard.svg';
+import LemonIcon from '@/assets/icons/lemon.svg';
+import SettingsIcon from '@/assets/icons/setting.svg';
 
 export default {
   name: 'NavMenu',
