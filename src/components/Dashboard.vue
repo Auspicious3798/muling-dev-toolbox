@@ -331,7 +331,6 @@ export default {
       eventBus.on('install:end', () => {
         this.refreshAll();
       });
-      // 监听各环境变化
       if (window.electronAPI) {
         window.electronAPI.onJDKChanged?.(() => this.refreshAll());
         window.electronAPI.onPythonChanged?.(() => this.refreshAll());
@@ -346,10 +345,10 @@ export default {
 
 <style scoped>
 .dashboard {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--gradient-bg);
   border-radius: 28px;
   padding: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-md);
   height: 100%;
   overflow-y: auto;
 }
@@ -367,14 +366,14 @@ export default {
   font-size: 1.8rem;
   font-weight: 700;
   margin: 0;
-  background: linear-gradient(135deg, #1e293b, #2c3e50);
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
 }
 
 .welcome-text p {
-  color: #64748b;
+  color: var(--text-secondary);
   margin: 4px 0 0;
 }
 
@@ -384,27 +383,28 @@ export default {
 }
 
 .stat-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 12px 20px;
   width: 160px;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 .stat-title {
   font-size: 0.8rem;
-  color: #64748b;
+  color: var(--text-secondary);
 }
 
 .stat-value {
   font-size: 1.5rem;
   font-weight: 700;
   margin: 8px 0;
+  color: var(--text-primary);
 }
 
 .progress-bar {
   height: 6px;
-  background: #e2e8f0;
+  background: var(--border-light);
   border-radius: 3px;
   overflow: hidden;
 }
@@ -429,15 +429,17 @@ export default {
   font-size: 1.4rem;
   font-weight: 600;
   margin: 0;
+  color: var(--text-primary);
 }
 
 .refresh-all-btn {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-medium);
   border-radius: 30px;
   padding: 6px 16px;
   cursor: pointer;
   font-size: 0.8rem;
+  color: var(--text-primary);
 }
 
 .env-grid {
@@ -447,16 +449,16 @@ export default {
 }
 
 .env-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 24px;
   padding: 16px;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--border-light);
   transition: all 0.2s;
 }
 
 .env-card.not-installed {
   opacity: 0.7;
-  background: #f9fafb;
+  background: var(--bg-hover);
 }
 
 .env-card-header {
@@ -475,12 +477,13 @@ export default {
 .env-name {
   font-weight: 700;
   font-size: 1.1rem;
+  color: var(--text-primary);
 }
 
 .env-info {
   margin-bottom: 12px;
   font-size: 0.85rem;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .env-version {
@@ -497,13 +500,13 @@ export default {
 }
 
 .env-service.running {
-  background: #dcfce7;
-  color: #166534;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .env-service.stopped {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .status-dot {
@@ -514,15 +517,15 @@ export default {
 }
 
 .env-service.running .status-dot {
-  background: #16a34a;
+  background: var(--success-text);
 }
 
 .env-service.stopped .status-dot {
-  background: #dc2626;
+  background: var(--danger-text);
 }
 
 .env-not-installed {
-  color: #9ca3af;
+  color: var(--text-muted);
   font-style: italic;
 }
 
@@ -543,32 +546,32 @@ export default {
 }
 
 .switch-btn {
-  background: #eff6ff;
-  color: #2563eb;
+  background: var(--info-bg);
+  color: var(--info-text);
 }
 
 .switch-btn:hover {
-  background: #dbeafe;
+  filter: brightness(0.95);
 }
 
 .service-btn {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--success-bg);
+  color: var(--success-text);
 }
 
 .service-btn.stopped {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .install-btn {
-  background: #2c7a4d;
+  background: var(--primary);
   color: white;
 }
 
 .delete-btn {
-  background: #fee2e2;
-  color: #dc2626;
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .quick-actions {
@@ -578,6 +581,7 @@ export default {
 .quick-actions h2 {
   font-size: 1.2rem;
   margin-bottom: 12px;
+  color: var(--text-primary);
 }
 
 .quick-buttons {
@@ -587,24 +591,26 @@ export default {
 }
 
 .quick-btn {
-  background: #f1f5f9;
-  border: 1px solid #e2e8f0;
+  background: var(--bg-hover);
+  border: 1px solid var(--border-medium);
   border-radius: 40px;
   padding: 8px 20px;
   cursor: pointer;
   transition: all 0.2s;
+  color: var(--text-primary);
 }
 
 .quick-btn:hover {
-  background: #e6edf4;
+  background: var(--border-light);
   transform: scale(0.98);
 }
 
 .log-section {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 12px;
   margin-top: 16px;
+  border: 1px solid var(--border-light);
 }
 
 .log-header {
@@ -613,6 +619,7 @@ export default {
   cursor: pointer;
   padding: 8px;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .log-list {
@@ -626,21 +633,21 @@ export default {
   gap: 12px;
   padding: 6px 8px;
   font-size: 0.8rem;
-  border-bottom: 1px solid #eef2f6;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .log-time {
-  color: #64748b;
+  color: var(--text-secondary);
   width: 70px;
 }
 
 .log-message {
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .log-empty {
   text-align: center;
-  color: #9ca3af;
+  color: var(--text-muted);
   padding: 12px;
 }
 </style>

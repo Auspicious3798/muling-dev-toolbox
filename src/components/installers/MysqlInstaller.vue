@@ -1,7 +1,7 @@
 <template>
   <div class="mysql-installer">
     <h3>
-      <img src="/src/assets/icons/mysql.svg" class="title-icon" alt=""/>
+      <img :src="MysqlIcon" class="title-icon" alt=""/>
       MySQL 安装
     </h3>
 
@@ -117,11 +117,13 @@
 
 <script>
 import eventBus from '@/eventBus';
+import MysqlIcon from '@/assets/icons/mysql.svg?url';
 
 export default {
   name: 'MySQLInstaller',
   data() {
     return {
+      MysqlIcon,
       activeMode: 'online',
       selectedVersion: '8.0',
       installing: false,
@@ -427,24 +429,24 @@ export default {
 
 <style scoped>
 .mysql-installer {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+  box-shadow: var(--shadow-sm);
 }
 
 h3 {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .mode-switch {
   display: flex;
   gap: 12px;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
   padding-bottom: 12px;
 }
 
@@ -458,20 +460,21 @@ h3 {
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .mode-btn.active {
-  background-color: #e0f2fe;
-  color: #0369a1;
+  background-color: var(--info-bg);
+  color: var(--info-text);
 }
 
 .version-select, .version-select-small {
   width: 100%;
   padding: 0.6rem 1rem;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background-color: #f9fafb;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   font-size: 0.95rem;
   margin-bottom: 1rem;
 }
@@ -484,17 +487,17 @@ h3 {
 .install-path, .import-path {
   margin: 1rem 0;
   padding: 0.6rem;
-  background-color: #f9fafb;
+  background-color: var(--bg-secondary);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .import-path {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
+  background-color: var(--success-bg);
+  border-color: var(--border-light);
 }
 
 .password-input {
@@ -506,14 +509,16 @@ h3 {
 
 .password-input label {
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .password-input input {
   flex: 1;
   padding: 0.5rem;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .version-input {
@@ -524,7 +529,7 @@ h3 {
 }
 
 .validate-btn {
-  background-color: #6b7280;
+  background-color: var(--text-muted);
   color: white;
   border: none;
   padding: 4px 12px;
@@ -535,9 +540,9 @@ h3 {
 .warning-message {
   margin-top: 8px;
   padding: 8px;
-  background-color: #fee2e2;
+  background-color: var(--danger-bg);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--danger-text);
   font-size: 0.8rem;
 }
 
@@ -568,32 +573,32 @@ h3 {
 }
 
 .install-btn {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
   border: none;
 }
 
 .install-btn:hover:not(:disabled) {
-  background-color: #1f5e3a;
+  background-color: var(--primary-hover);
 }
 
 .cancel-btn {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
   border: none;
 }
 
 .service-panel {
   margin-top: 24px;
   padding: 16px;
-  background-color: #f8fafc;
+  background-color: var(--bg-secondary);
   border-radius: 16px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
 }
 
 .service-panel h4 {
   margin-bottom: 12px;
-  color: #1e293b;
+  color: var(--text-primary);
 }
 
 .service-status {
@@ -601,15 +606,16 @@ h3 {
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
+  color: var(--text-secondary);
 }
 
 .status-running {
-  color: #16a34a;
+  color: var(--success-text);
   font-weight: 600;
 }
 
 .status-stopped {
-  color: #dc2626;
+  color: var(--danger-text);
   font-weight: 600;
 }
 
@@ -629,23 +635,23 @@ h3 {
 }
 
 .service-btn.start {
-  background-color: #22c55e;
-  color: white;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .service-btn.stop {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .service-btn.restart {
-  background-color: #f59e0b;
-  color: white;
+  background-color: var(--warning-bg);
+  color: var(--warning-text);
 }
 
 .service-btn.password {
-  background-color: #3b82f6;
-  color: white;
+  background-color: var(--info-bg);
+  color: var(--info-text);
 }
 
 .service-btn:disabled {
@@ -658,23 +664,24 @@ h3 {
   text-align: center;
   padding: 0.5rem;
   border-radius: 10px;
-  background-color: #f3f4f6;
+  background-color: var(--bg-secondary);
   margin-bottom: 1rem;
+  color: var(--text-primary);
 }
 
 .status-success {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .status-error {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .progress-bar {
   width: 100%;
-  background-color: #e5e7eb;
+  background-color: var(--border-light);
   border-radius: 999px;
   overflow: hidden;
   height: 8px;
@@ -682,7 +689,7 @@ h3 {
 
 .progress-fill {
   height: 100%;
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
@@ -709,15 +716,16 @@ h3 {
 }
 
 .modal {
-  background: white;
+  background: var(--bg-modal);
   padding: 24px;
   border-radius: 20px;
   width: 400px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal h4 {
   margin-bottom: 16px;
+  color: var(--text-primary);
 }
 
 .modal-field {
@@ -728,13 +736,16 @@ h3 {
   display: block;
   margin-bottom: 4px;
   font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .modal-field input {
   width: 100%;
   padding: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-medium);
   border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .modal-buttons {
@@ -753,12 +764,12 @@ h3 {
 }
 
 .modal-btn.confirm {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
 }
 
 .modal-btn.cancel {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 </style>

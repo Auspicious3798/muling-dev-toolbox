@@ -81,7 +81,7 @@ export default {
 .drawer-container {
   width: 500px;
   height: 100%;
-  background: white;
+  background: var(--bg-card);
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
   display: flex;
   flex-direction: column;
@@ -102,13 +102,14 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 20px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--border-light);
 }
 
 .drawer-header h3 {
   margin: 0;
   font-size: 1.25rem;
   font-weight: 600;
+  color: var(--text-primary);
 }
 
 .close-btn {
@@ -116,7 +117,7 @@ export default {
   border: none;
   font-size: 1.5rem;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .drawer-body {

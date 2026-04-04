@@ -47,10 +47,10 @@ export default {
 
 <style scoped>
 .about-lemon {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--gradient-bg);
   border-radius: 28px;
   padding: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-md);
   height: 100%;
   display: flex;
   align-items: center;
@@ -92,7 +92,7 @@ h1 {
   font-size: 2.2rem;
   font-weight: 700;
   margin: 0 0 8px;
-  background: linear-gradient(135deg, #1e293b, #2c3e50);
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -101,7 +101,7 @@ h1 {
 
 .subtitle {
   font-size: 0.9rem;
-  color: #64748b;
+  color: var(--text-secondary);
   letter-spacing: 0.5px;
   text-transform: uppercase;
   font-weight: 500;
@@ -110,13 +110,13 @@ h1 {
 .description p {
   font-size: 1rem;
   line-height: 1.7;
-  color: #334155;
+  color: var(--text-primary);
   margin-bottom: 20px;
   text-align: justify;
 }
 
 .future-block {
-  background: rgba(44, 122, 77, 0.05);
+  background: var(--primary-light);
   border-radius: 20px;
   padding: 20px;
   margin: 24px 0;
@@ -126,7 +126,7 @@ h1 {
 .future-block h3 {
   font-size: 1.2rem;
   font-weight: 600;
-  color: #2c7a4d;
+  color: var(--primary);
   margin-bottom: 16px;
 }
 
@@ -139,21 +139,21 @@ h1 {
 }
 
 .badge {
-  background: white;
+  background: var(--bg-card);
   border-radius: 40px;
   padding: 6px 16px;
   font-size: 0.85rem;
   font-weight: 500;
-  color: #2c7a4d;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  border: 1px solid rgba(44, 122, 77, 0.2);
+  color: var(--primary);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-light);
   transition: all 0.2s;
 }
 
 .badge:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
-  border-color: #2c7a4d;
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
 }
 
 .tagline {
@@ -161,8 +161,7 @@ h1 {
   margin-top: 32px;
   font-size: 1.3rem;
   font-weight: 700;
-  color: #2c7a4d;
-  background: linear-gradient(135deg, #2c7a4d, #1f5e3a);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;

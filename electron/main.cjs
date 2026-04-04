@@ -1,4 +1,4 @@
-const {app, BrowserWindow, ipcMain, protocol, dialog} = require('electron');
+const {app, BrowserWindow, ipcMain, protocol, dialog, Menu} = require('electron');
 const path = require('path');
 const fs = require('fs');
 const registerJDKHandlers = require('./handlers/jdk.cjs');
@@ -30,6 +30,8 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 function createWindow() {
+    Menu.setApplicationMenu(null);
+
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 800,
@@ -37,16 +39,32 @@ function createWindow() {
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
-            preload: path.join(__dirname, 'preload.cjs')
+            preload: path.join(__dirname, 'preload.cjs'),
+            // devTools: process.env.NODE_ENV === 'development'
         }
     });
 
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173').then(r => r);
+        mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadURL('app://index.html').then(r => r);
+        mainWindow.webContents.closeDevTools();
     }
+
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+        if (input.control && input.shift && input.key.toLowerCase() === 'i') {
+            event.preventDefault();
+        }
+        if (input.key === 'F12') {
+            event.preventDefault();
+        }
+    });
+
+    mainWindow.webContents.on('context-menu', (event) => {
+        event.preventDefault();
+    });
 }
 
 app.whenReady().then(() => {
@@ -117,6 +135,78 @@ app.whenReady().then(() => {
             cpu: Math.round(cpuUsage),
             memory: Math.round((totalMem - freeMem) / totalMem * 100)
         };
+    });
+
+    ipcMain.handle('get-cache-size', async () => {
+        const downloadDir = path.join(app.getPath('userData'), 'downloads');
+        const logsDir = app.getPath('userData');
+        let cacheSize = 0;
+        let logsSize = 0;
+        const getFolderSize = (folder) => {
+            if (!fs.existsSync(folder)) return 0;
+            let size = 0;
+            const files = fs.readdirSync(folder);
+            for (const file of files) {
+                const filePath = path.join(folder, file);
+                const stat = fs.statSync(filePath);
+                if (stat.isDirectory()) {
+                    size += getFolderSize(filePath);
+                } else {
+                    size += stat.size;
+                }
+            }
+            return size;
+        };
+        if (fs.existsSync(downloadDir)) cacheSize = getFolderSize(downloadDir);
+        const logFiles = fs.readdirSync(logsDir).filter(f => f.endsWith('.log'));
+        for (const log of logFiles) {
+            const stat = fs.statSync(path.join(logsDir, log));
+            logsSize += stat.size;
+        }
+        return {cacheSize, logsSize};
+    });
+
+    ipcMain.handle('clear-cache', async () => {
+        const downloadDir = path.join(app.getPath('userData'), 'downloads');
+        if (fs.existsSync(downloadDir)) {
+            fs.rmSync(downloadDir, {recursive: true, force: true});
+            fs.mkdirSync(downloadDir);
+        }
+        return {success: true};
+    });
+
+    ipcMain.handle('clear-logs', async () => {
+        const logsDir = app.getPath('userData');
+        const logFiles = fs.readdirSync(logsDir).filter(f => f.endsWith('.log'));
+        for (const log of logFiles) {
+            fs.unlinkSync(path.join(logsDir, log));
+        }
+        return {success: true};
+    });
+
+    ipcMain.handle('get-version-info', async () => {
+        return {
+            version: app.getVersion(),
+            electron: process.versions.electron,
+            node: process.versions.node,
+            chrome: process.versions.chrome
+        };
+    });
+
+    ipcMain.handle('open-github', async () => {
+        const {shell} = require('electron');
+        await shell.openExternal('https://github.com/Auspicious3798/muling-dev-toolbox');
+    });
+
+    ipcMain.handle('set-proxy', async (event, proxy) => {
+        if (proxy && proxy.trim() !== '') {
+            process.env.HTTP_PROXY = proxy;
+            process.env.HTTPS_PROXY = proxy;
+        } else {
+            delete process.env.HTTP_PROXY;
+            delete process.env.HTTPS_PROXY;
+        }
+        return {success: true};
     });
 
     ipcMain.on('select-install-path', async (event) => {

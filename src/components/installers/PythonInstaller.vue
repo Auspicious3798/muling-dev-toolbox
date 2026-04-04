@@ -1,7 +1,7 @@
 <template>
   <div class="python-installer">
     <h3>
-      <img src="/src/assets/icons/python.svg" class="title-icon" alt=""/>
+      <img :src="PythonIcon" class="title-icon" alt=""/>
       Python 安装
     </h3>
 
@@ -91,11 +91,13 @@
 
 <script>
 import eventBus from '@/eventBus';
+import PythonIcon from '@/assets/icons/Python.svg?url';
 
 export default {
   name: 'PythonInstaller',
   data() {
     return {
+      PythonIcon,
       activeMode: 'online',
       selectedVersion: '3.12.9',
       installing: false,
@@ -293,29 +295,29 @@ export default {
 
 <style scoped>
 .python-installer {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow 0.3s ease;
 }
 
 .python-installer:hover {
-  box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 h3 {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .mode-switch {
   display: flex;
   gap: 12px;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
   padding-bottom: 12px;
 }
 
@@ -329,16 +331,16 @@ h3 {
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .mode-btn.active {
-  background-color: #e0f2fe;
-  color: #0369a1;
+  background-color: var(--info-bg);
+  color: var(--info-text);
 }
 
 .mode-btn:hover:not(.active) {
-  background-color: #f3f4f6;
+  background-color: var(--bg-hover);
 }
 
 .mirror-select {
@@ -350,15 +352,16 @@ h3 {
 
 .mirror-select label {
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .mirror-select select {
   flex: 1;
   padding: 6px 8px;
   border-radius: 8px;
-  border: 1px solid #e2e8f0;
-  background-color: #f9fafb;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   font-size: 0.9rem;
 }
 
@@ -366,8 +369,9 @@ h3 {
   width: 100%;
   padding: 0.6rem 1rem;
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
-  background-color: #f9fafb;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-input);
+  color: var(--text-primary);
   font-size: 0.95rem;
   margin-bottom: 1rem;
   transition: all 0.2s ease;
@@ -375,40 +379,34 @@ h3 {
 
 .version-select:focus {
   outline: none;
-  border-color: #2c7a4d;
-  box-shadow: 0 0 0 3px rgba(44, 122, 77, 0.1);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
-.install-path {
+.install-path, .import-path {
   margin: 1rem 0;
   padding: 0.6rem;
-  background-color: #f9fafb;
+  background-color: var(--bg-secondary);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .import-path {
-  margin: 0.5rem 0;
-  padding: 0.6rem;
-  background-color: #f0fdf4;
-  border-radius: 12px;
-  border: 1px solid #bbf7d0;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+  background-color: var(--success-bg);
+  border-color: var(--border-light);
 }
 
 .path-label {
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .path-display {
   font-family: monospace;
-  color: #1f2937;
+  color: var(--text-primary);
   word-break: break-all;
 }
 
@@ -422,13 +420,15 @@ h3 {
 .version-text-input {
   flex: 1;
   padding: 6px 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-medium);
   border-radius: 8px;
   font-size: 1rem;
+  background-color: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .validate-btn {
-  background-color: #6b7280;
+  background-color: var(--text-muted);
   color: white;
   border: none;
   padding: 4px 12px;
@@ -439,15 +439,15 @@ h3 {
 }
 
 .validate-btn:hover {
-  background-color: #4b5563;
+  background-color: var(--text-secondary);
 }
 
 .warning-message {
   margin-top: 8px;
   padding: 8px;
-  background-color: #fee2e2;
+  background-color: var(--danger-bg);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--danger-text);
   font-size: 0.8rem;
 }
 
@@ -491,29 +491,30 @@ h3 {
 }
 
 .install-btn {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
   border: none;
 }
 
 .install-btn:hover:not(:disabled) {
-  background-color: #1f5e3a;
+  background-color: var(--primary-hover);
   transform: scale(0.98);
 }
 
 .install-btn:disabled {
-  background-color: #9ca3af;
+  background-color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .cancel-btn {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
   border: none;
 }
 
 .cancel-btn:hover {
-  background-color: #dc2626;
+  background-color: var(--danger-bg);
+  filter: brightness(0.95);
   transform: scale(0.98);
 }
 
@@ -522,24 +523,25 @@ h3 {
   text-align: center;
   padding: 0.5rem;
   border-radius: 10px;
-  background-color: #f3f4f6;
+  background-color: var(--bg-secondary);
   margin-bottom: 1rem;
   transition: all 0.3s ease;
+  color: var(--text-primary);
 }
 
 .status-success {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .status-error {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .progress-bar {
   width: 100%;
-  background-color: #e5e7eb;
+  background-color: var(--border-light);
   border-radius: 999px;
   overflow: hidden;
   height: 8px;
@@ -554,7 +556,7 @@ h3 {
 
 .progress-fill {
   height: 100%;
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;

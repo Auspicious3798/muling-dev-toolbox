@@ -106,19 +106,19 @@ export default {
   padding: 10px 16px;
   cursor: pointer;
   transition: all 0.2s;
-  color: #cbd5e1;
+  color: var(--text-nav);
   gap: 10px;
 }
 
 .menu-item:hover {
-  background-color: #2d3e4e;
-  color: white;
+  background-color: var(--bg-hover);
+  color: var(--text-nav-hover);
 }
 
 .menu-item.active {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
-  border-left: 3px solid #f5b042;
+  border-left: 3px solid var(--accent);
 }
 
 .menu-item.has-children {
