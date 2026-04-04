@@ -2,7 +2,8 @@
   <div class="environment-panel">
     <div class="panel-header">
       <div class="title-section">
-        <span class="tool-icon">{{ toolIcon }}</span>
+        <img v-if="toolIconPath" :src="toolIconPath" class="tool-icon-img" alt="" />
+        <span v-else class="tool-icon-emoji">{{ toolIconEmoji }}</span>
         <h3>{{ toolLabel }}</h3>
       </div>
       <button class="install-btn" @click="$emit('install')">
@@ -35,21 +36,30 @@
               {{ serviceStatus[v] === 'running' ? '运行中' : (serviceStatus[v] === 'stopped' ? '已停止' : '未知') }}
             </span>
           </div>
+          <div v-if="tool === 'redis'" class="redis-config-row">
+            <span class="config-label">端口：</span>
+            <span>{{ redisConfigs[v]?.port || '未知' }}</span>
+            <span class="config-label">密码：</span>
+            <span>{{ redisConfigs[v]?.hasPassword ? '已设置' : '无密码' }}</span>
+          </div>
         </div>
         <div class="card-actions">
           <button v-if="v !== defaultVersion" @click="switchVersion(v)" class="action-switch" :disabled="actionLoading">
             <span class="action-icon">⇄</span> 切换
           </button>
-          <button v-if="['mysql', 'redis'].includes(tool)" @click="startService(v)" class="action-start"
-                  :disabled="actionLoading">
-            <span class="action-icon">▶</span> 启动
+          <template v-if="tool === 'mysql'">
+            <button @click="startService(v)" class="action-start" :disabled="actionLoading">
+              <span class="action-icon">▶</span> 启动
+            </button>
+            <button @click="stopService(v)" class="action-stop" :disabled="actionLoading">
+              <span class="action-icon">■</span> 停止
+            </button>
+          </template>
+          <button v-if="tool === 'redis'" @click="toggleService(v)" :class="serviceStatus[v] === 'running' ? 'action-stop' : 'action-start'" :disabled="actionLoading">
+            <span class="action-icon">{{ serviceStatus[v] === 'running' ? '■' : '▶' }}</span>
+            {{ serviceStatus[v] === 'running' ? '停止' : '启动' }}
           </button>
-          <button v-if="['mysql', 'redis'].includes(tool)" @click="stopService(v)" class="action-stop"
-                  :disabled="actionLoading">
-            <span class="action-icon">■</span> 停止
-          </button>
-          <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password"
-                  :disabled="actionLoading">
+          <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password" :disabled="actionLoading">
             <span class="action-icon">🔑</span> 修改密码
           </button>
           <button @click="uninstallVersion(v)" class="action-delete" :disabled="actionLoading">
@@ -68,11 +78,11 @@
         <h4>修改 Redis 密码</h4>
         <div class="modal-field">
           <label>旧密码（若无则留空）：</label>
-          <input type="password" v-model="oldRedisPassword"/>
+          <input type="password" v-model="oldRedisPassword" />
         </div>
         <div class="modal-field">
           <label>新密码：</label>
-          <input type="password" v-model="newRedisPassword"/>
+          <input type="password" v-model="newRedisPassword" />
         </div>
         <div class="modal-buttons">
           <button @click="changeRedisPassword" :disabled="passwordChanging" class="modal-btn confirm">确认修改</button>
@@ -84,6 +94,30 @@
 </template>
 
 <script>
+import AIIcon from '@/assets/icons/AI.svg?url';
+import CIcon from '@/assets/icons/c.svg?url';
+import ElasticsearchIcon from '@/assets/icons/elasticsearch.svg?url';
+import GitIcon from '@/assets/icons/git.svg?url';
+import GolangIcon from '@/assets/icons/Golang.svg?url';
+import GradleIcon from '@/assets/icons/gradle.svg?url';
+import JavaIcon from '@/assets/icons/java.svg?url';
+import JupyterIcon from '@/assets/icons/Jupyter.svg?url';
+import KibanaIcon from '@/assets/icons/kibana.svg?url';
+import MavenIcon from '@/assets/icons/maven.svg?url';
+import MinicondaIcon from '@/assets/icons/Miniconda.svg?url';
+import MinioIcon from '@/assets/icons/minio.svg?url';
+import MysqlIcon from '@/assets/icons/mysql.svg?url';
+import NacosIcon from '@/assets/icons/nacos.svg?url';
+import NginxIcon from '@/assets/icons/nginx.svg?url';
+import OllamaIcon from '@/assets/icons/Ollama.svg?url';
+import PythonIcon from '@/assets/icons/Python.svg?url';
+import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg?url';
+import RedisIcon from '@/assets/icons/Redis.svg?url';
+import SentinelIcon from '@/assets/icons/sentinel.svg?url';
+import DashboardIcon from '@/assets/icons/仪表板.svg?url';
+import LemonIcon from '@/assets/icons/柠檬.svg?url';
+import SettingsIcon from '@/assets/icons/设置.svg?url';
+
 export default {
   name: 'EnvironmentPanel',
   props: {
@@ -98,6 +132,7 @@ export default {
       versions: [],
       defaultVersion: null,
       serviceStatus: {},
+      redisConfigs: {},
       actionLoading: false,
       apiMissing: false,
       showPasswordModal: false,
@@ -133,7 +168,7 @@ export default {
       };
       return map[this.tool] || this.tool.toUpperCase();
     },
-    toolIcon() {
+    toolIconEmoji() {
       const icons = {
         jdk: '☕',
         python: '🐍',
@@ -157,6 +192,35 @@ export default {
         'redis-insight': '🔴'
       };
       return icons[this.tool] || '🛠️';
+    },
+    toolIconPath() {
+      const pathMap = {
+        jdk: JavaIcon,
+        python: PythonIcon,
+        mysql: MysqlIcon,
+        redis: RedisIcon,
+        maven: MavenIcon,
+        gradle: GradleIcon,
+        nacos: NacosIcon,
+        sentinel: SentinelIcon,
+        rabbitmq: RabbitmqIcon,
+        miniconda: MinicondaIcon,
+        jupyter: JupyterIcon,
+        ollama: OllamaIcon,
+        go: GolangIcon,
+        mingw: CIcon,
+        git: GitIcon,
+        nginx: NginxIcon,
+        minio: MinioIcon,
+        elasticsearch: ElasticsearchIcon,
+        kibana: KibanaIcon,
+        'redis-insight': RedisIcon,
+        dashboard: DashboardIcon,
+        settings: SettingsIcon,
+        about: LemonIcon,
+        'ai-assistant': AIIcon
+      };
+      return pathMap[this.tool] || null;
     },
     checkMethod() {
       const methodMap = {
@@ -239,6 +303,9 @@ export default {
         if (['mysql', 'redis'].includes(this.tool)) {
           await this.refreshAllServiceStatus();
         }
+        if (this.tool === 'redis') {
+          await this.refreshRedisConfigs();
+        }
       } catch (err) {
         console.error(`${this.toolLabel} 检测失败`, err);
         if (err.message && err.message.includes('is not a function')) {
@@ -262,6 +329,21 @@ export default {
           }
         } catch {
           this.serviceStatus[v] = 'unknown';
+        }
+      }
+    },
+    async refreshRedisConfigs() {
+      if (this.tool !== 'redis') return;
+      for (const v of this.versions) {
+        try {
+          const res = await window.electronAPI.getRedisConfig(v);
+          if (res.success) {
+            this.redisConfigs[v] = { port: res.port, hasPassword: res.hasPassword };
+          } else {
+            this.redisConfigs[v] = { port: '未知', hasPassword: false };
+          }
+        } catch {
+          this.redisConfigs[v] = { port: '未知', hasPassword: false };
         }
       }
     },
@@ -354,6 +436,13 @@ export default {
         this.actionLoading = false;
       }
     },
+    async toggleService(version) {
+      if (this.serviceStatus[version] === 'running') {
+        await this.stopService(version);
+      } else {
+        await this.startService(version);
+      }
+    },
     openPasswordModal(version) {
       this.currentVersionForPassword = version;
       this.oldRedisPassword = '';
@@ -378,6 +467,7 @@ export default {
           this.$emit('status', `✅ ${result.message}`);
           this.closePasswordModal();
           await this.refreshAllServiceStatus();
+          await this.refreshRedisConfigs();
         } else {
           this.$emit('status', `❌ 修改密码失败：${result.message}`);
         }
@@ -418,7 +508,14 @@ export default {
   gap: 12px;
 }
 
-.tool-icon {
+.tool-icon-img {
+  width: 32px;
+  height: 32px;
+  display: block;
+  object-fit: contain;
+}
+
+.tool-icon-emoji {
   font-size: 2rem;
   filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
 }
@@ -610,6 +707,19 @@ export default {
 
 .service-status.stopped .status-dot {
   background-color: #dc2626;
+}
+
+.redis-config-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.config-label {
+  font-weight: 500;
 }
 
 .card-actions {

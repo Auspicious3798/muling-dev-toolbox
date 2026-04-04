@@ -9,7 +9,15 @@
       }"
         @click="toggleOrSelect"
     >
-      <span class="item-icon">{{ item.icon || '📁' }}</span>
+      <span class="item-icon">
+        <img
+            v-if="isImageIcon"
+            :src="item.icon"
+            class="nav-icon"
+            alt=""
+        />
+        <span v-else>{{ item.icon || '📁' }}</span>
+      </span>
       <span class="item-label">{{ item.label }}</span>
       <span v-if="hasChildren" class="item-arrow">{{ expanded ? '▼' : '▶' }}</span>
     </div>
@@ -49,6 +57,14 @@ export default {
     },
     isActive() {
       return this.item.id === this.activeId;
+    },
+    isImageIcon() {
+      const icon = this.item.icon;
+      if (!icon) return false;
+      if (typeof icon === 'string') {
+        return icon.endsWith('.svg') || icon.endsWith('.png') || icon.startsWith('data:image') || icon.startsWith('/src/') || icon.startsWith('@/');
+      }
+      return false;
     }
   },
   watch: {
@@ -111,7 +127,16 @@ export default {
 
 .item-icon {
   width: 24px;
-  font-size: 1.1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  object-fit: contain;
 }
 
 .item-label {

@@ -1,6 +1,9 @@
 <template>
   <div class="jdk-installer">
-    <h3>☕ JDK 安装</h3>
+    <h3>
+      <img src="/src/assets/icons/java.svg" class="title-icon" alt=""/>
+      JDK 安装
+    </h3>
 
     <div class="mode-switch">
       <button :class="['mode-btn', { active: activeMode === 'online' }]" @click="switchMode('online')">
@@ -84,6 +87,7 @@
 
 <script>
 import eventBus from '@/eventBus';
+import JavaIcon from '@/assets/icons/java.svg';
 
 export default {
   name: 'JDKInstaller',
@@ -279,6 +283,13 @@ export default {
   padding: 24px;
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
   transition: box-shadow 0.3s ease;
+}
+
+.title-icon {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 
 .jdk-installer:hover {

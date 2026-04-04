@@ -1,6 +1,9 @@
 <template>
   <div class="python-installer">
-    <h3>🐍 Python 安装</h3>
+    <h3>
+      <img src="/src/assets/icons/python.svg" class="title-icon" alt=""/>
+      Python 安装
+    </h3>
 
     <div class="mode-switch">
       <button :class="['mode-btn', { active: activeMode === 'online' }]" @click="switchMode('online')">
@@ -540,6 +543,13 @@ h3 {
   border-radius: 999px;
   overflow: hidden;
   height: 8px;
+}
+
+.title-icon {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 
 .progress-fill {
