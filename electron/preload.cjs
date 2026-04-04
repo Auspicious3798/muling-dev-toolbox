@@ -2,7 +2,6 @@ const {contextBridge, ipcRenderer, shell} = require('electron');
 console.log('✅ Preload script loaded with Python API');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    // JDK API
     installJDK: (version) => ipcRenderer.invoke('install-jdk', version),
     installFromLocal: (version) => ipcRenderer.invoke('install-from-local', version),
     importLocalJDK: (filePath) => ipcRenderer.invoke('import-local-jdk', filePath),
@@ -13,7 +12,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onDownloadProgress: (callback) => ipcRenderer.on('download-progress', (_, data) => callback(data)),
     onJDKChanged: (callback) => ipcRenderer.on('jdk-changed', callback),
 
-    // Python API
     installPython: (version, mirror) => ipcRenderer.invoke('install-python', version, mirror),
     installFromLocalPython: (version, mirror) => ipcRenderer.invoke('install-from-local-python', version, mirror),
     importLocalPython: (filePath) => ipcRenderer.invoke('import-local-python', filePath),
@@ -23,7 +21,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelPythonDownload: () => ipcRenderer.send('cancel-python-download'),
     onPythonChanged: (callback) => ipcRenderer.on('python-changed', callback),
 
-    // MySQL API
     installMySQL: (version, password) => ipcRenderer.invoke('install-mysql', version, password),
     installFromLocalMySQL: (version, password) => ipcRenderer.invoke('install-from-local-mysql', version, password),
     importLocalMySQL: (filePath) => ipcRenderer.invoke('import-local-mysql', filePath),
@@ -39,7 +36,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     onMySQLProgress: (callback) => ipcRenderer.on('mysql-progress', (_, data) => callback(data)),
     onMySQLChanged: (callback) => ipcRenderer.on('mysql-changed', callback),
 
-    // Redis API
     installRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-redis', version, password, maxmemory),
     installFromLocalRedis: (version, password, maxmemory) => ipcRenderer.invoke('install-from-local-redis', version, password, maxmemory),
     importLocalRedis: (filePath) => ipcRenderer.invoke('import-local-redis', filePath),
@@ -50,12 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     stopRedisService: (version) => ipcRenderer.invoke('stop-redis-service', version),
     restartRedisService: (version) => ipcRenderer.invoke('restart-redis-service', version),
     getRedisServiceStatus: (version) => ipcRenderer.invoke('get-redis-service-status', version),
+    getRedisConfig: (version) => ipcRenderer.invoke('get-redis-config', version),
     changeRedisPassword: (version, oldPassword, newPassword) => ipcRenderer.invoke('change-redis-password', version, oldPassword, newPassword),
     cancelRedisDownload: () => ipcRenderer.send('cancel-redis-download'),
     onRedisProgress: (callback) => ipcRenderer.on('redis-progress', (_, data) => callback(data)),
     onRedisChanged: (callback) => ipcRenderer.on('redis-changed', callback),
 
-    // Common utilities
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),

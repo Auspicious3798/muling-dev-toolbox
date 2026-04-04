@@ -1,6 +1,9 @@
 <template>
   <div class="mysql-installer">
-    <h3>🐬 MySQL 安装</h3>
+    <h3>
+      <img src="/src/assets/icons/mysql.svg" class="title-icon" alt=""/>
+      MySQL 安装
+    </h3>
 
     <div class="mode-switch">
       <button :class="['mode-btn', { active: activeMode === 'online' }]" @click="switchMode('online')">
@@ -683,6 +686,13 @@ h3 {
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
+}
+
+.title-icon {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 
 .modal-overlay {

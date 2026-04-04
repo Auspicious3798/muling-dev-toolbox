@@ -1,6 +1,9 @@
 <template>
   <div class="redis-installer">
-    <h3>🔴 Redis 安装</h3>
+    <h3>
+      <img src="/src/assets/icons/redis.svg" class="title-icon" alt=""/>
+      Redis 安装
+    </h3>
 
     <div class="mode-switch">
       <button :class="['mode-btn', { active: activeMode === 'online' }]" @click="switchMode('online')">
@@ -29,10 +32,6 @@
       <div class="install-path">
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
-      </div>
-      <div class="config-input">
-        <label>端口（默认自动分配）：</label>
-        <input type="number" v-model.number="port" placeholder="留空则自动分配"/>
       </div>
       <div class="config-input">
         <label>密码（可选）：</label>
@@ -81,10 +80,6 @@
           ⚠️ 安装目录已存在文件！请删除或选择其他版本。
         </div>
         <div class="config-input">
-          <label>端口（默认自动分配）：</label>
-          <input type="number" v-model.number="localPort" placeholder="留空则自动分配"/>
-        </div>
-        <div class="config-input">
           <label>密码（可选）：</label>
           <input type="password" v-model="localPassword" placeholder="留空则无密码"/>
         </div>
@@ -131,11 +126,8 @@ export default {
       localFilePath: '',
       localVersion: '7.0',
       dirExistsWarning: false,
-      // 配置项
-      port: null,
       password: '',
       maxmemory: null,
-      localPort: null,
       localPassword: '',
       localMaxmemory: null
     };
@@ -175,11 +167,9 @@ export default {
         this.localFilePath = '';
         this.localVersion = '7.0';
         this.dirExistsWarning = false;
-        this.localPort = null;
         this.localPassword = '';
         this.localMaxmemory = null;
       } else {
-        this.port = null;
         this.password = '';
         this.maxmemory = null;
       }
@@ -368,7 +358,8 @@ h3 {
   color: #0369a1;
 }
 
-.version-select, .version-select-small {
+.version-select,
+.version-select-small {
   width: 100%;
   padding: 0.6rem 1rem;
   border-radius: 12px;
@@ -383,7 +374,8 @@ h3 {
   margin-bottom: 0;
 }
 
-.install-path, .import-path {
+.install-path,
+.import-path {
   margin: 1rem 0;
   padding: 0.6rem;
   background-color: #f9fafb;
@@ -426,6 +418,13 @@ h3 {
   gap: 12px;
 }
 
+.title-icon {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+  margin-right: 8px;
+}
+
 .validate-btn {
   background-color: #6b7280;
   color: white;
@@ -462,7 +461,8 @@ h3 {
   margin-bottom: 1rem;
 }
 
-.install-btn, .cancel-btn {
+.install-btn,
+.cancel-btn {
   flex: 1;
   padding: 0.8rem;
   border-radius: 12px;

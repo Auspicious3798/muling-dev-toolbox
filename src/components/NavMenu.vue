@@ -17,6 +17,29 @@
 
 <script>
 import NavMenuItem from './NavMenuItem.vue';
+import AIIcon from '@/assets/icons/AI.svg';
+import CIcon from '@/assets/icons/c.svg';
+import ElasticsearchIcon from '@/assets/icons/elasticsearch.svg';
+import GitIcon from '@/assets/icons/git.svg';
+import GolangIcon from '@/assets/icons/Golang.svg';
+import GradleIcon from '@/assets/icons/gradle.svg';
+import JavaIcon from '@/assets/icons/java.svg';
+import JupyterIcon from '@/assets/icons/Jupyter.svg';
+import KibanaIcon from '@/assets/icons/kibana.svg';
+import MavenIcon from '@/assets/icons/maven.svg';
+import MinicondaIcon from '@/assets/icons/Miniconda.svg';
+import MinioIcon from '@/assets/icons/minio.svg';
+import MysqlIcon from '@/assets/icons/mysql.svg';
+import NacosIcon from '@/assets/icons/nacos.svg';
+import NginxIcon from '@/assets/icons/nginx.svg';
+import OllamaIcon from '@/assets/icons/Ollama.svg';
+import PythonIcon from '@/assets/icons/Python.svg';
+import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg';
+import RedisIcon from '@/assets/icons/Redis.svg';
+import SentinelIcon from '@/assets/icons/sentinel.svg';
+import DashboardIcon from '@/assets/icons/仪表板.svg';
+import LemonIcon from '@/assets/icons/柠檬.svg';
+import SettingsIcon from '@/assets/icons/设置.svg';
 
 export default {
   name: 'NavMenu',
@@ -33,80 +56,80 @@ export default {
         {
           id: 'dashboard',
           label: '首页 / 仪表盘',
-          icon: '📊',
+          icon: DashboardIcon,
           children: []
         },
         {
           id: 'java-group',
           label: 'Java 开发环境',
-          icon: '☕',
+          icon: JavaIcon,
           children: [
-            {id: 'jdk', label: 'JDK', icon: '☕'},
-            {id: 'maven', label: 'Maven', icon: '📦'},
-            {id: 'gradle', label: 'Gradle', icon: '🔄'},
-            {id: 'mysql', label: 'MySQL', icon: '🐬'},
-            {id: 'redis', label: 'Redis', icon: '🔴'},
-            {id: 'nacos', label: 'Nacos', icon: '⚙️'},
-            {id: 'sentinel', label: 'Sentinel', icon: '🛡️'},
-            {id: 'rabbitmq', label: 'RabbitMQ', icon: '🐇'}
+            {id: 'jdk', label: 'JDK', icon: JavaIcon},
+            {id: 'maven', label: 'Maven', icon: MavenIcon},
+            {id: 'gradle', label: 'Gradle', icon: GradleIcon},
+            {id: 'mysql', label: 'MySQL', icon: MysqlIcon},
+            {id: 'redis', label: 'Redis', icon: RedisIcon},
+            {id: 'nacos', label: 'Nacos', icon: NacosIcon},
+            {id: 'sentinel', label: 'Sentinel', icon: SentinelIcon},
+            {id: 'rabbitmq', label: 'RabbitMQ', icon: RabbitmqIcon}
           ]
         },
         {
           id: 'python-group',
           label: 'Python & AI 环境',
-          icon: '🐍',
+          icon: PythonIcon,
           children: [
-            {id: 'python', label: 'Python', icon: '🐍'},
-            {id: 'miniconda', label: 'Miniconda', icon: '📦'},
-            {id: 'jupyter', label: 'Jupyter Lab', icon: '📓'},
-            {id: 'ollama', label: 'Ollama', icon: '🦙'}
+            {id: 'python', label: 'Python', icon: PythonIcon},
+            {id: 'miniconda', label: 'Miniconda', icon: MinicondaIcon},
+            {id: 'jupyter', label: 'Jupyter Lab', icon: JupyterIcon},
+            {id: 'ollama', label: 'Ollama', icon: OllamaIcon}
           ]
         },
         {
           id: 'go-group',
           label: 'Go 开发环境',
-          icon: '🐹',
+          icon: GolangIcon,
           children: [
-            {id: 'go', label: 'Go', icon: '🐹'}
+            {id: 'go', label: 'Go', icon: GolangIcon}
           ]
         },
         {
           id: 'cpp-group',
           label: 'C/C++ 环境',
-          icon: '⚙️',
+          icon: CIcon,
           children: [
-            {id: 'mingw', label: 'MinGW', icon: '🔧'}
+            {id: 'mingw', label: 'MinGW', icon: CIcon}
           ]
         },
         {
           id: 'middleware-group',
           label: '通用中间件',
-          icon: '🔌',
+          icon: NginxIcon,
           children: [
-            {id: 'git', label: 'Git', icon: '📜'},
-            {id: 'nginx', label: 'Nginx', icon: '🌐'},
-            {id: 'minio', label: 'MinIO', icon: '💾'},
-            {id: 'elasticsearch', label: 'Elasticsearch', icon: '🔍'},
-            {id: 'kibana', label: 'Kibana', icon: '📊'},
-            {id: 'redis-insight', label: 'Redis Insight', icon: '🔴'}
+            {id: 'git', label: 'Git', icon: GitIcon},
+            {id: 'nginx', label: 'Nginx', icon: NginxIcon},
+            {id: 'minio', label: 'MinIO', icon: MinioIcon},
+            {id: 'elasticsearch', label: 'Elasticsearch', icon: ElasticsearchIcon},
+            {id: 'kibana', label: 'Kibana', icon: KibanaIcon},
+            {id: 'redis-insight', label: 'Redis Insight', icon: RedisIcon}
           ]
         },
         {
           id: 'ai-assistant',
           label: 'AI 智能助手',
-          icon: '🤖',
+          icon: AIIcon,
           children: []
         },
         {
           id: 'settings',
           label: '工具箱设置',
-          icon: '⚙️',
+          icon: SettingsIcon,
           children: []
         },
         {
           id: 'about',
           label: '关于沐柠',
-          icon: 'ℹ️',
+          icon: LemonIcon,
           children: []
         }
       ]
