@@ -1,0 +1,111 @@
+/* src/styles/theme.css */
+
+/* 浅色主题变量 (默认) */
+:root {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f8fafc;
+    --bg-card: #ffffff;
+    --bg-hover: #f1f5f9;
+    --bg-input: #f9fafb;
+    --bg-nav: #1e2a3a;
+    --bg-modal: #ffffff;
+    --text-primary: #1e293b;
+    --text-secondary: #64748b;
+    --text-muted: #94a3b8;
+    --text-nav: #e2e8f0;
+    --text-nav-hover: #ffffff;
+    --border-light: #eef2f6;
+    --border-medium: #e2e8f0;
+    --border-dark: #cbd5e1;
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.1);
+    --gradient-bg: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+    --success-bg: #dcfce7;
+    --success-text: #166534;
+    --danger-bg: #fee2e2;
+    --danger-text: #991b1b;
+    --warning-bg: #fffbeb;
+    --warning-text: #b45309;
+    --info-bg: #eff6ff;
+    --info-text: #2563eb;
+    --primary: #2c7a4d;
+    --primary-hover: #1f5e3a;
+    --primary-light: #dcfce7;
+    --accent: #f5b042;
+    --accent-light: #fef3c7;
+}
+
+/* 深色主题变量 */
+.dark {
+    --bg-primary: #0f172a;
+    --bg-secondary: #1e293b;
+    --bg-card: #1e293b;
+    --bg-hover: #334155;
+    --bg-input: #1e293b;
+    --bg-nav: #0f172a;
+    --bg-modal: #1e293b;
+    --text-primary: #f1f5f9;
+    --text-secondary: #cbd5e1;
+    --text-muted: #94a3b8;
+    --text-nav: #cbd5e1;
+    --text-nav-hover: #ffffff;
+    --border-light: #334155;
+    --border-medium: #475569;
+    --border-dark: #64748b;
+    --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
+    --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+    --gradient-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    --success-bg: #064e3b;
+    --success-text: #86efac;
+    --danger-bg: #7f1d1d;
+    --danger-text: #fca5a5;
+    --warning-bg: #78350f;
+    --warning-text: #fcd34d;
+    --info-bg: #1e3a8a;
+    --info-text: #93c5fd;
+    --primary: #2c7a4d;
+    --primary-hover: #1f5e3a;
+    --primary-light: #064e3b;
+    --accent: #f5b042;
+    --accent-light: #78350f;
+}
+
+/* 跟随系统 */
+@media (prefers-color-scheme: dark) {
+    :root:not(.light) {
+        --bg-primary: #0f172a;
+        --bg-secondary: #1e293b;
+        --bg-card: #1e293b;
+        --bg-hover: #334155;
+        --bg-input: #1e293b;
+        --bg-nav: #0f172a;
+        --bg-modal: #1e293b;
+        --text-primary: #f1f5f9;
+        --text-secondary: #cbd5e1;
+        --text-muted: #94a3b8;
+        --text-nav: #cbd5e1;
+        --text-nav-hover: #ffffff;
+        --border-light: #334155;
+        --border-medium: #475569;
+        --border-dark: #64748b;
+        --shadow-sm: 0 2px 6px rgba(0, 0, 0, 0.2);
+        --shadow-md: 0 8px 20px rgba(0, 0, 0, 0.3);
+        --shadow-lg: 0 12px 24px rgba(0, 0, 0, 0.4);
+        --gradient-bg: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+        --success-bg: #064e3b;
+        --success-text: #86efac;
+        --danger-bg: #7f1d1d;
+        --danger-text: #fca5a5;
+        --warning-bg: #78350f;
+        --warning-text: #fcd34d;
+        --info-bg: #1e3a8a;
+        --info-text: #93c5fd;
+        --primary: #2c7a4d;
+        --primary-hover: #1f5e3a;
+        --primary-light: #064e3b;
+        --accent: #f5b042;
+        --accent-light: #78350f;
+    }
+}

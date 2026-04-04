@@ -63,6 +63,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getSystemStats: () => ipcRenderer.invoke('get-system-stats'),
 
+    getCacheSize: () => ipcRenderer.invoke('get-cache-size'),
+    clearCache: () => ipcRenderer.invoke('clear-cache'),
+    clearLogs: () => ipcRenderer.invoke('clear-logs'),
+    getVersionInfo: () => ipcRenderer.invoke('get-version-info'),
+    openGitHub: () => ipcRenderer.invoke('open-github'),
+    setProxy: (proxy) => ipcRenderer.invoke('set-proxy', proxy),
+
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),

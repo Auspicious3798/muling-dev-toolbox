@@ -3,6 +3,7 @@
     <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
       <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
+      <Settings v-else-if="activeTool === 'settings'"/>
       <AboutLemon v-else-if="activeTool === 'about'"/>
       <AIAssistant v-else-if="activeTool === 'ai-assistant'"/>
       <ComingSoon v-else-if="isComingSoon(activeTool)" :tool="activeTool"/>
@@ -24,6 +25,9 @@ import AboutLemon from './components/AboutLemon.vue';
 import AIAssistant from './components/AIAssistant.vue';
 import ComingSoon from './components/ComingSoon.vue';
 import Dashboard from './components/Dashboard.vue';
+import Settings from './components/Settings.vue';
+import eventBus from './eventBus';
+import '@/styles/theme.css';
 
 export default {
   name: 'App',
@@ -35,12 +39,22 @@ export default {
     AIAssistant,
     ComingSoon,
     Dashboard,
+    Settings,
   },
   data() {
     return {
       activeTool: 'dashboard',
       drawerVisible: false,
     };
+  },
+  mounted() {
+    this.initTheme();
+    eventBus.on('theme-change', this.handleThemeChange);
+    window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
+  },
+  beforeUnmount() {
+    eventBus.off('theme-change', this.handleThemeChange);
+    window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
     handleToolSelect(toolId) {
@@ -61,9 +75,55 @@ export default {
       }, 1000);
     },
     isComingSoon(tool) {
-      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'settings', 'about', 'ai-assistant'];
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'ai-assistant'];
       return !implemented.includes(tool);
-    }
+    },
+    initTheme() {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else if (savedTheme === 'light') {
+        document.documentElement.classList.remove('dark');
+      } else if (savedTheme === 'system') {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      } else {
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    },
+    handleThemeChange(theme) {
+      if (theme === 'dark') {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      } else if (theme === 'light') {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('theme', 'light');
+      } else if (theme === 'system') {
+        localStorage.setItem('theme', 'system');
+        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    },
+    handleSystemThemeChange(e) {
+      const savedTheme = localStorage.getItem('theme');
+      if (savedTheme === 'system') {
+        if (e.matches) {
+          document.documentElement.classList.add('dark');
+        } else {
+          document.documentElement.classList.remove('dark');
+        }
+      }
+    },
   },
 };
 </script>
@@ -73,18 +133,26 @@ export default {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+*::-webkit-scrollbar {
+  display: none;
 }
 
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
 }
 
 .app-layout {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: #f0f2f5;
+  background: var(--bg-secondary);
 }
 
 .right-panel {

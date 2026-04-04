@@ -539,10 +539,10 @@ export default {
 
 <style scoped>
 .environment-panel {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--gradient-bg);
   border-radius: 28px;
   padding: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-md);
   height: 100%;
   display: flex;
   flex-direction: column;
@@ -555,7 +555,7 @@ export default {
   align-items: center;
   margin-bottom: 20px;
   padding-bottom: 12px;
-  border-bottom: 2px solid #eef2f6;
+  border-bottom: 2px solid var(--border-light);
 }
 
 .title-section {
@@ -580,7 +580,7 @@ export default {
   font-size: 1.8rem;
   font-weight: 700;
   margin: 0;
-  background: linear-gradient(135deg, #1e293b, #2c3e50);
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
@@ -588,7 +588,7 @@ export default {
 }
 
 .install-btn {
-  background: linear-gradient(135deg, #2c7a4d, #1f5e3a);
+  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
   color: white;
   border: none;
   padding: 10px 20px;
@@ -600,7 +600,7 @@ export default {
   align-items: center;
   gap: 8px;
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-sm);
 }
 
 .install-btn .plus-icon {
@@ -610,8 +610,8 @@ export default {
 
 .install-btn:hover {
   transform: translateY(-2px);
-  background: linear-gradient(135deg, #1f5e3a, #154e2f);
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(135deg, var(--primary-hover), #154e2f);
+  box-shadow: var(--shadow-md);
 }
 
 .toolbar {
@@ -619,9 +619,9 @@ export default {
 }
 
 .refresh-btn {
-  background-color: #f1f5f9;
-  color: #334155;
-  border: 1px solid #e2e8f0;
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
   padding: 8px 18px;
   border-radius: 30px;
   cursor: pointer;
@@ -634,18 +634,18 @@ export default {
 }
 
 .refresh-btn:hover:not(:disabled) {
-  background-color: #e6edf4;
-  border-color: #cbd5e1;
+  background-color: var(--border-light);
+  border-color: var(--border-dark);
   transform: scale(0.98);
 }
 
 .empty-state {
   text-align: center;
   padding: 60px 20px;
-  background: #fefefe;
+  background: var(--bg-card);
   border-radius: 28px;
   margin-top: 20px;
-  border: 1px dashed #cbd5e1;
+  border: 1px dashed var(--border-medium);
 }
 
 .empty-icon {
@@ -655,7 +655,7 @@ export default {
 }
 
 .empty-state p {
-  color: #64748b;
+  color: var(--text-secondary);
   font-size: 1rem;
 }
 
@@ -668,26 +668,26 @@ export default {
 }
 
 .version-card {
-  background: white;
+  background: var(--bg-card);
   border-radius: 24px;
   padding: 16px;
-  border: 1px solid #eef2f6;
+  border: 1px solid var(--border-light);
   transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
 .version-card:hover {
-  border-color: #cbd5e1;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  border-color: var(--border-dark);
+  box-shadow: var(--shadow-md);
   transform: translateY(-2px);
 }
 
 .version-card.is-default {
   background: linear-gradient(135deg, #f0f9ff, #e6f4ff);
-  border-left: 4px solid #2c7a4d;
+  border-left: 4px solid var(--primary);
   border-color: #b9e0f0;
 }
 
@@ -705,15 +705,15 @@ export default {
 .version-badge {
   font-weight: 700;
   font-size: 1rem;
-  background: #eef2ff;
+  background: var(--info-bg);
   padding: 6px 14px;
   border-radius: 40px;
-  color: #1e293b;
+  color: var(--info-text);
 }
 
 .default-tag {
   font-size: 0.75rem;
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
   padding: 4px 12px;
   border-radius: 30px;
@@ -732,7 +732,7 @@ export default {
 
 .status-label {
   font-weight: 500;
-  color: #475569;
+  color: var(--text-secondary);
 }
 
 .service-status {
@@ -753,21 +753,21 @@ export default {
 }
 
 .service-status.running {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .service-status.running .status-dot {
-  background-color: #16a34a;
+  background-color: var(--success-text);
 }
 
 .service-status.stopped {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .service-status.stopped .status-dot {
-  background-color: #dc2626;
+  background-color: var(--danger-text);
 }
 
 .redis-config-row {
@@ -775,7 +775,7 @@ export default {
   align-items: center;
   gap: 12px;
   font-size: 0.8rem;
-  color: #475569;
+  color: var(--text-secondary);
   margin-top: 4px;
 }
 
@@ -809,42 +809,43 @@ export default {
 }
 
 .action-switch {
-  background-color: #eff6ff;
-  color: #2563eb;
+  background-color: var(--info-bg);
+  color: var(--info-text);
 }
 
 .action-switch:hover:not(:disabled) {
-  background-color: #dbeafe;
+  background-color: var(--info-bg);
+  filter: brightness(0.95);
   transform: scale(0.96);
 }
 
 .action-start {
-  background-color: #dcfce7;
-  color: #16a34a;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .action-start:hover:not(:disabled) {
-  background-color: #bbf7d0;
+  filter: brightness(0.95);
   transform: scale(0.96);
 }
 
 .action-stop {
-  background-color: #fee2e2;
-  color: #dc2626;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .action-stop:hover:not(:disabled) {
-  background-color: #fecaca;
+  filter: brightness(0.95);
   transform: scale(0.96);
 }
 
 .action-delete {
-  background-color: #fee2e2;
-  color: #dc2626;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .action-delete:hover:not(:disabled) {
-  background-color: #fecaca;
+  filter: brightness(0.95);
   transform: scale(0.96);
 }
 
@@ -867,11 +868,11 @@ export default {
 .warning-message {
   margin-top: 20px;
   padding: 14px 18px;
-  background-color: #fffbeb;
+  background-color: var(--warning-bg);
   border-left: 4px solid #f59e0b;
   border-radius: 20px;
   font-size: 0.9rem;
-  color: #b45309;
+  color: var(--warning-text);
   display: flex;
   align-items: center;
   gap: 10px;
@@ -895,15 +896,16 @@ export default {
 }
 
 .modal {
-  background: white;
+  background: var(--bg-modal);
   padding: 24px;
   border-radius: 20px;
   width: 400px;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal h4 {
   margin-bottom: 16px;
+  color: var(--text-primary);
 }
 
 .modal-field {
@@ -914,13 +916,16 @@ export default {
   display: block;
   margin-bottom: 4px;
   font-weight: 500;
+  color: var(--text-secondary);
 }
 
 .modal-field input {
   width: 100%;
   padding: 8px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-medium);
   border-radius: 8px;
+  background: var(--bg-input);
+  color: var(--text-primary);
 }
 
 .modal-buttons {
@@ -939,12 +944,12 @@ export default {
 }
 
 .modal-btn.confirm {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
 }
 
 .modal-btn.cancel {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 </style>

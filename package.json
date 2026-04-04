@@ -1,6 +1,6 @@
 {
-  "name": "muling-dev-toolbox",
-  "version": "0.0.0",
+  "name": "muling-environment-box",
+  "version": "v1.0.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -33,6 +33,7 @@
   "build": {
     "appId": "com.muling.dev-toolbox",
     "productName": "沐柠环境盒",
+    "artifactName": "${productName}-Setup-${version}.exe",
     "directories": {
       "output": "dist_electron"
     },

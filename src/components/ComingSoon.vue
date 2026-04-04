@@ -53,10 +53,10 @@ export default {
 
 <style scoped>
 .coming-soon {
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  background: var(--gradient-bg);
   border-radius: 28px;
   padding: 24px;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05), 0 2px 4px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-md);
   height: 100%;
   display: flex;
   align-items: center;
@@ -68,9 +68,9 @@ export default {
   max-width: 500px;
   text-align: center;
   padding: 40px 20px;
-  background: white;
+  background: var(--bg-card);
   border-radius: 32px;
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-lg);
 }
 
 .icon {
@@ -82,20 +82,20 @@ h2 {
   font-size: 1.8rem;
   font-weight: 700;
   margin-bottom: 8px;
-  background: linear-gradient(135deg, #1e293b, #2c3e50);
+  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
   background-clip: text;
   -webkit-background-clip: text;
   color: transparent;
 }
 
 .subtitle {
-  color: #64748b;
+  color: var(--text-secondary);
   margin-bottom: 24px;
 }
 
 .details {
   text-align: left;
-  background: #f8fafc;
+  background: var(--bg-secondary);
   border-radius: 20px;
   padding: 20px;
   margin-top: 20px;
@@ -104,6 +104,7 @@ h2 {
 .details p {
   font-weight: 600;
   margin-bottom: 8px;
+  color: var(--text-primary);
 }
 
 .details ul {
@@ -113,7 +114,7 @@ h2 {
 
 .details li {
   padding: 4px 0;
-  color: #334155;
+  color: var(--text-secondary);
   display: flex;
   align-items: center;
   gap: 8px;
@@ -121,7 +122,7 @@ h2 {
 
 .details li::before {
   content: "✓";
-  color: #2c7a4d;
+  color: var(--primary);
   font-weight: bold;
 }
 </style>

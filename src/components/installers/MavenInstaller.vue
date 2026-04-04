@@ -1,7 +1,7 @@
 <template>
   <div class="maven-installer">
     <h3>
-      <img src="/src/assets/icons/maven.svg" class="title-icon" alt=""/>
+      <img :src="MavenIcon" class="title-icon" alt=""/>
       Maven 安装
     </h3>
 
@@ -73,6 +73,7 @@ export default {
   name: 'MavenInstaller',
   data() {
     return {
+      MavenIcon,
       activeMode: 'online',
       installing: false,
       downloading: false,
@@ -229,10 +230,10 @@ export default {
 
 <style scoped>
 .maven-installer {
-  background: white;
+  background: var(--bg-card);
   border-radius: 20px;
   padding: 24px;
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.02);
+  box-shadow: var(--shadow-sm);
   transition: box-shadow 0.3s ease;
 }
 
@@ -244,21 +245,21 @@ export default {
 }
 
 .maven-installer:hover {
-  box-shadow: 0 20px 25px -12px rgba(0, 0, 0, 0.1);
+  box-shadow: var(--shadow-md);
 }
 
 h3 {
   font-size: 1.5rem;
   font-weight: 600;
   margin-bottom: 1rem;
-  color: #1f2937;
+  color: var(--text-primary);
 }
 
 .mode-switch {
   display: flex;
   gap: 12px;
   margin-bottom: 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border-light);
   padding-bottom: 12px;
 }
 
@@ -272,42 +273,42 @@ h3 {
   cursor: pointer;
   border-radius: 8px;
   transition: all 0.2s;
-  color: #6b7280;
+  color: var(--text-secondary);
 }
 
 .mode-btn.active {
-  background-color: #e0f2fe;
-  color: #0369a1;
+  background-color: var(--info-bg);
+  color: var(--info-text);
 }
 
 .mode-btn:hover:not(.active) {
-  background-color: #f3f4f6;
+  background-color: var(--bg-hover);
 }
 
 .install-path, .import-path {
   margin: 1rem 0;
   padding: 0.6rem;
-  background-color: #f9fafb;
+  background-color: var(--bg-secondary);
   border-radius: 12px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .import-path {
-  background-color: #f0fdf4;
-  border-color: #bbf7d0;
+  background-color: var(--success-bg);
+  border-color: var(--border-light);
 }
 
 .path-label {
   font-weight: 500;
-  color: #4b5563;
+  color: var(--text-secondary);
 }
 
 .path-display {
   font-family: monospace;
-  color: #1f2937;
+  color: var(--text-primary);
   word-break: break-all;
 }
 
@@ -351,29 +352,30 @@ h3 {
 }
 
 .install-btn {
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   color: white;
   border: none;
 }
 
 .install-btn:hover:not(:disabled) {
-  background-color: #1f5e3a;
+  background-color: var(--primary-hover);
   transform: scale(0.98);
 }
 
 .install-btn:disabled {
-  background-color: #9ca3af;
+  background-color: var(--text-muted);
   cursor: not-allowed;
 }
 
 .cancel-btn {
-  background-color: #ef4444;
-  color: white;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
   border: none;
 }
 
 .cancel-btn:hover {
-  background-color: #dc2626;
+  background-color: var(--danger-bg);
+  filter: brightness(0.95);
   transform: scale(0.98);
 }
 
@@ -382,24 +384,25 @@ h3 {
   text-align: center;
   padding: 0.5rem;
   border-radius: 10px;
-  background-color: #f3f4f6;
+  background-color: var(--bg-secondary);
   margin-bottom: 1rem;
   transition: all 0.3s ease;
+  color: var(--text-primary);
 }
 
 .status-success {
-  background-color: #dcfce7;
-  color: #166534;
+  background-color: var(--success-bg);
+  color: var(--success-text);
 }
 
 .status-error {
-  background-color: #fee2e2;
-  color: #991b1b;
+  background-color: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .progress-bar {
   width: 100%;
-  background-color: #e5e7eb;
+  background-color: var(--border-light);
   border-radius: 999px;
   overflow: hidden;
   height: 8px;
@@ -407,7 +410,7 @@ h3 {
 
 .progress-fill {
   height: 100%;
-  background-color: #2c7a4d;
+  background-color: var(--primary);
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
@@ -433,9 +436,9 @@ h3 {
 .warning-message {
   margin-top: 12px;
   padding: 8px;
-  background-color: #fee2e2;
+  background-color: var(--danger-bg);
   border-radius: 8px;
-  color: #991b1b;
+  color: var(--danger-text);
   font-size: 0.8rem;
 }
 </style>
