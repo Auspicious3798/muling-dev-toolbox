@@ -2,7 +2,10 @@
   <div class="app-layout">
     <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
-      <AboutLemon v-if="activeTool === 'about'"/>
+      <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
+      <AboutLemon v-else-if="activeTool === 'about'"/>
+      <AIAssistant v-else-if="activeTool === 'ai-assistant'"/>
+      <ComingSoon v-else-if="isComingSoon(activeTool)" :tool="activeTool"/>
       <EnvironmentPanel v-else ref="envPanel" :tool="activeTool" @install="openDrawer"/>
     </div>
     <InstallDrawer
@@ -18,6 +21,9 @@ import NavMenu from './components/NavMenu.vue';
 import EnvironmentPanel from './components/EnvironmentPanel.vue';
 import InstallDrawer from './components/InstallDrawer.vue';
 import AboutLemon from './components/AboutLemon.vue';
+import AIAssistant from './components/AIAssistant.vue';
+import ComingSoon from './components/ComingSoon.vue';
+import Dashboard from './components/Dashboard.vue';
 
 export default {
   name: 'App',
@@ -26,10 +32,13 @@ export default {
     EnvironmentPanel,
     InstallDrawer,
     AboutLemon,
+    AIAssistant,
+    ComingSoon,
+    Dashboard,
   },
   data() {
     return {
-      activeTool: 'jdk',
+      activeTool: 'dashboard',
       drawerVisible: false,
     };
   },
@@ -41,12 +50,20 @@ export default {
     openDrawer() {
       this.drawerVisible = true;
     },
+    openDrawerFromDashboard(toolId) {
+      this.activeTool = toolId;
+      this.drawerVisible = true;
+    },
     onInstalled() {
       this.$refs.envPanel?.refresh();
       setTimeout(() => {
         this.drawerVisible = false;
       }, 1000);
     },
+    isComingSoon(tool) {
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'settings', 'about', 'ai-assistant'];
+      return !implemented.includes(tool);
+    }
   },
 };
 </script>

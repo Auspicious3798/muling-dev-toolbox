@@ -93,6 +93,32 @@ app.whenReady().then(() => {
     registerRedisHandlers(mainWindow, app.getPath('userData'));
     registerMavenHandlers(mainWindow, app.getPath('userData'));
 
+    ipcMain.handle('get-system-stats', async () => {
+        const os = require('os');
+        const totalMem = os.totalmem();
+        const freeMem = os.freemem();
+        const getCpuUsage = () => {
+            const start = os.cpus().map(cpu => cpu.times);
+            return new Promise((resolve) => {
+                setTimeout(() => {
+                    const end = os.cpus().map(cpu => cpu.times);
+                    const usage = start.map((s, i) => {
+                        const idle = end[i].idle - s.idle;
+                        const total = (end[i].user + end[i].nice + end[i].sys + end[i].idle + end[i].irq) - (s.user + s.nice + s.sys + s.idle + s.irq);
+                        return 1 - idle / total;
+                    });
+                    const avgUsage = usage.reduce((a, b) => a + b, 0) / usage.length;
+                    resolve(avgUsage * 100);
+                }, 100);
+            });
+        };
+        const cpuUsage = await getCpuUsage();
+        return {
+            cpu: Math.round(cpuUsage),
+            memory: Math.round((totalMem - freeMem) / totalMem * 100)
+        };
+    });
+
     ipcMain.on('select-install-path', async (event) => {
         const result = await dialog.showOpenDialog(mainWindow, {
             properties: ['openDirectory'],
