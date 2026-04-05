@@ -14,7 +14,20 @@ function initConfig(userDataPath) {
     
     // 如果配置文件不存在，从默认配置复制
     if (!fs.existsSync(configPath)) {
-        const defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+        // 处理 asar 打包后的路径
+        let defaultConfigPath;
+        if (process.resourcesPath) {
+            // 生产环境（打包后）
+            defaultConfigPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'downloads.json');
+            if (!fs.existsSync(defaultConfigPath)) {
+                // 尝试其他可能的路径
+                defaultConfigPath = path.join(process.resourcesPath, 'config', 'downloads.json');
+            }
+        } else {
+            // 开发环境
+            defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+        }
+        
         console.log('[Config] 默认配置文件路径:', defaultConfigPath);
         console.log('[Config] 默认配置文件存在:', fs.existsSync(defaultConfigPath));
         if (fs.existsSync(defaultConfigPath)) {
@@ -57,7 +70,18 @@ function loadConfig() {
         console.error('[Config] 加载配置文件失败:', err.message);
         // 如果解析失败，尝试使用内置默认配置
         try {
-            const defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+            let defaultConfigPath;
+            if (process.resourcesPath) {
+                // 生产环境（打包后）
+                defaultConfigPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'downloads.json');
+                if (!fs.existsSync(defaultConfigPath)) {
+                    defaultConfigPath = path.join(process.resourcesPath, 'config', 'downloads.json');
+                }
+            } else {
+                // 开发环境
+                defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+            }
+            
             if (fs.existsSync(defaultConfigPath)) {
                 const defaultContent = fs.readFileSync(defaultConfigPath, 'utf-8');
                 configCache = JSON.parse(defaultContent);

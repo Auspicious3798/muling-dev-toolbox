@@ -39,7 +39,11 @@
     },
     "files": [
       "dist/**/*",
-      "electron/**/*"
+      "electron/**/*",
+      "config/**/*"
+    ],
+    "asarUnpack": [
+      "config/**/*"
     ],
     "win": {
       "target": "nsis",
