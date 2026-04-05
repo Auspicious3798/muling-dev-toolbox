@@ -40,14 +40,12 @@ function createWindow() {
             nodeIntegration: false,
             contextIsolation: true,
             preload: path.join(__dirname, 'preload.cjs'),
-            // devTools: process.env.NODE_ENV === 'development'
         }
     });
 
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173').then(r => r);
-        mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadURL('app://index.html').then(r => r);
         mainWindow.webContents.closeDevTools();
@@ -135,6 +133,11 @@ app.whenReady().then(() => {
             cpu: Math.round(cpuUsage),
             memory: Math.round((totalMem - freeMem) / totalMem * 100)
         };
+    });
+
+    ipcMain.handle('get-username', async () => {
+        const os = require('os');
+        return os.userInfo().username;
     });
 
     ipcMain.handle('get-cache-size', async () => {

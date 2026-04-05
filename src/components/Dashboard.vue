@@ -138,8 +138,16 @@ export default {
     this.listenEvents();
   },
   methods: {
-    initUserInfo() {
-      this.username = window.electronAPI ? window.electronAPI.getUserDataPath ? '开发者' : '用户' : '用户';
+    async initUserInfo() {
+      if (window.electronAPI && window.electronAPI.getUsername) {
+        try {
+          this.username = await window.electronAPI.getUsername();
+        } catch (err) {
+          this.username = '用户';
+        }
+      } else {
+        this.username = '用户';
+      }
     },
     updateDateTime() {
       const now = new Date();

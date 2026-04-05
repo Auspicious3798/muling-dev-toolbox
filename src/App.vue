@@ -78,64 +78,57 @@ export default {
       const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'ai-assistant'];
       return !implemented.includes(tool);
     },
-    initTheme() {
-      const savedTheme = localStorage.getItem('theme');
-      const applyTheme = (theme) => {
-        let isDark = false;
-        if (theme === 'dark') isDark = true;
-        else if (theme === 'light') isDark = false;
-        else if (theme === 'system') isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    applyTheme(theme) {
+      let isDark = false;
+      if (theme === 'dark') isDark = true;
+      else if (theme === 'light') isDark = false;
+      else if (theme === 'system') isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 
-        if (isDark) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-        localStorage.setItem('theme', theme);
-      };
-
-      if (savedTheme) {
-        applyTheme(savedTheme);
+      if (isDark) {
+        document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
+        document.body.style.backgroundColor = '#0f172a';
+        document.body.style.color = '#f1f5f9';
       } else {
-        applyTheme('system');
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        document.body.style.backgroundColor = '#f8fafc';
+        document.body.style.color = '#1e293b';
       }
-
+      localStorage.setItem('theme', theme);
+    },
+    initTheme() {
+      // 优先从 toolbox_settings 读取主题设置
+      let savedTheme = localStorage.getItem('theme');
+      const stored = localStorage.getItem('toolbox_settings');
+      if (stored) {
+        try {
+          const settings = JSON.parse(stored);
+          savedTheme = settings.theme || savedTheme;
+        } catch (e) {
+          // ignore parse error
+        }
+      }
+      
+      if (savedTheme) {
+        this.applyTheme(savedTheme);
+      } else {
+        this.applyTheme('system');
+      }
       window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
         const currentTheme = localStorage.getItem('theme');
         if (currentTheme === 'system') {
-          applyTheme('system');
+          this.applyTheme('system');
         }
       });
     },
     handleThemeChange(theme) {
-      console.log('App.vue received theme-change event:', theme);
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-        document.documentElement.classList.remove('light');
-        localStorage.setItem('theme', 'dark');
-      } else if (theme === 'light') {
-        document.documentElement.classList.add('light');
-        document.documentElement.classList.remove('dark');
-        localStorage.setItem('theme', 'light');
-      } else if (theme === 'system') {
-        document.documentElement.classList.remove('light');
-        localStorage.setItem('theme', 'system');
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      }
-      console.log('Current theme class on html:', document.documentElement.classList.contains('dark') ? 'dark' : (document.documentElement.classList.contains('light') ? 'light' : 'system'));
+      this.applyTheme(theme);
     },
     handleSystemThemeChange(e) {
       const savedTheme = localStorage.getItem('theme');
       if (savedTheme === 'system') {
-        if (e.matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
+        this.applyTheme('system');
       }
     },
   },
@@ -158,20 +151,19 @@ export default {
 body {
   font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
   overflow: hidden;
-  background: var(--bg-secondary);
-  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
 }
 
 .app-layout {
   display: flex;
   height: 100vh;
   width: 100vw;
-  background: var(--bg-secondary);
 }
 
 .right-panel {
   flex: 1;
   overflow-y: auto;
   padding: 20px;
+  background-color: transparent !important;
 }
 </style>
