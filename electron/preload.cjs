@@ -89,5 +89,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     getDownloadConfig: () => ipcRenderer.invoke('get-download-config'),
     setMirror: (mirrorUrl) => ipcRenderer.invoke('set-mirror', mirrorUrl),
     getMirrors: () => ipcRenderer.invoke('get-mirrors'),
-    getToolConfig: (toolName, version) => ipcRenderer.invoke('get-tool-config', toolName, version)
+    getToolConfig: (toolName, version) => ipcRenderer.invoke('get-tool-config', toolName, version),
+    testMirrorSpeed: () => ipcRenderer.invoke('test-mirror-speed')
 });

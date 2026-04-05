@@ -31,9 +31,16 @@
       <h2>下载与网络</h2>
       <div class="setting-item">
         <label>下载镜像源</label>
-        <select v-model="mirror" @change="saveMirror">
-          <option v-for="m in mirrors" :key="m.url" :value="m.url">{{ m.name }}</option>
-        </select>
+        <div class="mirror-selector">
+          <select v-model="mirror" @change="saveMirror" :disabled="testingSpeed">
+            <option v-for="m in mirrors" :key="m.url" :value="m.url">
+              {{ m.name }}{{ m.recommended ? ' ⭐推荐' : '' }} ({{ speedResults[m.url] ? (speedResults[m.url].success ? speedResults[m.url].duration + 'ms' : '超时') : '未测试' }})
+            </option>
+          </select>
+          <button @click="testSpeed" :disabled="testingSpeed" class="test-speed-btn">
+            {{ testingSpeed ? '测试中...' : '测速' }}
+          </button>
+        </div>
       </div>
       <div class="setting-item">
         <label>代理设置</label>
@@ -96,6 +103,8 @@ export default {
       closeBehavior: 'exit',
       mirror: 'https://ghfast.top/',
       mirrors: [],
+      speedResults: {},
+      testingSpeed: false,
       proxy: '',
       cacheSize: 0,
       logsSize: 0,
@@ -205,23 +214,63 @@ export default {
         if (!result || !Array.isArray(result) || result.length === 0) {
           console.warn('镜像列表为空，使用默认值');
           this.mirrors = [
-            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/' },
-            { name: 'ghproxy.com', url: 'https://ghproxy.com/' },
-            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/' }
+            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
+            { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
+            { name: 'hub.nuaa.cf', url: 'https://hub.nuaa.cf/', recommended: false },
+            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false },
+            { name: 'github.com.cnpmjs.org', url: 'https://github.com.cnpmjs.org/', recommended: false },
+            { name: 'hub.fastgit.org', url: 'https://hub.fastgit.org/', recommended: false },
+            { name: 'gh.api.99988866.xyz', url: 'https://gh.api.99988866.xyz/', recommended: false }
           ];
         } else {
           this.mirrors = result;
+          // 自动选择推荐的镜像
+          const recommendedMirror = this.mirrors.find(m => m.recommended);
+          if (recommendedMirror) {
+            this.mirror = recommendedMirror.url;
+          }
         }
         
         console.log('最终 mirrors 列表:', this.mirrors);
+        console.log('当前选择的镜像:', this.mirror);
       } catch (err) {
         console.error('加载镜像列表失败:', err);
         // 使用默认镜像列表
         this.mirrors = [
-          { name: '默认 (ghfast.top)', url: 'https://ghfast.top/' },
-          { name: 'ghproxy.com', url: 'https://ghproxy.com/' },
-          { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/' }
+          { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
+          { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
+          { name: 'hub.nuaa.cf', url: 'https://hub.nuaa.cf/', recommended: false },
+          { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false },
+          { name: 'github.com.cnpmjs.org', url: 'https://github.com.cnpmjs.org/', recommended: false },
+          { name: 'hub.fastgit.org', url: 'https://hub.fastgit.org/', recommended: false },
+          { name: 'gh.api.99988866.xyz', url: 'https://gh.api.99988866.xyz/', recommended: false }
         ];
+      }
+    },
+    async testSpeed() {
+      if (!window.electronAPI || !window.electronAPI.testMirrorSpeed) {
+        console.error('electronAPI.testMirrorSpeed 不存在');
+        return;
+      }
+      
+      this.testingSpeed = true;
+      this.speedResults = {};
+      
+      try {
+        const results = await window.electronAPI.testMirrorSpeed();
+        console.log('测速结果:', results);
+        
+        // 将结果转换为以 URL 为键的对象
+        results.forEach(result => {
+          this.speedResults[result.url] = result;
+        });
+        
+        // 刷新镜像列表以更新推荐标记
+        await this.loadMirrors();
+      } catch (err) {
+        console.error('测速失败:', err);
+      } finally {
+        this.testingSpeed = false;
       }
     },
     async saveMirror() {
@@ -336,6 +385,47 @@ export default {
   border: 1px solid var(--border-medium);
   background: var(--bg-input);
   color: var(--text-primary);
+}
+
+.mirror-selector {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mirror-selector select {
+  flex: 1;
+}
+
+.test-speed-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 6px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.test-speed-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.recommended-badge {
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  color: white;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  margin-left: 8px;
+  font-weight: 600;
+}
+
+.speed-badge {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  margin-left: 8px;
 }
 
 .cache-info {

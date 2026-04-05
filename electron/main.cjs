@@ -267,6 +267,79 @@ app.whenReady().then(() => {
         return configManager.getToolConfig(toolName, version);
     });
 
+    // 测试镜像源速度
+    ipcMain.handle('test-mirror-speed', async () => {
+        const https = require('https');
+        let mirrors = configManager.getMirrors();
+        
+        // 确保有镜像可测
+        if (!mirrors || mirrors.length === 0) {
+            mirrors = [
+                { name: '默认 (ghfast.top)', url: 'https://ghfast.top/' },
+                { name: 'ghproxy.com', url: 'https://ghproxy.com/' },
+                { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/' }
+            ];
+        }
+        
+        const results = [];
+
+        const testMirror = (mirror) => {
+            return new Promise((resolve) => {
+                const startTime = Date.now();
+                // 尝试获取一个小文件来测试延迟和带宽
+                const testUrl = mirror.url.replace(/\/$/, '') + '/https://github.com/robots.txt';
+                
+                const req = https.get(testUrl, {
+                    timeout: 5000,
+                    rejectUnauthorized: false, // 忽略可能的证书问题
+                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                }, (res) => {
+                    const endTime = Date.now();
+                    const duration = endTime - startTime;
+                    res.resume();
+                    res.on('end', () => {
+                        resolve({ url: mirror.url, name: mirror.name, duration, success: true, statusCode: res.statusCode });
+                    });
+                });
+                
+                req.on('error', (err) => {
+                    console.error(`[Mirror Test] ${mirror.name} Error:`, err.message);
+                    resolve({ url: mirror.url, name: mirror.name, duration: -1, success: false, error: err.message });
+                });
+                
+                req.on('timeout', () => {
+                    req.destroy();
+                    resolve({ url: mirror.url, name: mirror.name, duration: -1, success: false, error: 'Timeout' });
+                });
+            });
+        };
+
+        for (const mirror of mirrors) {
+            const result = await testMirror(mirror);
+            results.push(result);
+            console.log(`[Mirror Test] ${mirror.name}: ${result.success ? result.duration + 'ms' : '失败'}`);
+        }
+
+        // 找到最快的镜像
+        const successfulMirrors = results.filter(r => r.success);
+        if (successfulMirrors.length > 0) {
+            successfulMirrors.sort((a, b) => a.duration - b.duration);
+            const fastestUrl = successfulMirrors[0].url;
+            
+            // 更新配置中的推荐标记
+            const config = configManager.getConfig();
+            if (config && config.mirrors) {
+                config.mirrors.forEach(m => {
+                    m.recommended = (m.url === fastestUrl);
+                });
+                configManager.saveConfig();
+                console.log(`[Mirror Test] 推荐镜像已更新: ${fastestUrl}`);
+            }
+        }
+
+        return results;
+    });
+
     ipcMain.on('minimize-window', () => mainWindow.minimize());
     ipcMain.on('maximize-window', () => {
         if (mainWindow.isMaximized()) mainWindow.unmaximize();

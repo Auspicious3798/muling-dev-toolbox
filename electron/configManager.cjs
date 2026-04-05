@@ -134,14 +134,19 @@ function getMirrors() {
     const config = getConfig();
     console.log('[Config] getMirrors 被调用');
     console.log('[Config] config 对象:', config ? '存在' : 'null');
-    if (config) {
-        console.log('[Config] config.mirrors:', config.mirrors);
-        console.log('[Config] config.mirrors 类型:', typeof config.mirrors);
-        console.log('[Config] config.mirrors 是否为数组:', Array.isArray(config.mirrors));
+    
+    // 确保 mirrors 字段始终存在且有默认值
+    if (!config || !config.mirrors) {
+        console.log('[Config] 配置中无 mirrors，使用默认值');
+        return [
+            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
+            { name: 'ghproxy.com', url: 'https://ghproxy.com/', recommended: false },
+            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false }
+        ];
     }
-    const mirrors = config && config.mirrors ? config.mirrors : [];
-    console.log('[Config] 返回的 mirrors:', mirrors);
-    return mirrors;
+    
+    console.log('[Config] config.mirrors:', JSON.stringify(config.mirrors));
+    return config.mirrors;
 }
 
 /**
