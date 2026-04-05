@@ -70,6 +70,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openGitHub: () => ipcRenderer.invoke('open-github'),
     setProxy: (proxy) => ipcRenderer.invoke('set-proxy', proxy),
 
+    getUsername: () => ipcRenderer.invoke('get-username'),
+
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
