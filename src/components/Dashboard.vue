@@ -95,11 +95,11 @@
 
 <script>
 import eventBus from '@/eventBus';
-import JavaIcon from '@/assets/icons/java.svg?url';
-import PythonIcon from '@/assets/icons/Python.svg?url';
-import MysqlIcon from '@/assets/icons/mysql.svg?url';
-import RedisIcon from '@/assets/icons/Redis.svg?url';
-import MavenIcon from '@/assets/icons/maven.svg?url';
+import JavaIcon from '../../public/icons/java.svg?url';
+import PythonIcon from '../../public/icons/Python.svg?url';
+import MysqlIcon from '../../public/icons/mysql.svg?url';
+import RedisIcon from '../../public/icons/Redis.svg?url';
+import MavenIcon from '../../public/icons/maven.svg?url';
 
 export default {
   name: 'Dashboard',

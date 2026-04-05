@@ -2,6 +2,11 @@
   <div class="app-layout">
     <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
+      <div class="window-controls">
+        <div class="control-btn" @click="minimizeWindow">─</div>
+        <div class="control-btn" @click="maximizeWindow">□</div>
+        <div class="control-btn close-btn" @click="closeWindow">✕</div>
+      </div>
       <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
       <Settings v-else-if="activeTool === 'settings'"/>
       <AboutLemon v-else-if="activeTool === 'about'"/>
@@ -131,6 +136,15 @@ export default {
         this.applyTheme('system');
       }
     },
+    minimizeWindow() {
+      if (window.electronAPI) window.electronAPI.minimizeWindow();
+    },
+    maximizeWindow() {
+      if (window.electronAPI) window.electronAPI.maximizeWindow();
+    },
+    closeWindow() {
+      if (window.electronAPI) window.electronAPI.closeWindow();
+    },
   },
 };
 </script>
@@ -165,5 +179,36 @@ body {
   overflow-y: auto;
   padding: 20px;
   background-color: transparent !important;
+  position: relative;
+}
+
+.window-controls {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  height: 32px;
+  z-index: 100;
+}
+
+.control-btn {
+  width: 46px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+  -webkit-app-region: no-drag;
+}
+
+.control-btn:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.control-btn.close-btn:hover {
+  background-color: #e81123;
+  color: white;
 }
 </style>

@@ -35,7 +35,7 @@
 </template>
 
 <script>
-import LemonIcon from '@/assets/icons/lemon.svg?url';
+import LemonIcon from '/icons/lemon.svg?url';
 
 export default {
   name: 'AboutLemon',

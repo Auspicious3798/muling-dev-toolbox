@@ -92,7 +92,7 @@
 
 <script>
 import eventBus from '@/eventBus';
-import PythonIcon from '@/assets/icons/Python.svg?url';
+import PythonIcon from '../../../public/icons/Python.svg?url';
 
 export default {
   name: 'PythonInstaller',

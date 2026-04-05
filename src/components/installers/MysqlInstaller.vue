@@ -118,7 +118,7 @@
 
 <script>
 import eventBus from '@/eventBus';
-import MysqlIcon from '@/assets/icons/mysql.svg?url';
+import MysqlIcon from '../../../public/icons/mysql.svg?url';
 
 export default {
   name: 'MySQLInstaller',
