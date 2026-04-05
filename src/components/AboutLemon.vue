@@ -3,7 +3,7 @@
     <div class="content-card">
       <div class="hero">
         <div class="lemon-icon">
-          <img src="/icons/lemon.svg" alt="沐柠"/>
+          <img :src="lemonIcon" alt="沐柠" style="width: 100%; height: 100%;"/>
         </div>
         <h1>关于沐柠</h1>
         <div class="subtitle">Lemon · 数字世界的原创虚拟形象</div>
@@ -34,14 +34,28 @@
         <div class="contact">
           <p>联系沐柠：<a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a></p>
         </div>
+
+        <div class="disclaimer">
+          <p><strong>免责声明</strong><br>
+            沐柠工具箱（以下简称“本工具”）仅供学习、交流及研究使用。本工具提供的第三方软件（包括但不限于
+            JDK、Python、MySQL、Redis
+            等）均为各自版权方所有，用户应遵守相应开源协议或许可证条款。本工具不对用户因使用、安装或配置第三方软件而产生的任何直接或间接损失承担责任。用户应自行确保所下载及安装的软件来源合法、安全可用，并自行承担使用风险。本工具不包含任何恶意代码，但无法控制第三方软件的完整性及安全性。如涉及侵权，请联系我们删除相关内容。
+          </p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
+import lemonIcon from '../../public/icons/lemon.svg?url';
 export default {
   name: 'AboutLemon',
+  data() {
+    return {
+      lemonIcon,
+    };
+  },
 };
 </script>
 
@@ -52,9 +66,6 @@ export default {
   padding: 24px;
   box-shadow: var(--shadow-md);
   height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
   overflow-y: auto;
 }
 
@@ -191,5 +202,21 @@ h1 {
 
 .contact a:hover {
   text-decoration: underline;
+}
+
+.disclaimer {
+  margin-top: 32px;
+  padding: 16px;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  background: var(--bg-secondary);
+  border-radius: 16px;
+  border-left: 3px solid var(--warning-text);
+  text-align: left;
+  line-height: 1.5;
+}
+
+.disclaimer p {
+  margin: 0;
 }
 </style>

@@ -1,7 +1,7 @@
 <template>
   <div class="nav-menu">
     <div class="nav-header">
-      <h2>沐柠工具箱</h2>
+      <h2>沐柠环境盒</h2>
     </div>
     <div class="nav-items">
       <NavMenuItem
