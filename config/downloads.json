@@ -1,8 +1,8 @@
 {
   "mirrors": [
-    { "name": "默认 (ghfast.top)", "url": "https://ghfast.top/" },
-    { "name": "ghproxy.com", "url": "https://ghproxy.com/" },
-    { "name": "mirror.ghproxy.com", "url": "https://mirror.ghproxy.com/" }
+    { "name": "默认 (ghfast.top)", "url": "https://ghfast.top/", "recommended": true },
+    { "name": "gh-proxy.com", "url": "https://gh-proxy.com/", "recommended": false },
+    { "name": "github.moeyy.xyz", "url": "https://github.moeyy.xyz/", "recommended": false }
   ],
   "currentMirror": "https://ghfast.top/",
   "tools": {
