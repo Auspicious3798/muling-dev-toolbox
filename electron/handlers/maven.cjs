@@ -356,7 +356,9 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
             return {success: false, message: '没有已导入的 Maven 安装包，请先导入'};
         }
         const zipPath = useLocal ? pendingLocalFile : installerPath;
-        const installPath = mavenConfig.installDir || MAVEN_INSTALL_DIR;
+        // 展开环境变量（如 %USERPROFILE%）
+        let installPath = mavenConfig.installDir || MAVEN_INSTALL_DIR;
+        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
         try {
             await installZip(zipPath, installPath);
             await setSystemEnvVariable('MAVEN_HOME', installPath);

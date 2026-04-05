@@ -42,10 +42,30 @@
           </button>
         </div>
       </div>
+      <div class="install-status" v-if="installing">
+        <div class="status-header">
+          <span class="phase-label">
+            {{ downloading ? '📥 下载中' : '🔧 安装中' }}
+          </span>
+          <span class="stage-label">{{ currentStage }}</span>
+        </div>
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+        </div>
+        <div class="steps-log">
+          <div v-for="(step, idx) in installSteps" :key="idx" class="step-item">
+            <span class="step-icon">✅</span>
+            <span class="step-text">{{ step }}</span>
+          </div>
+          <div v-if="currentStage && !installSteps.includes(getStepLabel(currentStage))" class="step-item current">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">{{ getStepLabel(currentStage) }}</span>
+          </div>
+        </div>
+      </div>
       <div class="button-group">
         <button @click="installMySQL" :disabled="installing" class="install-btn">
-          <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
-          <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
+          {{ installing ? (downloading ? '下载中...' : '安装中...') : '开始安装' }}
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
           取消下载
@@ -113,7 +133,7 @@
     <div class="status" :class="{ 'status-success': status.includes('✅'), 'status-error': status.includes('❌') }">
       {{ status }}
     </div>
-    <div class="progress-bar" v-if="showProgress">
+    <div class="progress-bar" v-if="showProgress && !installing">
       <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
     </div>
 
@@ -156,6 +176,8 @@ export default {
       installing: false,
       downloading: false,
       status: '未安装',
+      currentStage: '',
+      installSteps: [],
       showProgress: false,
       progressPercent: 0,
       localFilePath: '',
@@ -197,12 +219,18 @@ export default {
       window.electronAPI.onMySQLProgress((data) => {
         if (data.type === 'mysql' && data.version === (this.activeMode === 'online' ? this.selectedVersion : this.localVersion)) {
           this.progressPercent = data.progress * 100;
-          if (data.stage) this.status = `${data.stage}...`;
+          if (data.stage) {
+            this.currentStage = data.stage;
+            // 将每一步添加到步骤日志中（去重）
+            const stepLabel = this.getStepLabel(data.stage);
+            if (stepLabel && !this.installSteps.includes(stepLabel)) {
+              this.installSteps.push(stepLabel);
+            }
+          }
           if (data.progress === 1) {
-            this.status = '安装完成，正在刷新环境...';
+            this.status = '✅ MySQL 安装成功';
             setTimeout(() => {
               this.showProgress = false;
-              this.status = '✅ MySQL 安装成功';
             }, 1500);
           }
         }
@@ -213,6 +241,21 @@ export default {
     }
   },
   methods: {
+    getStepLabel(stage) {
+      if (!stage) return '';
+      const map = {
+        '下载安装包': '下载 MySQL 安装包',
+        '解压中': '解压安装包',
+        '初始化配置': '生成配置文件 (my.ini)',
+        '初始化数据目录': '初始化数据目录',
+        '安装服务': '注册 Windows 服务',
+        '启动服务': '启动 MySQL 服务',
+        '设置 root 密码': '设置 root 密码',
+        '配置环境变量': '配置系统环境变量',
+        '安装完成': '安装完成'
+      };
+      return map[stage] || stage;
+    },
     switchMode(mode) {
       this.activeMode = mode;
       if (mode === 'local') {
@@ -229,22 +272,23 @@ export default {
         this.showProgress = false;
       }
     },
-    async installMySQL() {
+    installMySQL() {
       if (this.installing) return;
       this.installing = true;
       this.showProgress = true;
       this.progressPercent = 0;
-      this.status = '⏳ 正在安装...';
+      this.currentStage = '';
+      this.installSteps = [];
+      this.status = '准备安装...';
       eventBus.emit('install:start');
 
-      try {
-        this.downloading = true;
-        const result = await window.electronAPI.installMySQL(this.selectedVersion, this.password);
+      this.downloading = true;
+      window.electronAPI.installMySQL(this.selectedVersion, this.password).then((result) => {
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.currentVersion = this.selectedVersion;
           this.$emit('installed');
-          await this.refreshServiceStatus();
+          this.refreshServiceStatus();
           setTimeout(() => {
             this.showProgress = false;
           }, 2000);
@@ -252,18 +296,18 @@ export default {
           this.status = `❌ 安装失败：${result.message}`;
           this.showProgress = false;
         }
-      } catch (err) {
+      }).catch((err) => {
         if (err.message && err.message.includes('canceled')) {
           this.status = '⏸️ 下载已取消';
         } else {
           this.status = `❌ 安装失败：${err.message}`;
         }
         this.showProgress = false;
-      } finally {
+      }).finally(() => {
         this.installing = false;
         this.downloading = false;
         eventBus.emit('install:end');
-      }
+      });
     },
     async importLocalMySQL() {
       const filePath = await window.electronAPI.openFileDialog({
@@ -831,6 +875,61 @@ h3 {
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
+}
+
+.install-status {
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.phase-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.stage-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.steps-log {
+  margin-top: 0.75rem;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  background-color: var(--bg-card);
+}
+
+.step-item.current {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.step-icon {
+  font-size: 0.9rem;
 }
 
 .title-icon {

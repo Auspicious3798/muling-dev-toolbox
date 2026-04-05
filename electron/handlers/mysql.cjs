@@ -400,15 +400,19 @@ port=${port}
 
     async function getAllInstalledVersions() {
         const versions = new Set();
-        for (const [ver, cfg] of Object.entries(mysqlVersions)) {
-            const varName = `MYSQL_HOME${cfg.suffix}`;
-            try {
-                const {stdout} = await execPromise(`echo %${varName}%`);
-                const home = stdout.trim();
-                if (home && fs.existsSync(home) && fs.existsSync(path.join(home, 'bin', 'mysqld.exe'))) {
-                    versions.add(ver);
+        // 从配置文件中获取所有 MySQL 版本
+        const config = configManager.getConfig();
+        if (config && config.tools && config.tools.mysql && config.tools.mysql.versions) {
+            for (const [ver, cfg] of Object.entries(config.tools.mysql.versions)) {
+                const varName = `MYSQL_HOME${cfg.suffix}`;
+                try {
+                    const {stdout} = await execPromise(`echo %${varName}%`);
+                    const home = stdout.trim();
+                    if (home && fs.existsSync(home) && fs.existsSync(path.join(home, 'bin', 'mysqld.exe'))) {
+                        versions.add(ver);
+                    }
+                } catch (err) {
                 }
-            } catch (err) {
             }
         }
         const baseDir = 'C:\\Program Files\\MySQL';
@@ -466,7 +470,7 @@ port=${port}
     }
 
     async function findMySQLHome(version) {
-        const cfg = mysqlVersions[version];
+        const cfg = getMySQLVersionConfig(version);
         if (!cfg) return null;
         const varName = `MYSQL_HOME${cfg.suffix}`;
         try {
@@ -492,8 +496,12 @@ port=${port}
             const match = userPath.match(/%MYSQL_HOME(\d+)%\\bin/);
             if (match && match[1]) {
                 const suffix = match[1];
-                for (const [ver, cfg] of Object.entries(mysqlVersions)) {
-                    if (cfg.suffix === suffix) return ver;
+                // 从配置文件中查找匹配的版本
+                const config = configManager.getConfig();
+                if (config && config.tools && config.tools.mysql && config.tools.mysql.versions) {
+                    for (const [ver, cfg] of Object.entries(config.tools.mysql.versions)) {
+                        if (cfg.suffix === suffix) return ver;
+                    }
                 }
             }
             const {stdout, stderr} = await execPromise('mysql --version 2>&1');
