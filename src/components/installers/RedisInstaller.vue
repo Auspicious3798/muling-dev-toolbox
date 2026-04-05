@@ -15,20 +15,21 @@
     </div>
 
     <div v-if="activeMode === 'online'">
-      <select v-model="selectedVersion" class="version-select">
-        <option value="3.2">Redis 3.2</option>
-        <option value="4.0">Redis 4.0</option>
-        <option value="5.0">Redis 5.0</option>
-        <option value="6.0">Redis 6.0</option>
-        <option value="6.2">Redis 6.2</option>
-        <option value="7.0">Redis 7.0</option>
-        <option value="7.2">Redis 7.2</option>
-        <option value="7.4">Redis 7.4</option>
-        <option value="8.0">Redis 8.0</option>
-        <option value="8.2">Redis 8.2</option>
-        <option value="8.4">Redis 8.4</option>
-        <option value="8.6">Redis 8.6</option>
-      </select>
+      <div class="version-selection">
+        <div class="version-options">
+          <label v-for="v in versionOptions" :key="v.value" class="version-option" :class="{ selected: selectedVersion === v.value }" @click="selectedVersion = v.value">
+            <input type="radio" :value="v.value" v-model="selectedVersion" class="radio-hidden"/>
+            <span class="version-name">{{ v.label }}</span>
+            <span v-if="v.recommended" class="recommend-tag">推荐</span>
+          </label>
+        </div>
+        <div class="version-info">
+          <span v-if="selectedVersion === '7.0'" class="info-text">✅ 官方推荐，稳定且性能优异</span>
+          <span v-else-if="selectedVersion.startsWith('8.')" class="info-text">🚀 最新版本，体验新特性</span>
+          <span v-else-if="selectedVersion === '6.2'" class="info-text">⚡ 经典稳定，广泛使用</span>
+          <span v-else class="info-text">💡 成熟版本，兼容性好</span>
+        </div>
+      </div>
       <div class="install-path">
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
@@ -136,6 +137,20 @@ export default {
       RedisIcon,
       activeMode: 'online',
       selectedVersion: '7.0',
+      versionOptions: [
+        { value: '3.2', label: '3.2', recommended: false },
+        { value: '4.0', label: '4.0', recommended: false },
+        { value: '5.0', label: '5.0', recommended: false },
+        { value: '6.0', label: '6.0', recommended: false },
+        { value: '6.2', label: '6.2', recommended: false },
+        { value: '7.0', label: '7.0', recommended: true },
+        { value: '7.2', label: '7.2', recommended: false },
+        { value: '7.4', label: '7.4', recommended: false },
+        { value: '8.0', label: '8.0', recommended: false },
+        { value: '8.2', label: '8.2', recommended: false },
+        { value: '8.4', label: '8.4', recommended: false },
+        { value: '8.6', label: '8.6', recommended: false }
+      ],
       installing: false,
       downloading: false,
       status: '未安装',
@@ -429,6 +444,82 @@ h3 {
 .mode-btn.active {
   background-color: var(--info-bg);
   color: var(--info-text);
+}
+
+/* Version selection area */
+.version-selection {
+  margin-bottom: 1rem;
+}
+
+.version-options {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.version-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 2px solid var(--border-medium);
+  background-color: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.version-option:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-hover);
+}
+
+.version-option.selected {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.version-option.selected .version-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.version-option .radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.version-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.recommend-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.version-info {
+  display: flex;
+  min-height: 20px;
+}
+
+.info-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .version-select,

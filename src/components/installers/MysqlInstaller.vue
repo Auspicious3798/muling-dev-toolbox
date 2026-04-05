@@ -15,11 +15,20 @@
     </div>
 
     <div v-if="activeMode === 'online'">
-      <select v-model="selectedVersion" class="version-select">
-        <option value="5.7">MySQL 5.7</option>
-        <option value="8.0">MySQL 8.0</option>
-        <option value="9.0">MySQL 9.0</option>
-      </select>
+      <div class="version-selection">
+        <div class="version-options">
+          <label v-for="v in versionOptions" :key="v.value" class="version-option" :class="{ selected: selectedVersion === v.value }" @click="selectedVersion = v.value">
+            <input type="radio" :value="v.value" v-model="selectedVersion" class="radio-hidden"/>
+            <span class="version-name">{{ v.label }}</span>
+            <span v-if="v.recommended" class="recommend-tag">推荐</span>
+          </label>
+        </div>
+        <div class="version-info">
+          <span v-if="selectedVersion === '5.7'" class="info-text">⚡ 经典稳定，适合老旧项目</span>
+          <span v-else-if="selectedVersion === '8.0'" class="info-text">✅ 官方推荐，性能最优，广泛使用</span>
+          <span v-else-if="selectedVersion === '9.0'" class="info-text">🚀 最新版本，体验新特性</span>
+        </div>
+      </div>
       <div class="install-path">
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
@@ -53,11 +62,13 @@
         </div>
         <div class="version-input">
           <label>MySQL 版本：</label>
-          <select v-model="localVersion" class="version-select-small">
-            <option value="5.7">5.7</option>
-            <option value="8.0">8.0</option>
-            <option value="9.0">9.0</option>
-          </select>
+          <div class="version-options-inline">
+            <label v-for="v in versionOptions" :key="v.value" class="version-option-small" :class="{ selected: localVersion === v.value }" @click="localVersion = v.value">
+              <input type="radio" :value="v.value" v-model="localVersion" class="radio-hidden"/>
+              <span>{{ v.label }}</span>
+              <span v-if="v.recommended" class="recommend-tag-small">推荐</span>
+            </label>
+          </div>
           <button @click="validateLocalVersion" class="validate-btn">验证目录</button>
         </div>
         <div v-if="dirExistsWarning" class="warning-message">
@@ -137,6 +148,11 @@ export default {
       MysqlIcon,
       activeMode: 'online',
       selectedVersion: '8.0',
+      versionOptions: [
+        { value: '5.7', label: 'MySQL 5.7', recommended: false },
+        { value: '8.0', label: 'MySQL 8.0', recommended: true },
+        { value: '9.0', label: 'MySQL 9.0', recommended: false }
+      ],
       installing: false,
       downloading: false,
       status: '未安装',
@@ -480,20 +496,123 @@ h3 {
   color: var(--info-text);
 }
 
-.version-select, .version-select-small {
-  width: 100%;
-  padding: 0.6rem 1rem;
-  border-radius: 12px;
-  border: 1px solid var(--border-medium);
-  background-color: var(--bg-input);
-  color: var(--text-primary);
-  font-size: 0.95rem;
+/* Version selection area */
+.version-selection {
   margin-bottom: 1rem;
 }
 
-.version-select-small {
-  width: auto;
-  margin-bottom: 0;
+.version-options {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.version-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  border: 2px solid var(--border-medium);
+  background-color: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.version-option:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-hover);
+}
+
+.version-option.selected {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.version-option.selected .version-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.version-option .radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.version-name {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.recommend-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.version-info {
+  display: flex;
+  min-height: 24px;
+}
+
+.info-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Inline version options for local install */
+.version-options-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.version-option-small {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-medium);
+  background-color: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.9rem;
+}
+
+.version-option-small:hover {
+  border-color: var(--primary);
+}
+
+.version-option-small.selected {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.version-option-small .radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.recommend-tag-small {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 8px;
 }
 
 .install-path, .import-path {

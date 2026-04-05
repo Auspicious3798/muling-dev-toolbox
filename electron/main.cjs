@@ -1,6 +1,7 @@
 const {app, BrowserWindow, ipcMain, protocol, dialog, Menu} = require('electron');
 const path = require('path');
 const fs = require('fs');
+const configManager = require('./configManager.cjs');
 const registerJDKHandlers = require('./handlers/jdk.cjs');
 const registerPythonHandlers = require('./handlers/python.cjs');
 const registerMysqlHandlers = require('./handlers/mysql.cjs');
@@ -69,6 +70,9 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    // 初始化配置管理器
+    configManager.initConfig(app.getPath('userData'));
+    
     protocol.handle('app', async (request) => {
         let filePath = request.url.slice('app://'.length);
         if (filePath.includes('?')) filePath = filePath.split('?')[0];
@@ -244,6 +248,24 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
+
+    // 配置管理 IPC
+    ipcMain.handle('get-download-config', () => {
+        return configManager.getConfig();
+    });
+
+    ipcMain.handle('set-mirror', (event, mirrorUrl) => {
+        const success = configManager.setCurrentMirror(mirrorUrl);
+        return { success };
+    });
+
+    ipcMain.handle('get-mirrors', () => {
+        return configManager.getMirrors();
+    });
+
+    ipcMain.handle('get-tool-config', (event, toolName, version) => {
+        return configManager.getToolConfig(toolName, version);
+    });
 
     ipcMain.on('minimize-window', () => mainWindow.minimize());
     ipcMain.on('maximize-window', () => {

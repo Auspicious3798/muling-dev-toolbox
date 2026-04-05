@@ -6,75 +6,28 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
-
-const redisVersions = {
-    '3.2': {
-        suffix: '32',
-        defaultPort: 6379,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-3.2.1.zip'
-    },
-    '4.0': {
-        suffix: '40',
-        defaultPort: 6380,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-4.0.14.zip'
-    },
-    '5.0': {
-        suffix: '50',
-        defaultPort: 6381,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-5.0.14.zip'
-    },
-    '6.0': {
-        suffix: '60',
-        defaultPort: 6382,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-6.0.19.zip'
-    },
-    '6.2': {
-        suffix: '62',
-        defaultPort: 6383,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-6.2.21.zip'
-    },
-    '7.0': {
-        suffix: '70',
-        defaultPort: 6384,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.0.15.zip'
-    },
-    '7.2': {
-        suffix: '72',
-        defaultPort: 6385,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.2.13.zip'
-    },
-    '7.4': {
-        suffix: '74',
-        defaultPort: 6386,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.4.8.zip'
-    },
-    '8.0': {
-        suffix: '80',
-        defaultPort: 6387,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.0.6.zip'
-    },
-    '8.2': {
-        suffix: '82',
-        defaultPort: 6388,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.2.5.zip'
-    },
-    '8.4': {
-        suffix: '84',
-        defaultPort: 6389,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.4.2.zip'
-    },
-    '8.6': {
-        suffix: '86',
-        defaultPort: 6390,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.6.2.zip'
-    }
-};
+const configManager = require('../configManager.cjs');
 
 module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
 
     const logFile = path.join(userDataPath, 'redis_install.log');
+
+    // 辅助函数：获取 Redis 版本配置
+    function getRedisVersionConfig(version) {
+        const cfg = configManager.getToolConfig('redis', version);
+        if (!cfg) return null;
+        
+        // 根据版本设置默认端口（从6379开始递增）
+        const versionNum = parseFloat(version);
+        const defaultPort = 6379 + Math.floor((versionNum - 3.2) / 0.2) * 1;
+        
+        return {
+            ...cfg,
+            defaultPort
+        };
+    }
 
     function logToFile(message) {
         const timestamp = new Date().toISOString();
@@ -367,15 +320,19 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     async function getAllInstalledVersions() {
         const versions = new Set();
-        for (const [ver, cfg] of Object.entries(redisVersions)) {
-            const varName = `REDIS_HOME${cfg.suffix}`;
-            try {
-                const {stdout} = await execPromise(`echo %${varName}%`);
-                const home = stdout.trim();
-                if (home && fs.existsSync(home) && fs.existsSync(path.join(home, 'redis-server.exe'))) {
-                    versions.add(ver);
+        // 从配置中获取所有 Redis 版本
+        const config = configManager.getConfig();
+        if (config && config.tools && config.tools.redis && config.tools.redis.versions) {
+            for (const [ver, cfg] of Object.entries(config.tools.redis.versions)) {
+                const varName = `REDIS_HOME${cfg.suffix}`;
+                try {
+                    const {stdout} = await execPromise(`echo %${varName}%`);
+                    const home = stdout.trim();
+                    if (home && fs.existsSync(home) && fs.existsSync(path.join(home, 'redis-server.exe'))) {
+                        versions.add(ver);
+                    }
+                } catch (err) {
                 }
-            } catch (err) {
             }
         }
         const baseDir = 'C:\\Program Files\\Redis';
@@ -385,7 +342,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 const fullPath = path.join(baseDir, dir);
                 if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'redis-server.exe'))) {
                     const match = dir.match(/redis-(\d+\.\d+)/);
-                    if (match && redisVersions[match[1]]) {
+                    if (match && getRedisVersionConfig(match[1])) {
                         versions.add(match[1]);
                     }
                 }
@@ -398,7 +355,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     }
 
     async function findRedisHome(version) {
-        const cfg = redisVersions[version];
+        const cfg = getRedisVersionConfig(version);
         if (!cfg) return null;
         const varName = `REDIS_HOME${cfg.suffix}`;
         try {
@@ -420,7 +377,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             const match = systemPath.match(/%REDIS_HOME(\d+)%/);
             if (match && match[1]) {
                 const suffix = match[1];
-                for (const [ver, cfg] of Object.entries(redisVersions)) {
+                for (const [ver, cfg] of Object.entries(config.tools.redis.versions)) {
                     if (cfg.suffix === suffix) return ver;
                 }
             }
@@ -429,7 +386,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             const verMatch = output.match(/redis-cli (\d+\.\d+\.\d+)/i);
             if (verMatch) {
                 const majorMinor = verMatch[1].split('.')[0] + '.' + verMatch[1].split('.')[1];
-                if (redisVersions[majorMinor]) return majorMinor;
+                if (getRedisVersionConfig(majorMinor)) return majorMinor;
             }
             return null;
         } catch (err) {
@@ -460,7 +417,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     });
 
     ipcMain.handle('install-redis', async (event, version, password = '', maxmemory = 0, customPort = null) => {
-        const cfg = redisVersions[version];
+        const cfg = getRedisVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
         const {url, suffix, defaultPort} = cfg;
         let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
@@ -514,7 +471,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('install-from-local-redis', async (event, version, password = '', maxmemory = 0, customPort = null) => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 Redis 安装包，请先导入'};
-        const cfg = redisVersions[version];
+        const cfg = getRedisVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
         const {suffix, defaultPort} = cfg;
         let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
@@ -568,7 +525,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('switch-redis', async (event, version) => {
         try {
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
@@ -588,7 +545,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('delete-redis', async (event, version) => {
         try {
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
@@ -598,7 +555,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 const allVersions = await getAllInstalledVersions();
                 const other = allVersions.find(v => v !== version);
                 if (other) {
-                    const otherCfg = redisVersions[other];
+                    const otherCfg = getRedisVersionConfig(other);
                     await setPathForRedis(otherCfg.suffix);
                 } else {
                     const systemPath = await getSystemPath();
@@ -621,7 +578,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('start-redis-service', async (event, version) => {
         try {
             logToFile(`收到启动 Redis ${version} 的请求`);
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
@@ -643,7 +600,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('stop-redis-service', async (event, version) => {
         try {
             logToFile(`收到停止 Redis ${version} 的请求`);
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
@@ -660,7 +617,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('restart-redis-service', async (event, version) => {
         try {
             logToFile(`收到重启 Redis ${version} 的请求`);
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
@@ -681,7 +638,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('get-redis-service-status', async (event, version) => {
         try {
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, status: 'unknown', message: '不支持的版本'};
             const home = await findRedisHome(version);
             const running = await isRedisRunning(version, home);
@@ -693,7 +650,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('get-redis-config', async (event, version) => {
         try {
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: '不支持的版本'};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: '未找到安装目录'};
@@ -712,7 +669,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('change-redis-password', async (event, version, oldPassword, newPassword) => {
         try {
-            const cfg = redisVersions[version];
+            const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};

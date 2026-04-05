@@ -15,25 +15,22 @@
     </div>
 
     <div v-if="activeMode === 'online'">
-      <select v-model="selectedVersion" class="version-select">
-        <option value="26">JDK 26</option>
-        <option value="25">JDK 25</option>
-        <option value="24">JDK 24</option>
-        <option value="23">JDK 23</option>
-        <option value="22">JDK 22</option>
-        <option value="21">JDK 21 (LTS)</option>
-        <option value="20">JDK 20</option>
-        <option value="19">JDK 19</option>
-        <option value="18">JDK 18</option>
-        <option value="17">JDK 17 (LTS)</option>
-        <option value="16">JDK 16</option>
-        <option value="15">JDK 15</option>
-        <option value="14">JDK 14</option>
-        <option value="13">JDK 13</option>
-        <option value="12">JDK 12</option>
-        <option value="11">JDK 11 (LTS)</option>
-        <option value="8">JDK 8 (LTS)</option>
-      </select>
+      <div class="version-selection">
+        <div class="version-options">
+          <label v-for="v in versionOptions" :key="v.value" class="version-option" :class="{ selected: selectedVersion === v.value }" @click="selectedVersion = v.value">
+            <input type="radio" :value="v.value" v-model="selectedVersion" class="radio-hidden"/>
+            <span class="version-name">{{ v.label }}</span>
+            <span v-if="v.recommended" class="recommend-tag">推荐</span>
+          </label>
+        </div>
+        <div class="version-info">
+          <span v-if="selectedVersion === '8'" class="info-text">🏛️ 经典 LTS，企业级应用首选</span>
+          <span v-else-if="selectedVersion === '11'" class="info-text">✅ LTS 版本，稳定可靠</span>
+          <span v-else-if="selectedVersion === '17'" class="info-text">✅ 最新 LTS，性能优异</span>
+          <span v-else-if="selectedVersion === '21'" class="info-text">🚀 长期支持版，现代特性</span>
+          <span v-else class="info-text">💡 最新版本，体验前沿功能</span>
+        </div>
+      </div>
       <div class="install-path">
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
@@ -97,6 +94,25 @@ export default {
       JavaIcon,
       activeMode: 'online',
       selectedVersion: '21',
+      versionOptions: [
+        { value: '26', label: 'JDK 26', recommended: false },
+        { value: '25', label: 'JDK 25', recommended: false },
+        { value: '24', label: 'JDK 24', recommended: false },
+        { value: '23', label: 'JDK 23', recommended: false },
+        { value: '22', label: 'JDK 22', recommended: false },
+        { value: '21', label: 'JDK 21', recommended: true },
+        { value: '20', label: 'JDK 20', recommended: false },
+        { value: '19', label: 'JDK 19', recommended: false },
+        { value: '18', label: 'JDK 18', recommended: false },
+        { value: '17', label: 'JDK 17', recommended: false },
+        { value: '16', label: 'JDK 16', recommended: false },
+        { value: '15', label: 'JDK 15', recommended: false },
+        { value: '14', label: 'JDK 14', recommended: false },
+        { value: '13', label: 'JDK 13', recommended: false },
+        { value: '12', label: 'JDK 12', recommended: false },
+        { value: '11', label: 'JDK 11', recommended: false },
+        { value: '8', label: 'JDK 8', recommended: false }
+      ],
       installing: false,
       downloading: false,
       status: '未安装',
@@ -333,6 +349,86 @@ h3 {
 
 .mode-btn:hover:not(.active) {
   background-color: var(--bg-hover);
+}
+
+/* Version selection area */
+.version-selection {
+  margin-bottom: 1rem;
+}
+
+.version-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.version-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 2px solid var(--border-medium);
+  background-color: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-size: 0.85rem;
+  min-width: 80px;
+}
+
+.version-option:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-hover);
+}
+
+.version-option.selected {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.version-option.selected .version-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.version-option .radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.version-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.recommend-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.version-info {
+  display: flex;
+  min-height: 20px;
+}
+
+.info-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .version-select {

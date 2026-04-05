@@ -83,5 +83,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     checkPathExists: (path) => ipcRenderer.invoke('check-path-exists', path),
     minimizeWindow: () => ipcRenderer.send('minimize-window'),
     maximizeWindow: () => ipcRenderer.send('maximize-window'),
-    closeWindow: () => ipcRenderer.send('close-window')
+    closeWindow: () => ipcRenderer.send('close-window'),
+    
+    // 配置管理
+    getDownloadConfig: () => ipcRenderer.invoke('get-download-config'),
+    setMirror: (mirrorUrl) => ipcRenderer.invoke('set-mirror', mirrorUrl),
+    getMirrors: () => ipcRenderer.invoke('get-mirrors'),
+    getToolConfig: (toolName, version) => ipcRenderer.invoke('get-tool-config', toolName, version)
 });

@@ -84,11 +84,10 @@
             <span class="action-icon">⇄</span> 切换
           </button>
           <template v-if="tool === 'mysql'">
-            <button @click="startService(v)" class="action-start" :disabled="actionLoading">
-              <span class="action-icon">▶</span> 启动
-            </button>
-            <button @click="stopService(v)" class="action-stop" :disabled="actionLoading">
-              <span class="action-icon">■</span> 停止
+            <button @click="toggleService(v)"
+                    :class="serviceStatus[v] === 'running' ? 'action-stop' : 'action-start'" :disabled="actionLoading">
+              <span class="action-icon">{{ serviceStatus[v] === 'running' ? '■' : '▶' }}</span>
+              {{ serviceStatus[v] === 'running' ? '停止' : '启动' }}
             </button>
           </template>
           <button v-if="tool === 'redis'" @click="toggleService(v)"

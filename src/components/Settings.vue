@@ -31,10 +31,8 @@
       <h2>下载与网络</h2>
       <div class="setting-item">
         <label>下载镜像源</label>
-        <select v-model="mirror">
-          <option value="https://ghfast.top/">ghfast.top (默认)</option>
-          <option value="https://ghproxy.com/">ghproxy.com</option>
-          <option value="https://mirror.ghproxy.com/">mirror.ghproxy.com</option>
+        <select v-model="mirror" @change="saveMirror">
+          <option v-for="m in mirrors" :key="m.url" :value="m.url">{{ m.name }}</option>
         </select>
       </div>
       <div class="setting-item">
@@ -97,6 +95,7 @@ export default {
       autoCheckUpdate: true,
       closeBehavior: 'exit',
       mirror: 'https://ghfast.top/',
+      mirrors: [],
       proxy: '',
       cacheSize: 0,
       logsSize: 0,
@@ -112,6 +111,7 @@ export default {
   },
   mounted() {
     this.loadSettings();
+    this.loadMirrors();
     this.loadCacheInfo();
     this.loadVersionInfo();
   },
@@ -190,6 +190,53 @@ export default {
       if (!window.electronAPI || !window.electronAPI.getVersionInfo) return;
       this.versionInfo = await window.electronAPI.getVersionInfo();
     },
+    async loadMirrors() {
+      if (!window.electronAPI || !window.electronAPI.getMirrors) {
+        console.error('electronAPI.getMirrors 不存在');
+        return;
+      }
+      try {
+        const result = await window.electronAPI.getMirrors();
+        console.log('Settings.vue getMirrors 返回结果:', result);
+        console.log('结果类型:', typeof result, '是否为数组:', Array.isArray(result));
+        console.log('结果长度:', result ? result.length : 'null');
+        
+        // 如果返回结果为空或不是数组，使用默认值
+        if (!result || !Array.isArray(result) || result.length === 0) {
+          console.warn('镜像列表为空，使用默认值');
+          this.mirrors = [
+            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/' },
+            { name: 'ghproxy.com', url: 'https://ghproxy.com/' },
+            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/' }
+          ];
+        } else {
+          this.mirrors = result;
+        }
+        
+        console.log('最终 mirrors 列表:', this.mirrors);
+      } catch (err) {
+        console.error('加载镜像列表失败:', err);
+        // 使用默认镜像列表
+        this.mirrors = [
+          { name: '默认 (ghfast.top)', url: 'https://ghfast.top/' },
+          { name: 'ghproxy.com', url: 'https://ghproxy.com/' },
+          { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/' }
+        ];
+      }
+    },
+    async saveMirror() {
+      if (!window.electronAPI || !window.electronAPI.setMirror) return;
+      try {
+        const result = await window.electronAPI.setMirror(this.mirror);
+        if (result.success) {
+          console.log('镜像源已更新:', this.mirror);
+        }
+      } catch (err) {
+        console.error('保存镜像源失败:', err);
+      }
+      // 同时保存到 localStorage
+      this.saveSettings();
+    },
     openGitHub() {
       if (window.electronAPI && window.electronAPI.openGitHub) {
         window.electronAPI.openGitHub();
@@ -202,6 +249,8 @@ export default {
       this.mirror = 'https://ghfast.top/';
       this.proxy = '';
       this.saveSettings();
+      // 同步更新主进程配置
+      this.saveMirror();
       alert('设置已重置为默认值');
     },
     formatSize(bytes) {
@@ -220,9 +269,6 @@ export default {
       this.saveSettings();
     },
     closeBehavior() {
-      this.saveSettings();
-    },
-    mirror() {
       this.saveSettings();
     },
     proxy() {
