@@ -50,7 +50,8 @@
       </div>
       <div class="button-group">
         <button @click="installRedis" :disabled="installing || portAvailable === false" class="install-btn">
-          {{ installing ? '安装中...' : '开始安装' }}
+          <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
+          <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
           取消下载

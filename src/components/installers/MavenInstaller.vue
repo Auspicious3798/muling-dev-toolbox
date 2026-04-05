@@ -14,7 +14,6 @@
       </button>
     </div>
 
-    <!-- 联网下载模式 -->
     <div v-if="activeMode === 'online'">
       <div class="install-path">
         <span class="path-label">安装目录：</span>
@@ -22,7 +21,8 @@
       </div>
       <div class="button-group">
         <button @click="installMaven" :disabled="installing || jdkMissing" class="install-btn">
-          {{ installing ? '安装中...' : '开始安装' }}
+          <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
+          <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
           取消下载
@@ -33,7 +33,6 @@
       </div>
     </div>
 
-    <!-- 手动导入模式 -->
     <div v-else>
       <div class="import-area">
         <button @click="importLocalMaven" class="import-btn">📁 选择 Maven 压缩包</button>
@@ -411,7 +410,7 @@ h3 {
 .progress-fill {
   height: 100%;
   background-color: var(--primary);
-  width: 0%;
+  width: 0;
   transition: width 0.2s linear;
   border-radius: 999px;
   animation: shimmer 1.2s infinite linear;
