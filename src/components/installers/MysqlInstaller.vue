@@ -26,7 +26,12 @@
       </div>
       <div class="password-input">
         <label>root 密码（可选）：</label>
-        <input type="password" v-model="password" placeholder="留空则无密码"/>
+        <div class="password-wrapper">
+          <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="留空则无密码"/>
+          <button type="button" @click="showPassword = !showPassword" class="toggle-password">
+            {{ showPassword ? '🙈' : '👁️' }}
+          </button>
+        </div>
       </div>
       <div class="button-group">
         <button @click="installMySQL" :disabled="installing" class="install-btn">
@@ -60,7 +65,12 @@
         </div>
         <div class="password-input">
           <label>root 密码（可选）：</label>
-          <input type="password" v-model="password" placeholder="留空则无密码"/>
+          <div class="password-wrapper">
+            <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="留空则无密码"/>
+            <button type="button" @click="showPassword = !showPassword" class="toggle-password">
+              {{ showPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
         </div>
         <div class="install-path">
           <span class="path-label">安装目录：</span>
@@ -136,6 +146,7 @@ export default {
       localVersion: '8.0',
       dirExistsWarning: false,
       password: '',
+      showPassword: false,
       currentVersion: null,
       serviceStatus: null,
       serviceActionLoading: false,
@@ -503,23 +514,30 @@ h3 {
 
 .password-input {
   margin: 1rem 0;
+}
+
+.password-wrapper {
   display: flex;
+  gap: 8px;
   align-items: center;
-  gap: 12px;
+  flex: 1;
 }
 
-.password-input label {
-  font-weight: 500;
-  color: var(--text-secondary);
-}
-
-.password-input input {
+.password-wrapper input {
   flex: 1;
   padding: 0.5rem;
   border-radius: 8px;
   border: 1px solid var(--border-medium);
   background-color: var(--bg-input);
   color: var(--text-primary);
+}
+
+.toggle-password {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 4px;
 }
 
 .version-input {

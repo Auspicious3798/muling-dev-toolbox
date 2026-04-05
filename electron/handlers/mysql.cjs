@@ -76,7 +76,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
                     logToFile(`已删除旧目录: ${installDir}`);
                 }
                 fs.mkdirSync(installDir, {recursive: true});
-                const zip = new AdmZip(zipPath);
+                const zip = new AdmZip(zipPath,{});
                 zip.extractAllTo(installDir, true);
                 logToFile(`解压成功: ${zipPath} -> ${installDir}`);
                 resolve();
@@ -87,29 +87,32 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         });
     }
 
-    function setSystemEnvVariable(name, value) {
+    function setUserEnvVariable(name, value) {
         return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
-            logToFile(`执行 setx: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (error, stdout, stderr) => {
+            const psCmd = `[Environment]::SetEnvironmentVariable('${name}', '${value.replace(/'/g, "''")}', 'User')`;
+            const fullCmd = `powershell -Command "${psCmd}"`;
+            logToFile(`执行 PowerShell 设置环境变量: ${name}=${value}`);
+            exec(fullCmd, {windowsHide: true, timeout: 15000}, (error, stdout, stderr) => {
                 if (error) {
-                    logToFile(`setx 失败: ${stderr || error.message}`);
-                    reject(new Error(`设置系统变量失败: ${stderr || error.message}`));
+                    if (error.killed) {
+                        logToFile(`设置环境变量超时: ${name}`);
+                        reject(new Error(`设置环境变量超时: ${name}`));
+                    } else {
+                        logToFile(`设置环境变量失败: ${stderr || error.message}`);
+                        reject(new Error(`设置环境变量失败: ${stderr || error.message}`));
+                    }
                 } else {
-                    logToFile(`setx 成功: ${name}=${value}`);
-                    const psRefresh = `$env:${name} = "${value}"`;
-                    exec(`powershell -NoProfile -Command "${psRefresh.replace(/"/g, '\\"')}"`, (err) => {
-                        if (err) logToFile(`刷新当前进程 ${name} 失败: ${err.message}`);
-                        resolve();
-                    });
+                    logToFile(`环境变量设置成功: ${name}=${value}`);
+                    process.env[name] = value;
+                    resolve();
                 }
             });
         });
     }
 
-    function removeSystemEnvVariable(name) {
+    function removeUserEnvVariable(name) {
         return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" ""`;
+            const setxCmd = `setx "${name}" ""`;
             exec(setxCmd, {windowsHide: true}, (error) => {
                 if (error) reject(error);
                 else resolve();
@@ -117,23 +120,50 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         });
     }
 
-    async function getSystemPath() {
-        try {
-            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-            const {stdout} = await execPromise(regCmd);
-            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-            if (match && match[1]) return match[1].trim();
-        } catch (err) {
-        }
-        return '';
+    async function getUserPath() {
+        return new Promise((resolve) => {
+            exec('reg query HKCU\\Environment /v PATH', {windowsHide: true}, (error, stdout) => {
+                if (error) {
+                    resolve('');
+                    return;
+                }
+                const match = stdout.match(/PATH\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
+                if (match && match[1]) {
+                    resolve(match[1].trim());
+                } else {
+                    resolve('');
+                }
+            });
+        });
+    }
+
+    function setUserPath(newPath) {
+        return new Promise((resolve, reject) => {
+            const psCmd = `[Environment]::SetEnvironmentVariable('PATH', '${newPath.replace(/'/g, "''")}', 'User')`;
+            const fullCmd = `powershell -Command "${psCmd}"`;
+            logToFile(`执行 PowerShell 设置 PATH (用户): 长度=${newPath.length}`);
+            exec(fullCmd, {windowsHide: true, timeout: 15000}, (err) => {
+                if (err) {
+                    if (err.killed) {
+                        logToFile(`设置 PATH 超时`);
+                        reject(new Error('设置 PATH 超时'));
+                    } else {
+                        reject(new Error(`设置用户 PATH 失败: ${err.message}`));
+                    }
+                } else {
+                    logToFile(`用户 PATH 设置成功: 长度=${newPath.length}`);
+                    resolve();
+                }
+            });
+        });
     }
 
     function setPathForMySQL(suffix) {
         return new Promise(async (resolve, reject) => {
             const targetVar = `MYSQL_HOME${suffix}`;
             const targetEntry = `%${targetVar}%\\bin`;
-
-            const currentPath = await getSystemPath();
+            let currentPath = await getUserPath();
+            if (!currentPath) currentPath = '';
             const parts = currentPath.split(';');
             const newParts = [];
             for (const p of parts) {
@@ -143,24 +173,27 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
             }
             newParts.unshift(targetEntry);
             const newPath = newParts.join(';');
-
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-            logToFile(`执行 setx PATH: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (err) => {
-                if (err) {
-                    reject(new Error(`设置 PATH 失败: ${err.message}`));
-                } else {
-                    logToFile(`PATH 设置成功: ${newPath}`);
-                    resolve();
-                }
-            });
+            try {
+                await setUserPath(newPath);
+                resolve();
+            } catch (err) {
+                reject(err);
+            }
         });
     }
 
     async function refreshCurrentProcessEnv() {
         try {
-            const systemPath = await getSystemPath();
-            process.env.Path = systemPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
+            let expandedPath = await getUserPath();
+            for (const [ver, cfg] of Object.entries(mysqlVersions)) {
+                const varName = `MYSQL_HOME${cfg.suffix}`;
+                const varValue = process.env[varName];
+                if (varValue) {
+                    expandedPath = expandedPath.replace(new RegExp(`%${varName}%`, 'g'), varValue);
+                }
+            }
+            expandedPath = expandedPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
+            process.env.Path = expandedPath;
         } catch (err) {
             logToFile(`刷新环境变量失败: ${err.message}`);
         }
@@ -191,7 +224,11 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
 
     async function generateMyCnf(installDir, port) {
         const myCnfPath = path.join(installDir, 'my.ini');
-        const content = `[mysqld]\nbasedir=${installDir.replace(/\\/g, '\\\\')}\ndatadir=${installDir.replace(/\\/g, '\\\\')}\\\\data\nport=${port}\n`;
+        const content = `[mysqld]
+basedir=${installDir.replace(/\\/g, '\\\\')}
+datadir=${installDir.replace(/\\/g, '\\\\')}\\\\data
+port=${port}
+`;
         fs.writeFileSync(myCnfPath, content, 'utf8');
         logToFile(`生成配置文件: ${myCnfPath}`);
         return myCnfPath;
@@ -211,7 +248,6 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         logToFile(`准备设置 root 密码，端口: ${port}`);
         const mysqladminPath = path.join(installDir, 'bin', 'mysqladmin.exe');
         if (!fs.existsSync(mysqladminPath)) throw new Error('未找到 mysqladmin.exe');
-        // 由于初始化后 root 密码为空，直接执行 mysqladmin -u root password "新密码"
         const changeCmd = `"${mysqladminPath}" -u root -P ${port} password "${password}"`;
         try {
             await execPromise(changeCmd);
@@ -257,13 +293,68 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         logToFile(`服务 ${serviceName} 删除成功`);
     }
 
+    // 动态查找匹配的服务名（支持 MySQL90, MySQL93, MySQL94 等任意小版本）
+    async function findMySQLServiceName(version) {
+        const cfg = mysqlVersions[version];
+        if (!cfg) return null;
+        const major = version.split('.')[0];
+        
+        // 优先尝试标准服务名（如 MySQL90）
+        const standardServiceName = `MySQL${cfg.suffix}`;
+        try {
+            const {stdout: testStdout} = await execPromise(`sc query ${standardServiceName}`);
+            if (testStdout.toUpperCase().includes('SERVICE_NAME') || testStdout.includes('服务名称')) {
+                logToFile(`找到标准服务名: ${standardServiceName}`);
+                return standardServiceName;
+            }
+        } catch (err) {
+            // 标准服务名不存在，继续扫描
+        }
+        
+        // 扫描所有 MySQL 服务
+        try {
+            const {stdout} = await execPromise('sc query type= service state= all');
+            logToFile(`sc query 完整输出（前500字符）: ${stdout.substring(0, 500)}`);
+            const serviceRegex = /SERVICE_NAME:\s*(MySQL\d+)/g;
+            let match;
+            while ((match = serviceRegex.exec(stdout)) !== null) {
+                const serviceName = match[1];
+                logToFile(`发现 MySQL 服务: ${serviceName}`);
+                const numMatch = serviceName.match(/MySQL(\d+)/);
+                if (numMatch) {
+                    const num = numMatch[1];
+                    if (num.startsWith(major)) {
+                        logToFile(`✅ 找到匹配的 MySQL 服务: ${serviceName} (版本 ${version})`);
+                        return serviceName;
+                    }
+                }
+            }
+        } catch (err) {
+            logToFile(`查找 MySQL 服务失败: ${err.message}`);
+        }
+        logToFile(`❌ 未找到匹配的 MySQL ${version} 服务`);
+        return null;
+    }
+
     async function getServiceStatus(serviceName) {
         try {
             const {stdout} = await execPromise(`sc query ${serviceName}`);
-            if (stdout.includes('RUNNING')) return 'running';
-            if (stdout.includes('STOPPED')) return 'stopped';
+            logToFile(`服务 ${serviceName} 状态查询结果: ${stdout.substring(0, 300)}`);
+            const upper = stdout.toUpperCase();
+            // 支持中英文状态关键词
+            if (upper.includes('RUNNING') || stdout.includes('运行中') || stdout.includes('RUNNING')) {
+                return 'running';
+            }
+            if (upper.includes('STOPPED') || stdout.includes('已停止') || stdout.includes('STOPPED')) {
+                return 'stopped';
+            }
+            // 如果服务存在但状态不明确，默认返回 stopped
+            if (upper.includes('SERVICE_NAME') || upper.includes('服务名称')) {
+                return 'stopped';
+            }
             return 'unknown';
         } catch (err) {
+            logToFile(`服务 ${serviceName} 状态查询失败: ${err.message}`);
             return 'not installed';
         }
     }
@@ -341,17 +432,31 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         for (const {version} of msiInstallations) {
             versions.add(version);
         }
-        const services = ['MySQL57', 'MySQL80', 'MySQL90', 'MySQL', 'MySQL5.7', 'MySQL8.0', 'MySQL9.0'];
-        for (const svc of services) {
-            try {
-                const {stdout} = await execPromise(`sc query ${svc}`);
-                if (stdout.includes('RUNNING') || stdout.includes('STOPPED')) {
-                    if (svc.includes('57') || svc.includes('5.7')) versions.add('5.7');
-                    if (svc.includes('80') || svc.includes('8.0')) versions.add('8.0');
-                    if (svc.includes('90') || svc.includes('9.0')) versions.add('9.0');
+        // 动态扫描所有 MySQL 服务，支持任意小版本号（如 MySQL93, MySQL94 等）
+        try {
+            const {stdout} = await execPromise('sc query type= service state= all');
+            // 匹配所有 MySQL 开头的服务名
+            const serviceMatches = stdout.match(/SERVICE_NAME:\s*MySQL\d+/g);
+            if (serviceMatches) {
+                for (const match of serviceMatches) {
+                    // 提取服务名，如 MySQL93
+                    const serviceNameMatch = match.match(/SERVICE_NAME:\s*(MySQL\d+)/);
+                    if (serviceNameMatch) {
+                        const serviceName = serviceNameMatch[1];
+                        // 提取数字后缀，如 MySQL93 → 93
+                        const numMatch = serviceName.match(/MySQL(\d+)/);
+                        if (numMatch) {
+                            const num = numMatch[1];
+                            // 映射规则：57→5.7, 80→8.0, 9x→9.0
+                            if (num.startsWith('5')) versions.add('5.7');
+                            else if (num.startsWith('8')) versions.add('8.0');
+                            else if (num.startsWith('9')) versions.add('9.0');
+                        }
+                    }
                 }
-            } catch (err) {
             }
+        } catch (err) {
+            logToFile(`扫描 MySQL 服务失败: ${err.message}`);
         }
         return Array.from(versions).sort((a, b) => {
             const order = ['5.7', '8.0', '9.0'];
@@ -382,8 +487,8 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
 
     async function getCurrentDefaultVersion() {
         try {
-            const systemPath = await getSystemPath();
-            const match = systemPath.match(/%MYSQL_HOME(\d+)%\\bin/);
+            const userPath = await getUserPath();
+            const match = userPath.match(/%MYSQL_HOME(\d+)%\\bin/);
             if (match && match[1]) {
                 const suffix = match[1];
                 for (const [ver, cfg] of Object.entries(mysqlVersions)) {
@@ -431,36 +536,48 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         const installerPath = path.join(downloadDir, fileName);
         const installPath = `C:\\Program Files\\MySQL\\mysql-${version}`;
         const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('mysql-progress', {type: 'mysql', version, progress, stage});
+            // 使用 setImmediate 确保 IPC 消息能立即发送到渲染进程
+            setImmediate(() => {
+                mainWindow.webContents.send('mysql-progress', {type: 'mysql', version, progress, stage});
+            });
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
         try {
             if (!fs.existsSync(installerPath)) {
                 sendProgress(0, '下载安装包');
-                await downloadFile(url, installerPath, (p) => sendProgress(p, '下载安装包'), abortController.signal);
+                await downloadFile(url, installerPath, (p) => sendProgress(p * 0.3, '下载安装包'), abortController.signal);
                 sendProgress(0.3, '解压中');
             } else {
                 sendProgress(0.3, '解压中');
             }
             await installZip(installerPath, installPath);
-            sendProgress(0.5, '初始化配置');
+            sendProgress(0.4, '初始化配置');
             const availablePort = await findAvailablePort(defaultPort);
             await generateMyCnf(installPath, availablePort);
+            sendProgress(0.45, '初始化数据目录');
             await initializeDataDir(installPath);
-            sendProgress(0.7, '安装服务');
+            sendProgress(0.6, '安装服务');
             const serviceName = await installService(installPath, suffix);
+            sendProgress(0.7, '启动服务');
             await startService(serviceName);
-            // 服务启动后设置密码（如果提供了密码）
             if (password && password.trim() !== '') {
+                sendProgress(0.8, '设置 root 密码');
                 await setRootPassword(installPath, password, availablePort);
             }
             sendProgress(0.9, '配置环境变量');
-            await setSystemEnvVariable(`MYSQL_HOME${suffix}`, installPath);
+            await setUserEnvVariable(`MYSQL_HOME${suffix}`, installPath);
             await setPathForMySQL(suffix);
             await refreshCurrentProcessEnv();
+            
+            // 等待服务完全就绪后再发送完成信号
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             sendProgress(1, '安装完成');
-            mainWindow.webContents.send('mysql-changed');
+            // 延迟发送 mysql-changed，确保进度 100% 先到达前端
+            setTimeout(() => {
+                mainWindow.webContents.send('mysql-changed');
+            }, 500);
             return {success: true, message: `MySQL ${version} 安装成功，端口: ${availablePort}`};
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
@@ -485,27 +602,37 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         const zipPath = pendingLocalFile;
         const installPath = `C:\\Program Files\\MySQL\\mysql-${version}`;
         const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('mysql-progress', {type: 'mysql', version, progress, stage});
+            setImmediate(() => {
+                mainWindow.webContents.send('mysql-progress', {type: 'mysql', version, progress, stage});
+            });
         };
         try {
             sendProgress(0.3, '解压中');
             await installZip(zipPath, installPath);
-            sendProgress(0.5, '初始化配置');
+            sendProgress(0.4, '初始化配置');
             const availablePort = await findAvailablePort(defaultPort);
             await generateMyCnf(installPath, availablePort);
+            sendProgress(0.45, '初始化数据目录');
             await initializeDataDir(installPath);
-            sendProgress(0.7, '安装服务');
+            sendProgress(0.6, '安装服务');
             const serviceName = await installService(installPath, suffix);
+            sendProgress(0.7, '启动服务');
             await startService(serviceName);
             if (password && password.trim() !== '') {
+                sendProgress(0.8, '设置 root 密码');
                 await setRootPassword(installPath, password, availablePort);
             }
             sendProgress(0.9, '配置环境变量');
-            await setSystemEnvVariable(`MYSQL_HOME${suffix}`, installPath);
+            await setUserEnvVariable(`MYSQL_HOME${suffix}`, installPath);
             await setPathForMySQL(suffix);
             await refreshCurrentProcessEnv();
+            
+            await new Promise(resolve => setTimeout(resolve, 2000));
+            
             sendProgress(1, '安装完成');
-            mainWindow.webContents.send('mysql-changed');
+            setTimeout(() => {
+                mainWindow.webContents.send('mysql-changed');
+            }, 500);
             return {success: true, message: `MySQL ${version} 安装成功，端口: ${availablePort}`};
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);
@@ -552,13 +679,15 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
-            const serviceName = `MySQL${cfg.suffix}`;
-            const status = await getServiceStatus(serviceName);
-            if (status === 'running') {
-                await stopService(serviceName);
-            }
-            if (status !== 'not installed') {
-                await deleteService(serviceName);
+            const serviceName = await findMySQLServiceName(version);
+            if (serviceName) {
+                const status = await getServiceStatus(serviceName);
+                if (status === 'running') {
+                    await stopService(serviceName);
+                }
+                if (status !== 'not installed') {
+                    await deleteService(serviceName);
+                }
             }
             const currentDefault = await getCurrentDefaultVersion();
             if (currentDefault === version) {
@@ -568,15 +697,14 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
                     const otherCfg = mysqlVersions[other];
                     await setPathForMySQL(otherCfg.suffix);
                 } else {
-                    const systemPath = await getSystemPath();
-                    const parts = systemPath.split(';');
+                    const currentPath = await getUserPath();
+                    const parts = currentPath.split(';');
                     const newParts = parts.filter(p => !/^%MYSQL_HOME\d+%\\bin$/i.test(p));
                     const newPath = newParts.join(';');
-                    const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-                    await execPromise(setxCmd);
+                    await setUserPath(newPath);
                 }
             }
-            await removeSystemEnvVariable(`MYSQL_HOME${cfg.suffix}`);
+            await removeUserEnvVariable(`MYSQL_HOME${cfg.suffix}`);
             fs.rmSync(home, {recursive: true, force: true});
             mainWindow.webContents.send('mysql-changed');
             return {success: true, message: `已删除 MySQL ${version}`};
@@ -589,7 +717,8 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         try {
             const cfg = mysqlVersions[version];
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const serviceName = `MySQL${cfg.suffix}`;
+            const serviceName = await findMySQLServiceName(version);
+            if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
             await startService(serviceName);
             return {success: true, message: `MySQL ${version} 服务已启动`};
         } catch (err) {
@@ -601,7 +730,8 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         try {
             const cfg = mysqlVersions[version];
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const serviceName = `MySQL${cfg.suffix}`;
+            const serviceName = await findMySQLServiceName(version);
+            if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
             await stopService(serviceName);
             return {success: true, message: `MySQL ${version} 服务已停止`};
         } catch (err) {
@@ -613,7 +743,8 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         try {
             const cfg = mysqlVersions[version];
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const serviceName = `MySQL${cfg.suffix}`;
+            const serviceName = await findMySQLServiceName(version);
+            if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
             await stopService(serviceName);
             await startService(serviceName);
             return {success: true, message: `MySQL ${version} 服务已重启`};
@@ -626,10 +757,16 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         try {
             const cfg = mysqlVersions[version];
             if (!cfg) return {success: false, status: 'unknown', message: '不支持的版本'};
-            const serviceName = `MySQL${cfg.suffix}`;
+            const serviceName = await findMySQLServiceName(version);
+            if (!serviceName) {
+                logToFile(`get-mysql-service-status: 未找到 ${version} 的服务`);
+                return {success: true, status: 'unknown'};
+            }
+            logToFile(`get-mysql-service-status: 使用服务名 ${serviceName}`);
             const status = await getServiceStatus(serviceName);
             return {success: true, status};
         } catch (err) {
+            logToFile(`get-mysql-service-status 异常: ${err.message}`);
             return {success: false, status: 'error', message: err.message};
         }
     });
@@ -664,5 +801,41 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         } catch (err) {
             return {success: false, message: err.message};
         }
+    });
+
+    ipcMain.handle('get-mysql-config', async (event, version) => {
+        const cfg = mysqlVersions[version];
+        if (!cfg) return {success: false, message: '不支持的版本'};
+        const home = await findMySQLHome(version);
+        if (!home) return {success: false, message: '未找到安装目录'};
+
+        let port = cfg.defaultPort;
+        const confPath = path.join(home, 'my.ini');
+        if (fs.existsSync(confPath)) {
+            const content = fs.readFileSync(confPath, 'utf8');
+            const portMatch = content.match(/^port\s*=\s*(\d+)/im);
+            if (portMatch) port = parseInt(portMatch[1], 10);
+        }
+
+        let hasPassword = false;
+        const serviceName = await findMySQLServiceName(version);
+        const status = serviceName ? await getServiceStatus(serviceName) : 'unknown';
+        if (status === 'running') {
+            const mysqlPath = path.join(home, 'bin', 'mysql.exe');
+            if (fs.existsSync(mysqlPath)) {
+                try {
+                    await execPromise(`"${mysqlPath}" -u root -P ${port} -e "exit"`, {timeout: 5000});
+                    hasPassword = false;
+                } catch (err) {
+                    hasPassword = true;
+                }
+            } else {
+                hasPassword = null;
+            }
+        } else {
+            hasPassword = null;
+        }
+
+        return {success: true, port, hasPassword};
     });
 };

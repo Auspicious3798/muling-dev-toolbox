@@ -56,6 +56,22 @@
               {{ serviceStatus[v] === 'running' ? '运行中' : (serviceStatus[v] === 'stopped' ? '已停止' : '未知') }}
             </span>
           </div>
+          <div v-if="tool === 'mysql'" class="mysql-info">
+            <div class="info-row">
+              <span class="info-label">端口：</span>
+              <span>{{ mysqlConfigs[v]?.port || '未知' }}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">用户名：</span>
+              <span>root</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">密码：</span>
+              <span v-if="mysqlConfigs[v]?.hasPassword === true">已设置</span>
+              <span v-else-if="mysqlConfigs[v]?.hasPassword === false">未设置</span>
+              <span v-else>未知（服务未运行）</span>
+            </div>
+          </div>
           <div v-if="tool === 'redis'" class="redis-config-row">
             <span class="config-label">端口：</span>
             <span>{{ redisConfigs[v]?.port || '未知' }}</span>
@@ -81,6 +97,10 @@
             {{ serviceStatus[v] === 'running' ? '停止' : '启动' }}
           </button>
           <button v-if="tool === 'redis'" @click="openPasswordModal(v)" class="action-password"
+                  :disabled="actionLoading">
+            <span class="action-icon">🔑</span> 修改密码
+          </button>
+          <button v-if="tool === 'mysql'" @click="openMySQLPasswordModal(v)" class="action-password"
                   :disabled="actionLoading">
             <span class="action-icon">🔑</span> 修改密码
           </button>
@@ -113,6 +133,35 @@
         <div class="modal-buttons">
           <button @click="changeRedisPassword" :disabled="passwordChanging" class="modal-btn confirm">确认修改</button>
           <button @click="closePasswordModal" class="modal-btn cancel">取消</button>
+        </div>
+      </div>
+    </div>
+
+    <div v-if="showMySQLPasswordModal" class="modal-overlay" @click.self="closeMySQLPasswordModal">
+      <div class="modal">
+        <h4>修改 MySQL root 密码</h4>
+        <div class="modal-field">
+          <label>旧密码（若无则留空）：</label>
+          <div class="password-wrapper">
+            <input :type="showMySQLPassword ? 'text' : 'password'" v-model="oldMySQLPassword"/>
+            <button type="button" @click="showMySQLPassword = !showMySQLPassword" class="toggle-password">
+              {{ showMySQLPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+        <div class="modal-field">
+          <label>新密码：</label>
+          <div class="password-wrapper">
+            <input :type="showMySQLPassword ? 'text' : 'password'" v-model="newMySQLPassword"/>
+            <button type="button" @click="showMySQLPassword = !showMySQLPassword" class="toggle-password">
+              {{ showMySQLPassword ? '🙈' : '👁️' }}
+            </button>
+          </div>
+        </div>
+        <div class="modal-buttons">
+          <button @click="changeMySQLPassword" :disabled="mysqlPasswordChanging" class="modal-btn confirm">确认修改
+          </button>
+          <button @click="closeMySQLPasswordModal" class="modal-btn cancel">取消</button>
         </div>
       </div>
     </div>
@@ -179,7 +228,14 @@ export default {
       mavenInstalled: false,
       mavenVersion: '',
       showPackageManager: false,
-      selectedPythonVersion: ''
+      selectedPythonVersion: '',
+      mysqlConfigs: {},
+      showMySQLPasswordModal: false,
+      currentMySQLVersion: null,
+      oldMySQLPassword: '',
+      newMySQLPassword: '',
+      mysqlPasswordChanging: false,
+      showMySQLPassword: false
     };
   },
   computed: {
@@ -356,6 +412,9 @@ export default {
           if (this.tool === 'redis') {
             await this.refreshRedisConfigs();
           }
+          if (this.tool === 'mysql') {
+            await this.refreshMySQLConfigs();
+          }
         }
       } catch (err) {
         console.error(`${this.toolLabel} 检测失败`, err);
@@ -395,6 +454,21 @@ export default {
           }
         } catch {
           this.redisConfigs[v] = {port: '未知', hasPassword: false};
+        }
+      }
+    },
+    async refreshMySQLConfigs() {
+      if (this.tool !== 'mysql') return;
+      for (const v of this.versions) {
+        try {
+          const res = await window.electronAPI.getMySQLConfig(v);
+          if (res.success) {
+            this.mysqlConfigs[v] = {port: res.port, hasPassword: res.hasPassword};
+          } else {
+            this.mysqlConfigs[v] = {port: '未知', hasPassword: null};
+          }
+        } catch (err) {
+          this.mysqlConfigs[v] = {port: '未知', hasPassword: null};
         }
       }
     },
@@ -476,6 +550,7 @@ export default {
         if (result.success) {
           this.$emit('status', `✅ ${result.message}`);
           await this.refreshAllServiceStatus();
+          if (this.tool === 'mysql') await this.refreshMySQLConfigs();
         } else {
           this.$emit('status', `❌ 启动失败：${result.message}`);
         }
@@ -498,6 +573,7 @@ export default {
         if (result.success) {
           this.$emit('status', `✅ ${result.message}`);
           await this.refreshAllServiceStatus();
+          if (this.tool === 'mysql') await this.refreshMySQLConfigs();
         } else {
           this.$emit('status', `❌ 停止失败：${result.message}`);
         }
@@ -555,6 +631,41 @@ export default {
     closePackageManager() {
       this.showPackageManager = false;
       this.selectedPythonVersion = '';
+    },
+    openMySQLPasswordModal(version) {
+      this.currentMySQLVersion = version;
+      this.oldMySQLPassword = '';
+      this.newMySQLPassword = '';
+      this.showMySQLPasswordModal = true;
+    },
+    closeMySQLPasswordModal() {
+      this.showMySQLPasswordModal = false;
+      this.currentMySQLVersion = null;
+      this.oldMySQLPassword = '';
+      this.newMySQLPassword = '';
+    },
+    async changeMySQLPassword() {
+      if (this.mysqlPasswordChanging) return;
+      this.mysqlPasswordChanging = true;
+      try {
+        const result = await window.electronAPI.changeMySQLPassword(
+            this.currentMySQLVersion,
+            this.oldMySQLPassword,
+            this.newMySQLPassword
+        );
+        if (result.success) {
+          this.$emit('status', `✅ ${result.message}`);
+          this.closeMySQLPasswordModal();
+          await this.refreshMySQLConfigs();
+          await this.refreshAllServiceStatus();
+        } else {
+          this.$emit('status', `❌ 修改密码失败：${result.message}`);
+        }
+      } catch (err) {
+        this.$emit('status', `❌ 修改密码失败：${err.message}`);
+      } finally {
+        this.mysqlPasswordChanging = false;
+      }
     }
   }
 };
@@ -793,6 +904,28 @@ export default {
   background-color: var(--danger-text);
 }
 
+.mysql-info {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--bg-secondary);
+  padding: 8px;
+  border-radius: 12px;
+}
+
+.info-row {
+  display: flex;
+  gap: 8px;
+  font-size: 0.8rem;
+}
+
+.info-label {
+  font-weight: 500;
+  color: var(--text-secondary);
+  width: 42px;
+}
+
 .redis-config-row {
   display: flex;
   align-items: center;
@@ -984,5 +1117,19 @@ export default {
 .modal-btn.cancel {
   background-color: var(--danger-bg);
   color: var(--danger-text);
+}
+
+.password-wrapper {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.toggle-password {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+  padding: 0 4px;
 }
 </style>

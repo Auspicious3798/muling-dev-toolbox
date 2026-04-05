@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     restartMySQLService: (version) => ipcRenderer.invoke('restart-mysql-service', version),
     getMySQLServiceStatus: (version) => ipcRenderer.invoke('get-mysql-service-status', version),
     changeMySQLPassword: (version, oldPassword, newPassword) => ipcRenderer.invoke('change-mysql-password', version, oldPassword, newPassword),
+    getMySQLConfig: (version) => ipcRenderer.invoke('get-mysql-config', version),
     cancelMySQLDownload: () => ipcRenderer.send('cancel-mysql-download'),
     onMySQLProgress: (callback) => ipcRenderer.on('mysql-progress', (_, data) => callback(data)),
     onMySQLChanged: (callback) => ipcRenderer.on('mysql-changed', callback),
