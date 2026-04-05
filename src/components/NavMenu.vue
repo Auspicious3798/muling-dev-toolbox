@@ -17,29 +17,29 @@
 
 <script>
 import NavMenuItem from './NavMenuItem.vue';
-import AIIcon from '@/assets/icons/AI.svg?url';
-import CIcon from '@/assets/icons/c.svg?url';
-import ElasticsearchIcon from '@/assets/icons/elasticsearch.svg?url';
-import GitIcon from '@/assets/icons/git.svg?url';
-import GolangIcon from '@/assets/icons/Golang.svg?url';
-import GradleIcon from '@/assets/icons/gradle.svg?url';
-import JavaIcon from '@/assets/icons/java.svg?url';
-import JupyterIcon from '@/assets/icons/Jupyter.svg?url';
-import KibanaIcon from '@/assets/icons/kibana.svg?url';
-import MavenIcon from '@/assets/icons/maven.svg?url';
-import MinicondaIcon from '@/assets/icons/Miniconda.svg?url';
-import MinioIcon from '@/assets/icons/minio.svg?url';
-import MysqlIcon from '@/assets/icons/mysql.svg?url';
-import NacosIcon from '@/assets/icons/nacos.svg?url';
-import NginxIcon from '@/assets/icons/nginx.svg?url';
-import OllamaIcon from '@/assets/icons/Ollama.svg?url';
-import PythonIcon from '@/assets/icons/Python.svg?url';
-import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg?url';
-import RedisIcon from '@/assets/icons/Redis.svg?url';
-import SentinelIcon from '@/assets/icons/sentinel.svg?url';
-import DashboardIcon from '@/assets/icons/Dashboard.svg?url';
-import LemonIcon from '@/assets/icons/lemon.svg?url';
-import SettingsIcon from '@/assets/icons/setting.svg?url';
+import AIIcon from '/icons/AI.svg?url';
+import CIcon from '/icons/c.svg?url';
+import ElasticsearchIcon from '/icons/elasticsearch.svg?url';
+import GitIcon from '/icons/git.svg?url';
+import GolangIcon from '/icons/Golang.svg?url';
+import GradleIcon from '/icons/gradle.svg?url';
+import JavaIcon from '/icons/java.svg?url';
+import JupyterIcon from '/icons/Jupyter.svg?url';
+import KibanaIcon from '/icons/kibana.svg?url';
+import MavenIcon from '/icons/maven.svg?url';
+import MinicondaIcon from '/icons/Miniconda.svg?url';
+import MinioIcon from '/icons/minio.svg?url';
+import MysqlIcon from '/icons/mysql.svg?url';
+import NacosIcon from '/icons/nacos.svg?url';
+import NginxIcon from '/icons/nginx.svg?url';
+import OllamaIcon from '/icons/Ollama.svg?url';
+import PythonIcon from '/icons/Python.svg?url';
+import RabbitmqIcon from '/icons/Rabbitmq.svg?url';
+import RedisIcon from '/icons/Redis.svg?url';
+import SentinelIcon from '/icons/sentinel.svg?url';
+import DashboardIcon from '/icons/Dashboard.svg?url';
+import LemonIcon from '/icons/lemon.svg?url';
+import SettingsIcon from '/icons/setting.svg?url';
 
 export default {
   name: 'NavMenu',
@@ -155,6 +155,11 @@ export default {
   overflow-y: auto;
   user-select: none;
   border-right: 1px solid var(--border-light);
+  -webkit-app-region: drag; /* 允许拖拽窗口 */
+}
+
+.nav-menu .nav-items {
+  -webkit-app-region: no-drag; /* 菜单项需要点击，不能拖拽 */
 }
 
 .nav-header {

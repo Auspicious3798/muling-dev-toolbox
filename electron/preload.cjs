@@ -75,5 +75,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
-    checkPathExists: (path) => ipcRenderer.invoke('check-path-exists', path)
+    checkPathExists: (path) => ipcRenderer.invoke('check-path-exists', path),
+    minimizeWindow: () => ipcRenderer.send('minimize-window'),
+    maximizeWindow: () => ipcRenderer.send('maximize-window'),
+    closeWindow: () => ipcRenderer.send('close-window')
 });

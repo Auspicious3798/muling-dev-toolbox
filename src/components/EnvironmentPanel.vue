@@ -116,29 +116,29 @@
 </template>
 
 <script>
-import AIIcon from '@/assets/icons/AI.svg?url';
-import CIcon from '@/assets/icons/c.svg?url';
-import ElasticsearchIcon from '@/assets/icons/elasticsearch.svg?url';
-import GitIcon from '@/assets/icons/git.svg?url';
-import GolangIcon from '@/assets/icons/Golang.svg?url';
-import GradleIcon from '@/assets/icons/gradle.svg?url';
-import JavaIcon from '@/assets/icons/java.svg?url';
-import JupyterIcon from '@/assets/icons/Jupyter.svg?url';
-import KibanaIcon from '@/assets/icons/kibana.svg?url';
-import MavenIcon from '@/assets/icons/maven.svg?url';
-import MinicondaIcon from '@/assets/icons/Miniconda.svg?url';
-import MinioIcon from '@/assets/icons/minio.svg?url';
-import MysqlIcon from '@/assets/icons/mysql.svg?url';
-import NacosIcon from '@/assets/icons/nacos.svg?url';
-import NginxIcon from '@/assets/icons/nginx.svg?url';
-import OllamaIcon from '@/assets/icons/Ollama.svg?url';
-import PythonIcon from '@/assets/icons/Python.svg?url';
-import RabbitmqIcon from '@/assets/icons/Rabbitmq.svg?url';
-import RedisIcon from '@/assets/icons/Redis.svg?url';
-import SentinelIcon from '@/assets/icons/sentinel.svg?url';
-import DashboardIcon from '@/assets/icons/Dashboard.svg?url';
-import LemonIcon from '@/assets/icons/lemon.svg?url';
-import SettingsIcon from '@/assets/icons/setting.svg?url';
+import AIIcon from '../../public/icons/AI.svg?url';
+import CIcon from '../../public/icons/c.svg?url';
+import ElasticsearchIcon from '../../public/icons/elasticsearch.svg?url';
+import GitIcon from '../../public/icons/git.svg?url';
+import GolangIcon from '../../public/icons/Golang.svg?url';
+import GradleIcon from '../../public/icons/gradle.svg?url';
+import JavaIcon from '../../public/icons/java.svg?url';
+import JupyterIcon from '../../public/icons/Jupyter.svg?url';
+import KibanaIcon from '../../public/icons/kibana.svg?url';
+import MavenIcon from '../../public/icons/maven.svg?url';
+import MinicondaIcon from '../../public/icons/Miniconda.svg?url';
+import MinioIcon from '../../public/icons/minio.svg?url';
+import MysqlIcon from '../../public/icons/mysql.svg?url';
+import NacosIcon from '../../public/icons/nacos.svg?url';
+import NginxIcon from '../../public/icons/nginx.svg?url';
+import OllamaIcon from '../../public/icons/Ollama.svg?url';
+import PythonIcon from '../../public/icons/Python.svg?url';
+import RabbitmqIcon from '../../public/icons/Rabbitmq.svg?url';
+import RedisIcon from '../../public/icons/Redis.svg?url';
+import SentinelIcon from '../../public/icons/sentinel.svg?url';
+import DashboardIcon from '../../public/icons/Dashboard.svg?url';
+import LemonIcon from '../../public/icons/lemon.svg?url';
+import SettingsIcon from '../../public/icons/setting.svg?url';
 
 export default {
   name: 'EnvironmentPanel',

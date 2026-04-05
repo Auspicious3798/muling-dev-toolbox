@@ -88,7 +88,7 @@
 
 <script>
 import eventBus from '@/eventBus';
-import JavaIcon from '@/assets/icons/java.svg?url';
+import JavaIcon from '../../../public/icons/java.svg?url';
 
 export default {
   name: 'JDKInstaller',

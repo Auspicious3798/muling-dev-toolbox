@@ -127,7 +127,7 @@
 
 <script>
 import eventBus from '@/eventBus';
-import RedisIcon from '@/assets/icons/Redis.svg?url';
+import RedisIcon from '../../../public/icons/Redis.svg?url';
 
 export default {
   name: 'RedisInstaller',

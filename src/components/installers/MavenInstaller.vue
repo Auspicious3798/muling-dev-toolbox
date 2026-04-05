@@ -66,7 +66,7 @@
 
 <script>
 import eventBus from '@/eventBus';
-import MavenIcon from '@/assets/icons/maven.svg?url';
+import MavenIcon from '../../../public/icons/maven.svg?url';
 
 export default {
   name: 'MavenInstaller',

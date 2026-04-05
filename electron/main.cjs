@@ -35,6 +35,9 @@ function createWindow() {
     mainWindow = new BrowserWindow({
         width: 1000,
         height: 800,
+        minWidth: 900,
+        minHeight: 600,
+        frame: false,
         icon: path.join(__dirname, '../build/icon.ico'),
         webPreferences: {
             nodeIntegration: false,
@@ -93,6 +96,7 @@ app.whenReady().then(() => {
             '.json': 'application/json',
             '.png': 'image/png',
             '.jpg': 'image/jpeg',
+            '.svg': 'image/svg+xml',
             '.ico': 'image/x-icon',
         };
         const mimeType = mimeTypes[ext] || 'application/octet-stream';
@@ -240,6 +244,13 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('get-user-data-path', () => app.getPath('userData'));
+
+    ipcMain.on('minimize-window', () => mainWindow.minimize());
+    ipcMain.on('maximize-window', () => {
+        if (mainWindow.isMaximized()) mainWindow.unmaximize();
+        else mainWindow.maximize();
+    });
+    ipcMain.on('close-window', () => mainWindow.close());
 });
 
 app.on('window-all-closed', () => {
