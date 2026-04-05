@@ -80,32 +80,45 @@ export default {
     },
     initTheme() {
       const savedTheme = localStorage.getItem('theme');
-      if (savedTheme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else if (savedTheme === 'light') {
-        document.documentElement.classList.remove('dark');
-      } else if (savedTheme === 'system') {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      const applyTheme = (theme) => {
+        let isDark = false;
+        if (theme === 'dark') isDark = true;
+        else if (theme === 'light') isDark = false;
+        else if (theme === 'system') isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+        if (isDark) {
           document.documentElement.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');
         }
+        localStorage.setItem('theme', theme);
+      };
+
+      if (savedTheme) {
+        applyTheme(savedTheme);
       } else {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
+        applyTheme('system');
       }
+
+      window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
+        const currentTheme = localStorage.getItem('theme');
+        if (currentTheme === 'system') {
+          applyTheme('system');
+        }
+      });
     },
     handleThemeChange(theme) {
+      console.log('App.vue received theme-change event:', theme);
       if (theme === 'dark') {
         document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
         localStorage.setItem('theme', 'dark');
       } else if (theme === 'light') {
+        document.documentElement.classList.add('light');
         document.documentElement.classList.remove('dark');
         localStorage.setItem('theme', 'light');
       } else if (theme === 'system') {
+        document.documentElement.classList.remove('light');
         localStorage.setItem('theme', 'system');
         if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
           document.documentElement.classList.add('dark');
@@ -113,6 +126,7 @@ export default {
           document.documentElement.classList.remove('dark');
         }
       }
+      console.log('Current theme class on html:', document.documentElement.classList.contains('dark') ? 'dark' : (document.documentElement.classList.contains('light') ? 'light' : 'system'));
     },
     handleSystemThemeChange(e) {
       const savedTheme = localStorage.getItem('theme');

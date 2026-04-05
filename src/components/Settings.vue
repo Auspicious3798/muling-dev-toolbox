@@ -81,13 +81,14 @@
     </div>
 
     <div class="settings-footer">
-      <button @click="applySettings" class="apply-btn">应用设置</button>
       <button @click="resetSettings" class="reset-btn">恢复默认设置</button>
     </div>
   </div>
 </template>
 
 <script>
+import eventBus from '../eventBus';
+
 export default {
   name: 'Settings',
   data() {
@@ -137,17 +138,24 @@ export default {
       };
       localStorage.setItem('toolbox_settings', JSON.stringify(settings));
       this.applyTheme();
+      console.log('Settings.vue emitting theme-change event:', this.theme);
+      eventBus.emit('theme-change', this.theme);
       if (window.electronAPI && window.electronAPI.setProxy) {
         window.electronAPI.setProxy(this.proxy);
       }
     },
     applyTheme() {
+      localStorage.setItem('theme', this.theme);
       if (this.theme === 'dark') {
         document.documentElement.classList.add('dark');
+        document.documentElement.classList.remove('light');
       } else if (this.theme === 'light') {
+        document.documentElement.classList.add('light');
         document.documentElement.classList.remove('dark');
       } else if (this.theme === 'system') {
-        if (window.matchMedia('(prefers-color-scheme: dark)').matches) {
+        document.documentElement.classList.remove('light');
+        const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (isDark) {
           document.documentElement.classList.add('dark');
         } else {
           document.documentElement.classList.remove('dark');
@@ -187,12 +195,6 @@ export default {
         window.electronAPI.openGitHub();
       }
     },
-    applySettings() {
-      this.saveSettings();
-      this.loadCacheInfo();
-      this.loadVersionInfo();
-      alert('设置已应用');
-    },
     resetSettings() {
       this.theme = 'system';
       this.autoCheckUpdate = true;
@@ -200,6 +202,7 @@ export default {
       this.mirror = 'https://ghfast.top/';
       this.proxy = '';
       this.saveSettings();
+      alert('设置已重置为默认值');
     },
     formatSize(bytes) {
       if (bytes === 0) return '0 B';

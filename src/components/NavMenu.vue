@@ -154,6 +154,7 @@ export default {
   height: 100vh;
   overflow-y: auto;
   user-select: none;
+  border-right: 1px solid var(--border-light);
 }
 
 .nav-header {
