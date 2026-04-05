@@ -545,6 +545,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
             if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
+            await installPip(pythonExe, pythonRoot, mirror);
             sendProgress(0.8, '配置环境变量');
             const versionKey = version.replace(/\./g, '');
             await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
@@ -612,6 +613,46 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             fs.rmSync(home, {recursive: true, force: true});
             mainWindow.webContents.send('python-changed');
             return {success: true, message: `已删除 Python ${version}`};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('list-packages', async (event, version) => {
+        try {
+            const home = await findPythonHome(version);
+            if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
+            const pythonExe = path.join(home, 'python.exe');
+            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
+            const {stdout} = await execPromise(`"${pythonExe}" -m pip list --format=json`);
+            const packages = JSON.parse(stdout);
+            return {success: true, packages};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('install-package', async (event, version, packageName) => {
+        try {
+            const home = await findPythonHome(version);
+            if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
+            const pythonExe = path.join(home, 'python.exe');
+            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
+            await execPromise(`"${pythonExe}" -m pip install ${packageName}`);
+            return {success: true, message: `包 ${packageName} 安装成功`};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('uninstall-package', async (event, version, packageName) => {
+        try {
+            const home = await findPythonHome(version);
+            if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
+            const pythonExe = path.join(home, 'python.exe');
+            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
+            await execPromise(`"${pythonExe}" -m pip uninstall ${packageName} -y`);
+            return {success: true, message: `包 ${packageName} 已卸载`};
         } catch (err) {
             return {success: false, message: err.message};
         }

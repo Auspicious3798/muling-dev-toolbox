@@ -84,6 +84,10 @@
                   :disabled="actionLoading">
             <span class="action-icon">🔑</span> 修改密码
           </button>
+          <button v-if="tool === 'python'" @click="openPackageManager(v)" class="action-package"
+                  :disabled="actionLoading">
+            <span class="action-icon">📦</span> 包管理
+          </button>
           <button @click="uninstallVersion(v)" class="action-delete" :disabled="actionLoading">
             <span class="action-icon">🗑</span> 卸载
           </button>
@@ -112,6 +116,12 @@
         </div>
       </div>
     </div>
+
+    <PackageManager
+        v-if="showPackageManager"
+        :version="selectedPythonVersion"
+        @close="closePackageManager"
+    />
   </div>
 </template>
 
@@ -139,9 +149,13 @@ import SentinelIcon from '../../public/icons/sentinel.svg?url';
 import DashboardIcon from '../../public/icons/Dashboard.svg?url';
 import LemonIcon from '../../public/icons/lemon.svg?url';
 import SettingsIcon from '../../public/icons/setting.svg?url';
+import PackageManager from './PackageManager.vue';
 
 export default {
   name: 'EnvironmentPanel',
+  components: {
+    PackageManager,
+  },
   props: {
     tool: {
       type: String,
@@ -163,7 +177,9 @@ export default {
       newRedisPassword: '',
       passwordChanging: false,
       mavenInstalled: false,
-      mavenVersion: ''
+      mavenVersion: '',
+      showPackageManager: false,
+      selectedPythonVersion: ''
     };
   },
   computed: {
@@ -531,6 +547,14 @@ export default {
       } finally {
         this.passwordChanging = false;
       }
+    },
+    openPackageManager(version) {
+      this.selectedPythonVersion = version;
+      this.showPackageManager = true;
+    },
+    closePackageManager() {
+      this.showPackageManager = false;
+      this.selectedPythonVersion = '';
     }
   }
 };
@@ -854,6 +878,16 @@ export default {
 }
 
 .action-password:hover:not(:disabled) {
+  background-color: #d8b4fe;
+  transform: scale(0.96);
+}
+
+.action-package {
+  background-color: #e9d5ff;
+  color: #6b21a5;
+}
+
+.action-package:hover:not(:disabled) {
   background-color: #d8b4fe;
   transform: scale(0.96);
 }

@@ -3,7 +3,7 @@
     <div class="content-card">
       <div class="hero">
         <div class="lemon-icon">
-          <img :src="LemonIcon" alt="沐柠"/>
+          <img src="/icons/lemon.svg" alt="沐柠"/>
         </div>
         <h1>关于沐柠</h1>
         <div class="subtitle">Lemon · 数字世界的原创虚拟形象</div>
@@ -11,7 +11,8 @@
 
       <div class="description">
         <p>
-          沐柠（Lemon），诞生于数字世界，拥有专属社交账号，存在于虚拟，陪伴于日常。她是朋友，是陪伴，是依赖，更是一个完整的品牌。</p>
+          沐柠（Lemon），诞生于数字世界，拥有专属社交账号，存在于虚拟，陪伴于日常。她是朋友，是陪伴，是依赖，更是一个完整的品牌。
+        </p>
 
         <div class="future-block">
           <h3>未来延伸</h3>
@@ -29,19 +30,18 @@
         <div class="tagline">
           <span class="quote">✨</span> 沐柠相伴，万物可期 <span class="quote">✨</span>
         </div>
+
+        <div class="contact">
+          <p>联系沐柠：<a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a></p>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import LemonIcon from '/icons/lemon.svg?url';
-
 export default {
   name: 'AboutLemon',
-  setup() {
-    return {LemonIcon};
-  }
 };
 </script>
 
@@ -174,5 +174,22 @@ h1 {
 .quote {
   font-size: 1.2rem;
   opacity: 0.7;
+}
+
+.contact {
+  text-align: center;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border-light);
+  font-size: 0.9rem;
+}
+
+.contact a {
+  color: var(--primary);
+  text-decoration: none;
+}
+
+.contact a:hover {
+  text-decoration: underline;
 }
 </style>

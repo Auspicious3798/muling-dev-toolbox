@@ -72,6 +72,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
     getUsername: () => ipcRenderer.invoke('get-username'),
 
+    listPackages: (version) => ipcRenderer.invoke('list-packages', version),
+    installPackage: (version, packageName) => ipcRenderer.invoke('install-package', version, packageName),
+    uninstallPackage: (version, packageName) => ipcRenderer.invoke('uninstall-package', version, packageName),
+
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
