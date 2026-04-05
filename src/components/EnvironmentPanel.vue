@@ -17,7 +17,6 @@
       </button>
     </div>
 
-    <!-- Maven 简单卡片 -->
     <div v-if="tool === 'maven'">
       <div v-if="mavenInstalled && !loading" class="version-card maven-card">
         <div class="card-header">
@@ -38,7 +37,6 @@
       </div>
     </div>
 
-    <!-- 多版本工具 -->
     <div v-else-if="versions.length === 0 && !loading" class="empty-state">
       <div class="empty-icon">📦</div>
       <p>未检测到已安装的 {{ toolLabel }}</p>
@@ -97,7 +95,6 @@
       <span class="warning-icon">⚠️</span> 当前工具暂未支持检测，敬请期待。
     </div>
 
-    <!-- 修改 Redis 密码弹窗 -->
     <div v-if="showPasswordModal" class="modal-overlay" @click.self="closePasswordModal">
       <div class="modal">
         <h4>修改 Redis 密码</h4>
@@ -396,7 +393,9 @@ export default {
         }
         const result = await api(version);
         if (result.success) {
-          this.$emit('status', `✅ 已切换到 ${this.toolLabel} ${version}`);
+          const msg = `✅ 已切换到 ${this.toolLabel} ${version}`;
+          this.$emit('status', msg);
+          alert(msg);
           await this.refresh();
         } else {
           this.$emit('status', `❌ 切换失败：${result.message}`);
