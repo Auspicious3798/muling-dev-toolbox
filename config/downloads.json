@@ -1,0 +1,89 @@
+{
+  "mirrors": [
+    { "name": "默认 (ghfast.top)", "url": "https://ghfast.top/" },
+    { "name": "ghproxy.com", "url": "https://ghproxy.com/" },
+    { "name": "mirror.ghproxy.com", "url": "https://mirror.ghproxy.com/" }
+  ],
+  "currentMirror": "https://ghfast.top/",
+  "tools": {
+    "jdk": {
+      "baseDir": "C:\\Program Files\\Java",
+      "versions": {
+        "26": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-26.zip", "type": "zip" },
+        "25": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-25.0.2.zip", "type": "zip" },
+        "24": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-24.0.2.zip", "type": "zip" },
+        "23": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-23.0.2.zip", "type": "zip" },
+        "22": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-22.0.2.zip", "type": "zip" },
+        "21": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-21.0.10.zip", "type": "zip" },
+        "20": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-20.0.2.zip", "type": "zip" },
+        "19": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-19.0.2.zip", "type": "zip" },
+        "18": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-18.0.2.1.zip", "type": "zip" },
+        "17": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-17.0.17.zip", "type": "zip" },
+        "16": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-16.0.2.zip", "type": "zip" },
+        "15": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-15.0.2.zip", "type": "zip" },
+        "14": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-14.0.2.zip", "type": "zip" },
+        "13": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-13.0.2.zip", "type": "zip" },
+        "12": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-12.0.2.zip", "type": "zip" },
+        "11": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-11.0.29.zip", "type": "zip" },
+        "8": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk1.8.0_471.zip", "type": "zip" }
+      }
+    },
+    "python": {
+      "baseDir": "C:\\Program Files\\Python",
+      "versions": {
+        "3.14.3": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.14.3.zip", "type": "zip" },
+        "3.13.12": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.13.12.zip", "type": "zip" },
+        "3.12.9": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.12.9.zip", "type": "zip" },
+        "3.11.9": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.11.9.zip", "type": "zip" },
+        "3.10.10": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.10.10.zip", "type": "zip" },
+        "3.9.10": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.9.10.zip", "type": "zip" },
+        "3.8.10": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.8.10.zip", "type": "zip" },
+        "3.7.8": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.7.8.zip", "type": "zip" },
+        "3.6.8": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.6.8.zip", "type": "zip" },
+        "3.5.3": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.5.3.zip", "type": "zip" }
+      }
+    },
+    "mysql": {
+      "baseDir": "C:\\Program Files\\MySQL",
+      "versions": {
+        "5.7": { 
+          "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-5.7.zip",
+          "type": "zip",
+          "suffix": "57"
+        },
+        "8.0": { 
+          "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-8.0.zip",
+          "type": "zip",
+          "suffix": "80"
+        },
+        "9.0": { 
+          "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-9.0.zip",
+          "type": "zip",
+          "suffix": "90"
+        }
+      }
+    },
+    "redis": {
+      "baseDir": "C:\\Program Files\\Redis",
+      "versions": {
+        "3.2": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-3.2.1.zip", "type": "zip" },
+        "4.0": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-4.0.14.zip", "type": "zip" },
+        "5.0": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-5.0.14.zip", "type": "zip" },
+        "6.0": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-6.0.19.zip", "type": "zip" },
+        "6.2": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-6.2.21.zip", "type": "zip" },
+        "7.0": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.0.15.zip", "type": "zip" },
+        "7.2": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.2.13.zip", "type": "zip" },
+        "7.4": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-7.4.8.zip", "type": "zip" },
+        "8.0": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.0.6.zip", "type": "zip" },
+        "8.2": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.2.5.zip", "type": "zip" },
+        "8.4": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.4.2.zip", "type": "zip" },
+        "8.6": { "url": "{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v4.0.0/Redis-8.6.2.zip", "type": "zip" }
+      }
+    },
+    "maven": {
+      "installDir": "C:\\Program Files\\Maven",
+      "url": "{mirror}https://github.com/apache/maven/releases/download/maven-3.9.14/apache-maven-3.9.14-bin.zip",
+      "type": "zip"
+    }
+  }
+}

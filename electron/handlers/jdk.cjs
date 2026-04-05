@@ -6,77 +6,7 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const { promisify } = require('util');
 const execPromise = promisify(exec);
-
-const jdkSources = {
-    '8': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk1.8.0_471.zip',
-        type: 'zip'
-    },
-    '11': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-11.0.29.zip',
-        type: 'zip'
-    },
-    '12': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-12.0.2.zip',
-        type: 'zip'
-    },
-    '13': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-13.0.2.zip',
-        type: 'zip'
-    },
-    '14': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-14.0.2.zip',
-        type: 'zip'
-    },
-    '15': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-15.0.2.zip',
-        type: 'zip'
-    },
-    '16': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-16.0.2.zip',
-        type: 'zip'
-    },
-    '17': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-17.0.17.zip',
-        type: 'zip'
-    },
-    '18': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-18.0.2.1.zip',
-        type: 'zip'
-    },
-    '19': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-19.0.2.zip',
-        type: 'zip'
-    },
-    '20': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-20.0.2.zip',
-        type: 'zip'
-    },
-    '21': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-21.0.10.zip',
-        type: 'zip'
-    },
-    '22': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-22.0.2.zip',
-        type: 'zip'
-    },
-    '23': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-23.0.2.zip',
-        type: 'zip'
-    },
-    '24': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-24.0.2.zip',
-        type: 'zip'
-    },
-    '25': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-25.0.2.zip',
-        type: 'zip'
-    },
-    '26': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v1.0.0/jdk-26.zip',
-        type: 'zip'
-    }
-};
+const configManager = require('../configManager.cjs');
 
 module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
@@ -395,12 +325,26 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     });
 
     ipcMain.handle('install-jdk', async (event, version) => {
-        const source = jdkSources[version];
-        if (!source) return { success: false, message: `不支持的 JDK 版本: ${version}` };
-        const { url } = source;
+        // 从配置获取下载信息
+        logToFile(`尝试获取 JDK ${version} 的配置`);
+        const toolConfig = configManager.getToolConfig('jdk', version);
+        if (!toolConfig) {
+            logToFile(`错误：未找到 JDK ${version} 的配置`);
+            // 调试：输出所有可用的 JDK 版本
+            const config = configManager.getConfig();
+            if (config && config.tools && config.tools.jdk && config.tools.jdk.versions) {
+                logToFile(`可用的 JDK 版本: ${Object.keys(config.tools.jdk.versions).join(', ')}`);
+            } else {
+                logToFile(`错误：配置中不存在 JDK 工具配置`);
+            }
+            return { success: false, message: `不支持的 JDK 版本: ${version}` };
+        }
+        
+        logToFile(`成功获取 JDK ${version} 配置，URL: ${toolConfig.url}`);
+        const { url } = toolConfig;
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = `C:\\Program Files\\Java\\jdk-${version}`;
+        const installPath = path.join(toolConfig.baseDir || 'C:\\Program Files\\Java', `jdk-${version}`);
         const sendProgress = (progress) => {
             mainWindow.webContents.send('download-progress', { type: 'jdk', version, progress });
         };

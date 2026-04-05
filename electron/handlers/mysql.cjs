@@ -7,30 +7,27 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
-
-const mysqlVersions = {
-    '5.7': {
-        suffix: '57',
-        defaultPort: 3306,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-5.7.zip'
-    },
-    '8.0': {
-        suffix: '80',
-        defaultPort: 3307,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-8.0.zip'
-    },
-    '9.0': {
-        suffix: '90',
-        defaultPort: 3308,
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v3.0.0/mysql-9.0.zip'
-    }
-};
+const configManager = require('../configManager.cjs');
 
 module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
 
     const logFile = path.join(userDataPath, 'mysql_install.log');
+
+    // 辅助函数：获取 MySQL 版本配置
+    function getMySQLVersionConfig(version) {
+        const cfg = configManager.getToolConfig('mysql', version);
+        if (!cfg) return null;
+        
+        // 根据版本设置默认端口
+        const defaultPort = version === '5.7' ? 3306 : (version === '8.0' ? 3307 : 3308);
+        
+        return {
+            ...cfg,
+            defaultPort
+        };
+    }
 
     function logToFile(message) {
         const timestamp = new Date().toISOString();
@@ -185,11 +182,15 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     async function refreshCurrentProcessEnv() {
         try {
             let expandedPath = await getUserPath();
-            for (const [ver, cfg] of Object.entries(mysqlVersions)) {
-                const varName = `MYSQL_HOME${cfg.suffix}`;
-                const varValue = process.env[varName];
-                if (varValue) {
-                    expandedPath = expandedPath.replace(new RegExp(`%${varName}%`, 'g'), varValue);
+            // 从配置中获取所有已安装的 MySQL 版本
+            const config = configManager.getConfig();
+            if (config && config.tools && config.tools.mysql && config.tools.mysql.versions) {
+                for (const [ver, cfg] of Object.entries(config.tools.mysql.versions)) {
+                    const varName = `MYSQL_HOME${cfg.suffix}`;
+                    const varValue = process.env[varName];
+                    if (varValue) {
+                        expandedPath = expandedPath.replace(new RegExp(`%${varName}%`, 'g'), varValue);
+                    }
                 }
             }
             expandedPath = expandedPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
@@ -295,7 +296,7 @@ port=${port}
 
     // 动态查找匹配的服务名（支持 MySQL90, MySQL93, MySQL94 等任意小版本）
     async function findMySQLServiceName(version) {
-        const cfg = mysqlVersions[version];
+        const cfg = getMySQLVersionConfig(version);
         if (!cfg) return null;
         const major = version.split('.')[0];
         
@@ -529,12 +530,15 @@ port=${port}
     });
 
     ipcMain.handle('install-mysql', async (event, version, password = '') => {
-        const cfg = mysqlVersions[version];
+        // 从配置获取下载信息
+        const cfg = configManager.getToolConfig('mysql', version);
         if (!cfg) return {success: false, message: `不支持的 MySQL 版本: ${version}`};
-        const {url, suffix, defaultPort} = cfg;
+        
+        const {url, suffix} = cfg;
+        const defaultPort = version === '5.7' ? 3306 : (version === '8.0' ? 3307 : 3308);
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = `C:\\Program Files\\MySQL\\mysql-${version}`;
+        const installPath = path.join(cfg.baseDir || 'C:\\Program Files\\MySQL', `mysql-${version}`);
         const sendProgress = (progress, stage = '') => {
             // 使用 setImmediate 确保 IPC 消息能立即发送到渲染进程
             setImmediate(() => {
@@ -596,7 +600,7 @@ port=${port}
 
     ipcMain.handle('install-from-local-mysql', async (event, version, password = '') => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 MySQL 安装包，请先导入'};
-        const cfg = mysqlVersions[version];
+        const cfg = getMySQLVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 MySQL 版本: ${version}`};
         const {suffix, defaultPort} = cfg;
         const zipPath = pendingLocalFile;
@@ -660,7 +664,7 @@ port=${port}
 
     ipcMain.handle('switch-mysql', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
@@ -675,7 +679,7 @@ port=${port}
 
     ipcMain.handle('delete-mysql', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
@@ -694,7 +698,7 @@ port=${port}
                 const allVersions = await getAllInstalledVersions();
                 const other = allVersions.find(v => v !== version);
                 if (other) {
-                    const otherCfg = mysqlVersions[other];
+                    const otherCfg = getMySQLVersionConfig(other);
                     await setPathForMySQL(otherCfg.suffix);
                 } else {
                     const currentPath = await getUserPath();
@@ -715,7 +719,7 @@ port=${port}
 
     ipcMain.handle('start-mysql-service', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = await findMySQLServiceName(version);
             if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
@@ -728,7 +732,7 @@ port=${port}
 
     ipcMain.handle('stop-mysql-service', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = await findMySQLServiceName(version);
             if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
@@ -741,7 +745,7 @@ port=${port}
 
     ipcMain.handle('restart-mysql-service', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const serviceName = await findMySQLServiceName(version);
             if (!serviceName) return {success: false, message: `未找到 MySQL ${version} 的服务`};
@@ -755,7 +759,7 @@ port=${port}
 
     ipcMain.handle('get-mysql-service-status', async (event, version) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, status: 'unknown', message: '不支持的版本'};
             const serviceName = await findMySQLServiceName(version);
             if (!serviceName) {
@@ -773,7 +777,7 @@ port=${port}
 
     ipcMain.handle('change-mysql-password', async (event, version, oldPassword, newPassword) => {
         try {
-            const cfg = mysqlVersions[version];
+            const cfg = getMySQLVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
             const home = await findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
@@ -804,7 +808,7 @@ port=${port}
     });
 
     ipcMain.handle('get-mysql-config', async (event, version) => {
-        const cfg = mysqlVersions[version];
+        const cfg = getMySQLVersionConfig(version);
         if (!cfg) return {success: false, message: '不支持的版本'};
         const home = await findMySQLHome(version);
         if (!home) return {success: false, message: '未找到安装目录'};

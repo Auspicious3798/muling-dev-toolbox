@@ -26,18 +26,22 @@
     </div>
 
     <div v-if="activeMode === 'online'">
-      <select v-model="selectedVersion" class="version-select">
-        <option value="3.14.3">Python 3.14.3</option>
-        <option value="3.13.12">Python 3.13.12</option>
-        <option value="3.12.9">Python 3.12.9</option>
-        <option value="3.11.9">Python 3.11.9</option>
-        <option value="3.10.10">Python 3.10.10</option>
-        <option value="3.9.10">Python 3.9.10</option>
-        <option value="3.8.10">Python 3.8.10</option>
-        <option value="3.7.8">Python 3.7.8</option>
-        <option value="3.6.8">Python 3.6.8</option>
-        <option value="3.5.3">Python 3.5.3</option>
-      </select>
+      <div class="version-selection">
+        <div class="version-options">
+          <label v-for="v in versionOptions" :key="v.value" class="version-option" :class="{ selected: selectedVersion === v.value }" @click="selectedVersion = v.value">
+            <input type="radio" :value="v.value" v-model="selectedVersion" class="radio-hidden"/>
+            <span class="version-name">{{ v.label }}</span>
+            <span v-if="v.recommended" class="recommend-tag">推荐</span>
+          </label>
+        </div>
+        <div class="version-info">
+          <span v-if="selectedVersion === '3.12.9'" class="info-text">✅ 官方推荐，稳定且生态完善</span>
+          <span v-else-if="selectedVersion === '3.11.9'" class="info-text">⚡ 性能优异，广泛使用</span>
+          <span v-else-if="selectedVersion === '3.10.10'" class="info-text">🔧 成熟稳定，兼容性好</span>
+          <span v-else-if="selectedVersion.startsWith('3.1')" class="info-text">🚀 较新版本，现代特性</span>
+          <span v-else class="info-text">💡 经典版本，适合老旧项目</span>
+        </div>
+      </div>
       <div class="install-path">
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
@@ -101,6 +105,18 @@ export default {
       PythonIcon,
       activeMode: 'online',
       selectedVersion: '3.12.9',
+      versionOptions: [
+        { value: '3.14.3', label: '3.14.3', recommended: false },
+        { value: '3.13.12', label: '3.13.12', recommended: false },
+        { value: '3.12.9', label: '3.12.9', recommended: true },
+        { value: '3.11.9', label: '3.11.9', recommended: false },
+        { value: '3.10.10', label: '3.10.10', recommended: false },
+        { value: '3.9.10', label: '3.9.10', recommended: false },
+        { value: '3.8.10', label: '3.8.10', recommended: false },
+        { value: '3.7.8', label: '3.7.8', recommended: false },
+        { value: '3.6.8', label: '3.6.8', recommended: false },
+        { value: '3.5.3', label: '3.5.3', recommended: false }
+      ],
       installing: false,
       downloading: false,
       status: '未安装',
@@ -338,6 +354,82 @@ h3 {
 .mode-btn.active {
   background-color: var(--info-bg);
   color: var(--info-text);
+}
+
+/* Version selection area */
+.version-selection {
+  margin-bottom: 1rem;
+}
+
+.version-options {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.version-option {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border-radius: 10px;
+  border: 2px solid var(--border-medium);
+  background-color: var(--bg-input);
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-size: 0.85rem;
+}
+
+.version-option:hover {
+  border-color: var(--primary);
+  background-color: var(--bg-hover);
+}
+
+.version-option.selected {
+  border-color: var(--primary);
+  background-color: var(--primary-bg);
+}
+
+.version-option.selected .version-name {
+  color: var(--primary);
+  font-weight: 600;
+}
+
+.version-option .radio-hidden {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.version-name {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.recommend-tag {
+  display: inline-block;
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.version-info {
+  display: flex;
+  min-height: 20px;
+}
+
+.info-text {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 
 .mode-btn:hover:not(.active) {

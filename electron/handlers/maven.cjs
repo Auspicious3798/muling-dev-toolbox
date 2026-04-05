@@ -6,16 +6,21 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
-
-const MAVEN_VERSION = '3.9.14';
-const MAVEN_URL = 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v5.0.0/maven-3.9.14.zip';
-const MAVEN_INSTALL_DIR = 'C:\\Program Files\\Maven';
+const configManager = require('../configManager.cjs');
 
 module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
 
     const logFile = path.join(userDataPath, 'maven_install.log');
+    
+    // 默认安装路径（作为后备）
+    const MAVEN_INSTALL_DIR = 'C:\\Program Files\\Maven';
+
+    // 从配置获取 Maven 下载信息
+    function getMavenConfig() {
+        return configManager.getToolConfig('maven');
+    }
 
     function logToFile(message) {
         const timestamp = new Date().toISOString();
@@ -321,6 +326,13 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
         if (!jdkOk) {
             return {success: false, message: '未检测到 JDK，请先安装 JDK 后再安装 Maven'};
         }
+        
+        // 从配置获取 Maven 下载信息
+        const mavenConfig = getMavenConfig();
+        if (!mavenConfig) {
+            return {success: false, message: '无法获取 Maven 配置'};
+        }
+        
         const installerPath = useLocal ? pendingLocalFile : path.join(downloadDir, 'maven.zip');
         if (!useLocal && !fs.existsSync(installerPath)) {
             const sendProgress = (progress) => {
@@ -330,7 +342,7 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
             currentAbortController = abortController;
             try {
                 sendProgress(0);
-                await downloadFile(MAVEN_URL, installerPath, sendProgress, abortController.signal);
+                await downloadFile(mavenConfig.url, installerPath, sendProgress, abortController.signal);
                 sendProgress(1);
             } catch (err) {
                 if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
@@ -344,7 +356,7 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
             return {success: false, message: '没有已导入的 Maven 安装包，请先导入'};
         }
         const zipPath = useLocal ? pendingLocalFile : installerPath;
-        const installPath = MAVEN_INSTALL_DIR;
+        const installPath = mavenConfig.installDir || MAVEN_INSTALL_DIR;
         try {
             await installZip(zipPath, installPath);
             await setSystemEnvVariable('MAVEN_HOME', installPath);
@@ -381,7 +393,8 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('uninstall-maven', async () => {
         try {
-            const installPath = MAVEN_INSTALL_DIR;
+            const mavenConfig = getMavenConfig();
+            const installPath = mavenConfig ? (mavenConfig.installDir || 'C:\\Program Files\\Maven') : 'C:\\Program Files\\Maven';
             if (fs.existsSync(installPath)) {
                 fs.rmSync(installPath, {recursive: true, force: true});
             }

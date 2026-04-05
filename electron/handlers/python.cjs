@@ -6,49 +6,7 @@ const axios = require('axios');
 const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
-
-const pythonSources = {
-    '3.14.3': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.14.3.zip',
-        type: 'zip'
-    },
-    '3.13.12': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.13.12.zip',
-        type: 'zip'
-    },
-    '3.12.9': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.12.9.zip',
-        type: 'zip'
-    },
-    '3.11.9': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.11.9.zip',
-        type: 'zip'
-    },
-    '3.10.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.10.10.zip',
-        type: 'zip'
-    },
-    '3.9.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.9.10.zip',
-        type: 'zip'
-    },
-    '3.8.10': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.8.10.zip',
-        type: 'zip'
-    },
-    '3.7.8': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.7.8.zip',
-        type: 'zip'
-    },
-    '3.6.8': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.6.8.zip',
-        type: 'zip'
-    },
-    '3.5.3': {
-        url: 'https://ghfast.top/https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.0.0/python-3.5.3.zip',
-        type: 'zip'
-    }
-};
+const configManager = require('../configManager.cjs');
 
 module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
@@ -196,7 +154,11 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
         }
 
         const pipConfigDir = path.join(installDir, 'pip.ini');
-        const pipConfigContent = `[global]\nindex-url = ${mirror}\n[install]\ntrusted-host = ${new URL(mirror).hostname}\n`;
+        const pipConfigContent = `[global]
+index-url = ${mirror}
+[install]
+trusted-host = ${new URL(mirror).hostname}
+`;
         fs.writeFileSync(pipConfigDir, pipConfigContent);
         logToFile(`pip 镜像源配置完成: ${mirror}`);
     }
@@ -521,12 +483,14 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     });
 
     ipcMain.handle('install-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
-        const source = pythonSources[version];
-        if (!source) return {success: false, message: `不支持的 Python 版本: ${version}`};
-        const {url} = source;
+        // 从配置获取下载信息
+        const toolConfig = configManager.getToolConfig('python', version);
+        if (!toolConfig) return {success: false, message: `不支持的 Python 版本: ${version}`};
+        
+        const {url} = toolConfig;
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = `C:\\Program Files\\Python\\python-${version}`;
+        const installPath = path.join(toolConfig.baseDir || 'C:\\Program Files\\Python', `python-${version}`);
         const sendProgress = (progress, stage = '') => {
             mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
         };
