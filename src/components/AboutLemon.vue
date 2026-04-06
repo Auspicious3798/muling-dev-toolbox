@@ -33,6 +33,7 @@
 
         <div class="contact">
           <p>联系沐柠：<a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a></p>
+          <p>GitHub 仓库：<a href="https://github.com/Auspicious3798/muling-dev-toolbox" target="_blank">https://github.com/Auspicious3798/muling-dev-toolbox</a></p>
         </div>
 
         <div class="disclaimer">
