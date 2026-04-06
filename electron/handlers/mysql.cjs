@@ -364,7 +364,8 @@ port=${port}
         const results = [];
         const baseDirs = [
             'C:\\Program Files\\MySQL',
-            'C:\\Program Files (x86)\\MySQL'
+            'C:\\Program Files (x86)\\MySQL',
+            'C:\\Program Files\\muling\\muling-env-box\\MySQL'
         ];
         for (const base of baseDirs) {
             if (!fs.existsSync(base)) continue;
@@ -415,20 +416,25 @@ port=${port}
                 }
             }
         }
-        const baseDir = 'C:\\Program Files\\MySQL';
-        if (fs.existsSync(baseDir)) {
-            const dirs = fs.readdirSync(baseDir);
-            for (const dir of dirs) {
-                const fullPath = path.join(baseDir, dir);
-                if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'bin', 'mysqld.exe'))) {
-                    const match = dir.match(/mysql-(\d+\.\d+)/);
-                    if (match) {
-                        const majorVersion = match[1].split('.')[0];
-                        let mappedVersion = null;
-                        if (majorVersion === '5') mappedVersion = '5.7';
-                        else if (majorVersion === '8') mappedVersion = '8.0';
-                        else if (majorVersion === '9') mappedVersion = '9.0';
-                        if (mappedVersion) versions.add(mappedVersion);
+        const baseDirs = [
+            'C:\\Program Files\\MySQL',
+            'C:\\Program Files\\muling\\muling-env-box\\MySQL'
+        ];
+        for (const baseDir of baseDirs) {
+            if (fs.existsSync(baseDir)) {
+                const dirs = fs.readdirSync(baseDir);
+                for (const dir of dirs) {
+                    const fullPath = path.join(baseDir, dir);
+                    if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'bin', 'mysqld.exe'))) {
+                        const match = dir.match(/mysql-(\d+\.\d+)/);
+                        if (match) {
+                            const majorVersion = match[1].split('.')[0];
+                            let mappedVersion = null;
+                            if (majorVersion === '5') mappedVersion = '5.7';
+                            else if (majorVersion === '8') mappedVersion = '8.0';
+                            else if (majorVersion === '9') mappedVersion = '9.0';
+                            if (mappedVersion) versions.add(mappedVersion);
+                        }
                     }
                 }
             }
@@ -479,9 +485,14 @@ port=${port}
             if (home && fs.existsSync(home)) return home;
         } catch (err) {
         }
-        const installDir = `C:\\Program Files\\MySQL\\mysql-${version}`;
-        if (fs.existsSync(installDir) && fs.existsSync(path.join(installDir, 'bin', 'mysqld.exe'))) {
-            return installDir;
+        const installDirs = [
+            `C:\\Program Files\\MySQL\\mysql-${version}`,
+            `C:\\Program Files\\muling\\muling-env-box\\MySQL\\mysql-${version}`
+        ];
+        for (const installDir of installDirs) {
+            if (fs.existsSync(installDir) && fs.existsSync(path.join(installDir, 'bin', 'mysqld.exe'))) {
+                return installDir;
+            }
         }
         const msiInstallations = await scanMsiMySQLInstallations();
         for (const {version: ver, path: p} of msiInstallations) {

@@ -335,15 +335,15 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
         
         const installerPath = useLocal ? pendingLocalFile : path.join(downloadDir, 'maven.zip');
         if (!useLocal && !fs.existsSync(installerPath)) {
-            const sendProgress = (progress) => {
-                mainWindow.webContents.send('maven-progress', {type: 'maven', progress});
+            const sendProgress = (progress, stage = '') => {
+                mainWindow.webContents.send('maven-progress', {type: 'maven', progress, stage});
             };
             const abortController = new AbortController();
             currentAbortController = abortController;
             try {
-                sendProgress(0);
-                await downloadFile(mavenConfig.url, installerPath, sendProgress, abortController.signal);
-                sendProgress(1);
+                sendProgress(0, '下载安装包');
+                await downloadFile(mavenConfig.url, installerPath, (p) => sendProgress(p * 0.5, '下载安装包'), abortController.signal);
+                sendProgress(0.5, '解压中');
             } catch (err) {
                 if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
                 logToFile(`下载失败: ${err.message}`);
@@ -360,13 +360,20 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
         let installPath = mavenConfig.installDir || MAVEN_INSTALL_DIR;
         installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
         try {
+            const sendProgress = (progress, stage = '') => {
+                mainWindow.webContents.send('maven-progress', {type: 'maven', progress, stage});
+            };
+            
+            sendProgress(0.5, '解压中');
             await installZip(zipPath, installPath);
+            sendProgress(0.8, '配置环境变量');
             await setSystemEnvVariable('MAVEN_HOME', installPath);
             await setPathForMaven();
             // 刷新当前进程环境变量
             await refreshCurrentProcessEnv();
             // 延迟确保系统环境生效
             await new Promise(resolve => setTimeout(resolve, 500));
+            sendProgress(1, '安装完成');
             if (!useLocal && fs.existsSync(installerPath)) {
                 try {
                     fs.unlinkSync(installerPath);

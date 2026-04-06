@@ -1,5 +1,27 @@
 <template>
   <div class="app-layout">
+    <!-- 全局扫描遮罩 -->
+    <transition name="scan-overlay">
+      <div v-if="showScanOverlay" class="global-scan-overlay">
+        <div class="scan-content">
+          <div class="scan-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+          </div>
+          <div class="scan-text">
+            <p class="scan-title">正在扫描环境</p>
+            <p class="scan-subtitle">正在检测已安装的 {{ scanningTool }} 版本...</p>
+          </div>
+          <div class="scan-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <NavMenu :active-tool="activeTool" @select-tool="handleToolSelect"/>
     <div class="right-panel">
       <div class="window-controls">
@@ -53,15 +75,21 @@ export default {
     return {
       activeTool: 'dashboard',
       drawerVisible: false,
+      showScanOverlay: false,
+      scanningTool: '',
     };
   },
   mounted() {
     this.initTheme();
     eventBus.on('theme-change', this.handleThemeChange);
+    eventBus.on('scan-start', this.handleScanStart);
+    eventBus.on('scan-end', this.handleScanEnd);
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
   },
   beforeUnmount() {
     eventBus.off('theme-change', this.handleThemeChange);
+    eventBus.off('scan-start', this.handleScanStart);
+    eventBus.off('scan-end', this.handleScanEnd);
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
@@ -148,6 +176,17 @@ export default {
     closeWindow() {
       if (window.electronAPI) window.electronAPI.closeWindow();
     },
+    handleScanStart(toolLabel) {
+      console.log('[App.vue] 收到 scan-start 事件，工具:', toolLabel);
+      this.scanningTool = toolLabel;
+      this.showScanOverlay = true;
+      console.log('[App.vue] showScanOverlay:', this.showScanOverlay);
+    },
+    handleScanEnd() {
+      console.log('[App.vue] 收到 scan-end 事件');
+      this.showScanOverlay = false;
+      this.scanningTool = '';
+    },
   },
 };
 </script>
@@ -213,5 +252,149 @@ body {
 .control-btn.close-btn:hover {
   background-color: #e81123;
   color: white;
+}
+
+/* 全局扫描遮罩 */
+.global-scan-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 99999;
+}
+
+.scan-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
+  padding: 48px 64px;
+  background: var(--bg-card);
+  border-radius: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  border: 1px solid var(--border-light);
+}
+
+.scan-spinner {
+  position: relative;
+  width: 80px;
+  height: 80px;
+}
+
+.spinner-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid transparent;
+  border-radius: 50%;
+  animation: spin 1.5s linear infinite;
+}
+
+.spinner-ring:nth-child(1) {
+  border-top-color: #3b82f6;
+  animation-delay: 0s;
+}
+
+.spinner-ring:nth-child(2) {
+  border-right-color: #8b5cf6;
+  animation-delay: 0.15s;
+  width: 90%;
+  height: 90%;
+  top: 5%;
+  left: 5%;
+}
+
+.spinner-ring:nth-child(3) {
+  border-bottom-color: #06b6d4;
+  animation-delay: 0.3s;
+  width: 80%;
+  height: 80%;
+  top: 10%;
+  left: 10%;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.scan-text {
+  text-align: center;
+}
+
+.scan-title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 8px 0;
+}
+
+.scan-subtitle {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.scan-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.scan-dots span {
+  width: 10px;
+  height: 10px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.scan-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.scan-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.scan-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes pulse {
+  0%, 80%, 100% {
+    transform: scale(0.6);
+    opacity: 0.4;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* 遮罩过渡动画 */
+.scan-overlay-enter-active,
+.scan-overlay-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.scan-overlay-enter-from,
+.scan-overlay-leave-to {
+  opacity: 0;
+}
+
+.scan-overlay-enter-to,
+.scan-overlay-leave-from {
+  opacity: 1;
 }
 </style>

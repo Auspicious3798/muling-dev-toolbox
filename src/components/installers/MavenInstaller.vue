@@ -19,10 +19,33 @@
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
       </div>
+      <div class="install-status" v-if="installing">
+        <div class="status-header">
+          <span class="phase-label">
+            {{ downloading ? '📥 下载中' : '🔧 安装中' }}
+          </span>
+          <span class="stage-label">{{ currentStage }}</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-bar" :class="{ 'downloading': downloading, 'installing': !downloading }">
+            <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+          </div>
+          <span class="progress-percent">{{ Math.round(progressPercent) }}%</span>
+        </div>
+        <div class="steps-log">
+          <div v-for="(step, idx) in installSteps" :key="idx" class="step-item">
+            <span class="step-icon">✅</span>
+            <span class="step-text">{{ step }}</span>
+          </div>
+          <div v-if="currentStage && !installSteps.includes(getStepLabel(currentStage))" class="step-item current">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">{{ getStepLabel(currentStage) }}</span>
+          </div>
+        </div>
+      </div>
       <div class="button-group">
         <button @click="installMaven" :disabled="installing || jdkMissing" class="install-btn">
-          <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
-          <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
+          {{ installing ? (downloading ? '下载中...' : '安装中...') : '开始安装' }}
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
           取消下载
@@ -77,6 +100,8 @@ export default {
       installing: false,
       downloading: false,
       status: '未安装',
+      currentStage: '',
+      installSteps: [],
       showProgress: false,
       progressPercent: 0,
       localFilePath: '',
@@ -94,8 +119,19 @@ export default {
       window.electronAPI.onMavenProgress((data) => {
         if (data.type === 'maven') {
           this.progressPercent = data.progress * 100;
+          if (data.stage) {
+            this.currentStage = data.stage;
+            // 将每一步添加到步骤日志中（去重）
+            const stepLabel = this.getStepLabel(data.stage);
+            if (stepLabel && !this.installSteps.includes(stepLabel)) {
+              this.installSteps.push(stepLabel);
+            }
+          }
           if (data.progress === 1) {
-            this.status = '下载完成，正在安装...';
+            this.status = '✅ Maven 安装成功';
+            setTimeout(() => {
+              this.showProgress = false;
+            }, 1500);
           }
         }
       });
@@ -104,6 +140,15 @@ export default {
     }
   },
   methods: {
+    getStepLabel(stage) {
+      if (!stage) return '';
+      const map = {
+        '下载安装包': '下载 Maven 安装包',
+        '解压中': '解压安装包',
+        '配置环境变量': '配置系统环境变量'
+      };
+      return map[stage] || stage;
+    },
     async checkJDK() {
       try {
         const result = await window.electronAPI.checkJDK();

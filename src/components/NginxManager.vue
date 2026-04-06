@@ -56,8 +56,9 @@
           <label>dist 目录路径</label>
           <div class="path-select">
             <input v-model="newSite.path" placeholder="D:/project/dist"/>
-            <button @click="selectDistFolder" class="browse-btn">浏览</button>
+            <button @click="selectDistFolder" class="browse-btn">挂载</button>
           </div>
+          <span v-if="newSite.path" class="warning-msg">⚠️ 提示：站点运行期间请勿删除或移动此文件夹</span>
         </div>
         <div class="modal-field">
           <label>端口号（可选）</label>
@@ -187,8 +188,14 @@ export default {
       if (res.success) {
         await this.loadSites();
         this.closeAddDialog();
-        await this.reloadNginx();
-        this.status = `✅ 站点已添加，端口：${res.port}`;
+        
+        // 如果 Nginx 正在运行，则重载配置
+        if (this.nginxRunning) {
+          await this.reloadNginx();
+          this.status = `✅ 站点已添加，端口：${res.port}，Nginx 已重载`;
+        } else {
+          this.status = `✅ 站点已添加，端口：${res.port}。请启动 Nginx 使配置生效。`;
+        }
       } else {
         if (res.message.includes('端口')) this.portConflict = true;
         else alert('添加失败：' + res.message);
@@ -200,8 +207,14 @@ export default {
       const res = await window.electronAPI.deleteNginxSite(port);
       if (res.success) {
         await this.loadSites();
-        await this.reloadNginx();
-        this.status = '✅ 站点已删除，Nginx 已重载';
+        
+        // 如果 Nginx 正在运行，则重载配置
+        if (this.nginxRunning) {
+          await this.reloadNginx();
+          this.status = '✅ 站点已删除，Nginx 已重载';
+        } else {
+          this.status = '✅ 站点已删除。请启动 Nginx 使配置生效。';
+        }
       } else {
         alert('删除失败：' + res.message);
       }
@@ -436,6 +449,14 @@ h3 {
   font-size: 0.75rem;
   margin-top: 4px;
   display: block;
+}
+
+.warning-msg {
+  color: var(--warning-text, #f59e0b);
+  font-size: 0.75rem;
+  margin-top: 6px;
+  display: block;
+  line-height: 1.4;
 }
 
 .modal-buttons {

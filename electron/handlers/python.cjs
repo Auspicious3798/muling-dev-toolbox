@@ -243,7 +243,8 @@ trusted-host = ${new URL(mirror).hostname}
             'C:\\Users\\' + process.env.USERNAME + '\\anaconda3',
             'C:\\ProgramData\\Anaconda3',
             'C:\\ProgramData\\anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Programs\\Python'
+            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Programs\\Python',
+            'C:\\Program Files\\muling\\muling-env-box\\Python'
         ];
         const possibleVersions = [
             `${digits[0]}.${digits.slice(1)}`,
@@ -348,7 +349,8 @@ trusted-host = ${new URL(mirror).hostname}
             'C:\\Program Files\\Python311',
             'C:\\Program Files\\Python312',
             'C:\\Program Files\\Python313',
-            'C:\\Program Files\\Python314'
+            'C:\\Program Files\\Python314',
+            'C:\\Program Files\\muling\\muling-env-box\\Python'
         ];
         for (const base of knownDirs) {
             if (fs.existsSync(base)) {
@@ -418,7 +420,8 @@ trusted-host = ${new URL(mirror).hostname}
             'C:\\Users\\' + process.env.USERNAME + '\\Anaconda3',
             'C:\\Users\\' + process.env.USERNAME + '\\anaconda3',
             'C:\\ProgramData\\Anaconda3',
-            'C:\\ProgramData\\anaconda3'
+            'C:\\ProgramData\\anaconda3',
+            'C:\\Program Files\\muling\\muling-env-box\\Python'
         ];
         for (const base of knownDirs) {
             const candidate = path.join(base, `python-${version}`);
