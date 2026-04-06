@@ -114,7 +114,7 @@ export default {
           eventBus.emit('scan-end');
         }, 500);
       } else if (this.$refs.envPanel) {
-        // 其他工具刷新 EnvironmentPanel
+        // 其他工具刷新 EnvironmentPanel（会自动发送 scan-start/scan-end 事件）
         this.$refs.envPanel.refresh();
       }
       

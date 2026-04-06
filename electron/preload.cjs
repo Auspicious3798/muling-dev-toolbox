@@ -102,6 +102,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     reloadNginx: () => ipcRenderer.invoke('reload-nginx'),
     addNginxSite: (site) => ipcRenderer.invoke('add-nginx-site', site),
     deleteNginxSite: (port) => ipcRenderer.invoke('delete-nginx-site', port),
+    updateNginxSite: (site) => ipcRenderer.invoke('update-nginx-site', site),
+    checkPortAvailable: (port) => ipcRenderer.invoke('check-port-available', port),
     cancelNginxDownload: () => ipcRenderer.send('cancel-nginx-download'),
     onNginxProgress: (callback) => ipcRenderer.on('nginx-progress', (_, data) => callback(data)),
     onNginxChanged: (callback) => ipcRenderer.on('nginx-changed', callback),

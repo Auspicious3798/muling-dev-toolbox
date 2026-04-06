@@ -26,14 +26,14 @@
       <div class="title-section">
         <img src="/icons/nginx.svg" class="tool-icon-img" alt=""/>
         <h3>Nginx 站点管理</h3>
+        <span v-if="nginxInstalled" class="status-badge" :class="nginxRunning ? 'running' : 'stopped'">
+          {{ nginxRunning ? '运行中' : '已停止' }}
+        </span>
       </div>
       <div class="nginx-global-actions">
         <button @click="refreshAll" :disabled="loading" class="refresh-btn">
           <span class="refresh-icon">⟳</span> {{ loading ? '刷新中...' : '刷新' }}
         </button>
-        <span v-if="nginxInstalled" class="status-badge" :class="nginxRunning ? 'running' : 'stopped'">
-          {{ nginxRunning ? '运行中' : '已停止' }}
-        </span>
         <button v-if="!nginxInstalled" @click="openInstallDrawer" class="install-btn">安装 Nginx</button>
         <template v-else>
           <button @click="startNginx" :disabled="actionLoading" class="action-btn start">启动</button>
@@ -73,7 +73,8 @@
           <div>{{ site.port }}</div>
           <div class="path-cell">{{ site.path }}</div>
           <div class="actions">
-            <button @click="openSite(site.port)" class="action-icon-btn" title="打开网站">🌐</button>
+            <button @click="copySiteUrl(site.port)" class="action-icon-btn" title="复制链接">📋</button>
+            <button @click="editSite(site)" class="action-icon-btn" title="编辑">✏️</button>
             <button @click="openDir(site.path)" class="action-icon-btn" title="打开目录">📁</button>
             <button @click="deleteSite(site.port)" class="action-icon-btn delete" title="删除">🗑</button>
           </div>
@@ -84,7 +85,7 @@
 
     <div v-if="showAddDialog" class="modal-overlay" @click.self="closeAddDialog">
       <div class="modal">
-        <h4>新增静态网站</h4>
+        <h4>{{ isEditMode ? '编辑站点' : '新增静态网站' }}</h4>
         <div class="modal-field">
           <label>网站名称</label>
           <input v-model="newSite.name" placeholder="例如：我的项目"/>
@@ -98,13 +99,13 @@
           <span v-if="newSite.path" class="warning-msg">⚠️ 提示：站点运行期间请勿删除或移动此文件夹</span>
         </div>
         <div class="modal-field">
-          <label>端口号（可选）</label>
-          <input type="number" v-model.number="newSite.port" placeholder="留空则自动分配"/>
+          <label>端口号{{ isEditMode ? '' : '（可选）' }}</label>
+          <input type="number" v-model.number="newSite.port" :placeholder="isEditMode ? '修改端口号' : '留空则自动分配'"/>
           <span v-if="portConflict" class="error-msg">端口已被占用或已被其他站点使用</span>
         </div>
         <div class="modal-buttons">
-          <button @click="addSite" :disabled="addingSite" class="modal-btn confirm">
-            {{ addingSite ? '添加中...' : '添加' }}
+          <button @click="isEditMode ? updateSite() : addSite()" :disabled="addingSite" class="modal-btn confirm">
+            {{ addingSite ? (isEditMode ? '保存中...' : '添加中...') : (isEditMode ? '保存' : '添加') }}
           </button>
           <button @click="closeAddDialog" :disabled="addingSite" class="modal-btn cancel">取消</button>
         </div>
@@ -134,8 +135,20 @@ export default {
       showAddDialog: false,
       newSite: {name: '', path: '', port: null},
       addingSite: false,
-      portConflict: false
+      portConflict: false,
+      isEditMode: false,
+      originalPort: null
     };
+  },
+  watch: {
+    // 监听端口输入，实时验证
+    'newSite.port'(newPort) {
+      if (newPort && newPort > 0) {
+        this.checkPortConflict(newPort);
+      } else {
+        this.portConflict = false;
+      }
+    }
   },
   mounted() {
     this.checkNginx();
@@ -243,8 +256,35 @@ export default {
       else this.status = `❌ 重载失败：${res.message}`;
       this.actionLoading = false;
     },
-    openSite(port) {
-      window.electronAPI.openExternal(`http://localhost:${port}`);
+    async copySiteUrl(port) {
+      const url = `http://localhost:${port}`;
+      await this.copyToClipboard(url);
+      this.status = `✅ 已复制网址：${url}`;
+      setTimeout(() => {
+        this.status = '';
+      }, 3000);
+    },
+    async copyToClipboard(text) {
+      try {
+        // 优先使用现代 Clipboard API
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          // 降级方案：使用传统的 execCommand
+          const textarea = document.createElement('textarea');
+          textarea.value = text;
+          textarea.style.position = 'fixed';
+          textarea.style.opacity = '0';
+          document.body.appendChild(textarea);
+          textarea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textarea);
+        }
+      } catch (err) {
+        console.error('[NginxManager] 复制失败:', err);
+        // 最后降级：提示用户手动复制
+        prompt('请手动复制以下网址：', text);
+      }
     },
     async openDir(dirPath) {
       await window.electronAPI.openFileDialog({properties: ['openDirectory'], defaultPath: dirPath});
@@ -252,6 +292,19 @@ export default {
     openAddSiteDialog() {
       this.newSite = {name: '', path: '', port: null};
       this.portConflict = false;
+      this.isEditMode = false;
+      this.originalPort = null;
+      this.showAddDialog = true;
+    },
+    editSite(site) {
+      this.newSite = {
+        name: site.name,
+        path: site.path,
+        port: site.port
+      };
+      this.portConflict = false;
+      this.isEditMode = true;
+      this.originalPort = site.port;
       this.showAddDialog = true;
     },
     closeAddDialog() {
@@ -301,6 +354,57 @@ export default {
       } catch (err) {
         console.error('[NginxManager] 添加站点异常:', err);
         alert('添加站点时发生错误：' + err.message);
+      } finally {
+        this.addingSite = false;
+      }
+    },
+    async updateSite() {
+      if (!this.newSite.name || !this.newSite.path) {
+        alert('请填写网站名称和 dist 路径');
+        return;
+      }
+      if (!this.originalPort) {
+        alert('错误：无法找到原始端口');
+        return;
+      }
+      
+      this.addingSite = true;
+      this.portConflict = false;
+      console.log('[NginxManager] 开始更新站点:', this.newSite);
+      
+      try {
+        const siteData = {
+          originalPort: this.originalPort,
+          name: this.newSite.name,
+          path: this.newSite.path,
+          port: this.newSite.port
+        };
+        const res = await window.electronAPI.updateNginxSite(siteData);
+        
+        if (res.success) {
+          await this.loadSites();
+          this.closeAddDialog();
+          
+          // 如果 Nginx 正在运行，则重载配置
+          if (this.nginxRunning) {
+            await this.reloadNginx();
+            this.status = `✅ 站点已更新，Nginx 已重载`;
+          } else {
+            this.status = `✅ 站点已更新。请启动 Nginx 使配置生效。`;
+          }
+          console.log('[NginxManager] 站点更新成功');
+        } else {
+          if (res.message.includes('端口')) {
+            this.portConflict = true;
+            console.log('[NginxManager] 端口冲突');
+          } else {
+            alert('更新失败：' + res.message);
+            console.error('[NginxManager] 更新失败:', res.message);
+          }
+        }
+      } catch (err) {
+        console.error('[NginxManager] 更新站点异常:', err);
+        alert('更新站点时发生错误：' + err.message);
       } finally {
         this.addingSite = false;
       }
