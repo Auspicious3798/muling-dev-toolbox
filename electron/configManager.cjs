@@ -180,9 +180,13 @@ function getMirrors() {
     if (!config || !config.mirrors) {
         console.log('[Config] 配置中无 mirrors，使用默认值');
         return [
-            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
-            { name: 'ghproxy.com', url: 'https://ghproxy.com/', recommended: false },
-            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false }
+            { name: 'GitHub 官方直连', url: '', recommended: false },
+            { name: 'ghfast.top', url: 'https://ghfast.top/', recommended: true },
+            { name: 'gh-proxy.com', url: 'https://gh-proxy.com/', recommended: false },
+            { name: 'ghproxy.com', url: 'http://ghproxy.com/', recommended: false },
+            { name: 'all.mk-proxy.tk', url: 'https://all.mk-proxy.tk/', recommended: false },
+            { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
+            { name: 'github.moeyy.xyz', url: 'https://github.moeyy.xyz/', recommended: false }
         ];
     }
     

@@ -31,6 +31,7 @@
       </div>
       <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
       <Settings v-else-if="activeTool === 'settings'"/>
+      <ProductIntro v-else-if="activeTool === 'product'"/>
       <AboutLemon v-else-if="activeTool === 'about'"/>
       <AIAssistant v-else-if="activeTool === 'ai-assistant'"/>
       <NginxManager v-else-if="activeTool === 'nginx'" @install="openDrawer"/>
@@ -55,6 +56,7 @@ import ComingSoon from './components/ComingSoon.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import NginxManager from './components/NginxManager.vue';
+import ProductIntro from './components/ProductIntro.vue';
 import eventBus from './eventBus';
 import '@/styles/theme.css';
 
@@ -70,6 +72,7 @@ export default {
     Dashboard,
     Settings,
     NginxManager,
+    ProductIntro,
   },
   data() {
     return {
@@ -125,7 +128,7 @@ export default {
       }, 1000);
     },
     isComingSoon(tool) {
-      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'product', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
       return !implemented.includes(tool);
     },
     applyTheme(theme) {

@@ -40,6 +40,7 @@ import SentinelIcon from '/icons/sentinel.svg?url';
 import DashboardIcon from '/icons/Dashboard.svg?url';
 import LemonIcon from '/icons/lemon.svg?url';
 import SettingsIcon from '/icons/setting.svg?url';
+import ProductIcon from '/icons/lemon.svg?url'; // 暂时使用沐柠图标
 
 export default {
   name: 'NavMenu',
@@ -118,6 +119,12 @@ export default {
           id: 'ai-assistant',
           label: 'AI 智能助手',
           icon: AIIcon,
+          children: []
+        },
+        {
+          id: 'product',
+          label: '产品介绍',
+          icon: ProductIcon,
           children: []
         },
         {

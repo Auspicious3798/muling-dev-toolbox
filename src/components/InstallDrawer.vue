@@ -17,23 +17,20 @@
     </div>
   </Transition>
   
-  <!-- 下载速度慢警告弹窗 -->
-  <div v-if="showSpeedWarning" class="speed-warning-overlay" @click="showSpeedWarning = false">
-    <div class="speed-warning-dialog" @click.stop>
-      <div class="warning-header">
-        <span class="warning-icon">⚠️</span>
-        <span class="warning-title">下载速度较慢</span>
+  <!-- 下载速度慢提示（Toast 通知） -->
+  <Transition name="toast">
+    <div v-if="showSpeedWarning" class="speed-warning-toast">
+      <div class="toast-content">
+        <span class="toast-icon">⚠️</span>
+        <div class="toast-text">
+          <p class="toast-message">{{ speedWarningMessage }}</p>
+          <p class="toast-tip">建议前往「设置」页面更换更快的代理节点</p>
+        </div>
+        <button class="toast-close" @click="showSpeedWarning = false">✕</button>
       </div>
-      <div class="warning-body">
-        <p class="warning-message">{{ speedWarningMessage }}</p>
-        <p class="warning-tip">建议前往「设置」页面更换更快的代理节点</p>
-      </div>
-      <div class="warning-actions">
-        <button class="btn-secondary" @click="showSpeedWarning = false">我知道了</button>
-        <button class="btn-primary" @click="goToSettings">前往设置</button>
-      </div>
+      <button class="toast-action" @click="goToSettings">前往设置</button>
     </div>
-  </div>
+  </Transition>
 </template>
 
 <script>
@@ -168,117 +165,116 @@ export default {
   padding: 20px;
 }
 
-/* 下载速度慢警告样式 */
-.speed-warning-overlay {
+/* 下载速度慢提示样式（Toast 通知） */
+.speed-warning-toast {
   position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  animation: fadeIn 0.2s ease;
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.speed-warning-dialog {
+  top: 80px;
+  right: 20px;
   background: var(--bg-card);
-  border-radius: 16px;
-  padding: 24px;
-  min-width: 400px;
-  max-width: 480px;
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 380px;
+  max-width: 450px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  animation: slideUp 0.3s ease;
+  border-left: 4px solid var(--warning-bg);
+  z-index: 3000;
+  animation: slideInRight 0.3s ease;
 }
 
-@keyframes slideUp {
+@keyframes slideInRight {
   from {
-    transform: translateY(20px);
+    transform: translateX(100%);
     opacity: 0;
   }
   to {
-    transform: translateY(0);
+    transform: translateX(0);
     opacity: 1;
   }
 }
 
-.warning-header {
+.toast-content {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.toast-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.toast-text {
+  flex: 1;
+}
+
+.toast-message {
+  font-size: 0.95rem;
+  color: var(--text-primary);
+  margin: 0 0 6px 0;
+  line-height: 1.5;
+}
+
+.toast-tip {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.toast-close {
+  background: none;
+  border: none;
+  font-size: 1.2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  padding: 0;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 
-.warning-icon {
-  font-size: 24px;
-}
-
-.warning-title {
-  font-size: 1.25rem;
-  font-weight: 600;
+.toast-close:hover {
+  background: var(--bg-hover);
   color: var(--text-primary);
 }
 
-.warning-body {
-  margin-bottom: 24px;
-}
-
-.warning-message {
-  font-size: 1rem;
-  color: var(--text-primary);
-  margin-bottom: 12px;
-  line-height: 1.6;
-}
-
-.warning-tip {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  padding: 8px 12px;
-  background-color: var(--info-bg);
-  border-radius: 8px;
-  border-left: 3px solid var(--info-text);
-}
-
-.warning-actions {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.btn-secondary,
-.btn-primary {
-  padding: 10px 20px;
-  border-radius: 10px;
-  font-size: 0.95rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.btn-secondary {
-  background-color: var(--bg-secondary);
-  color: var(--text-secondary);
-}
-
-.btn-secondary:hover {
-  background-color: var(--border-light);
-}
-
-.btn-primary {
-  background-color: var(--primary);
+.toast-action {
+  width: 100%;
+  background: var(--primary);
   color: white;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 500;
+  transition: all 0.2s;
 }
 
-.btn-primary:hover {
-  background-color: var(--primary-hover);
-  transform: scale(0.98);
+.toast-action:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+/* Toast 过渡动画 */
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.3s ease;
+}
+
+.toast-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.toast-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 </style>
