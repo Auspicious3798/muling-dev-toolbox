@@ -105,9 +105,19 @@ export default {
       this.drawerVisible = true;
     },
     onInstalled() {
-      if (this.$refs.envPanel) {
+      // 根据当前工具类型触发对应的刷新
+      if (this.activeTool === 'nginx') {
+        // Nginx 安装完成后，通过 eventBus 通知 NginxManager 自动刷新
+        console.log('[App.vue] Nginx 安装完成，触发自动刷新');
+        eventBus.emit('scan-start', 'Nginx');
+        setTimeout(() => {
+          eventBus.emit('scan-end');
+        }, 500);
+      } else if (this.$refs.envPanel) {
+        // 其他工具刷新 EnvironmentPanel
         this.$refs.envPanel.refresh();
       }
+      
       setTimeout(() => {
         this.drawerVisible = false;
       }, 1000);

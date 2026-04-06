@@ -1,12 +1,37 @@
 <template>
   <div class="nginx-manager">
+    <!-- 全局扫描遮罩 -->
+    <transition name="scan-overlay">
+      <div v-if="loading" class="global-scan-overlay">
+        <div class="scan-content">
+          <div class="scan-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+            <div class="spinner-ring"></div>
+          </div>
+          <div class="scan-text">
+            <p class="scan-title">正在扫描环境</p>
+            <p class="scan-subtitle">正在检测 Nginx 状态...</p>
+          </div>
+          <div class="scan-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+      </div>
+    </transition>
+
     <div class="panel-header">
       <div class="title-section">
         <img src="/icons/nginx.svg" class="tool-icon-img" alt=""/>
         <h3>Nginx 站点管理</h3>
       </div>
       <div class="nginx-global-actions">
-        <span class="status-badge" :class="nginxRunning ? 'running' : 'stopped'">
+        <button @click="refreshAll" :disabled="loading" class="refresh-btn">
+          <span class="refresh-icon">⟳</span> {{ loading ? '刷新中...' : '刷新' }}
+        </button>
+        <span v-if="nginxInstalled" class="status-badge" :class="nginxRunning ? 'running' : 'stopped'">
           {{ nginxRunning ? '运行中' : '已停止' }}
         </span>
         <button v-if="!nginxInstalled" @click="openInstallDrawer" class="install-btn">安装 Nginx</button>
@@ -19,7 +44,19 @@
       </div>
     </div>
 
-    <div v-if="nginxInstalled" class="sites-list">
+    <!-- 未安装提示 -->
+    <div v-if="!nginxInstalled && !loading" class="empty-state">
+      <div class="empty-animation">
+        <img src="/icons/nginx.svg" class="floating-icon" alt="Nginx"/>
+        <div class="pulse-ring"></div>
+        <div class="pulse-ring delay-1"></div>
+        <div class="pulse-ring delay-2"></div>
+      </div>
+      <h3 class="empty-title">暂未安装 Nginx</h3>
+      <p class="empty-desc">点击顶部"安装 Nginx"按钮开始安装</p>
+    </div>
+
+    <div v-else-if="nginxInstalled" class="sites-list">
       <div class="list-header">
         <span>网站列表</span>
         <button @click="openAddSiteDialog" class="add-btn">+ 新增站点</button>
@@ -66,8 +103,10 @@
           <span v-if="portConflict" class="error-msg">端口已被占用或已被其他站点使用</span>
         </div>
         <div class="modal-buttons">
-          <button @click="addSite" :disabled="addingSite" class="modal-btn confirm">添加</button>
-          <button @click="closeAddDialog" class="modal-btn cancel">取消</button>
+          <button @click="addSite" :disabled="addingSite" class="modal-btn confirm">
+            {{ addingSite ? '添加中...' : '添加' }}
+          </button>
+          <button @click="closeAddDialog" :disabled="addingSite" class="modal-btn cancel">取消</button>
         </div>
       </div>
     </div>
@@ -79,6 +118,8 @@
 </template>
 
 <script>
+import eventBus from '../eventBus';
+
 export default {
   name: 'NginxManager',
   data() {
@@ -88,6 +129,7 @@ export default {
       nginxRunning: false,
       sites: [],
       actionLoading: false,
+      loading: false,
       status: '',
       showAddDialog: false,
       newSite: {name: '', path: '', port: null},
@@ -107,10 +149,52 @@ export default {
         this.checkNginxStatus();
       });
     }
+    // 监听全局扫描事件，实现安装后自动刷新
+    eventBus.on('scan-start', async (toolLabel) => {
+      if (toolLabel === 'Nginx' && !this.loading) {
+        console.log('[NginxManager] 收到 scan-start 事件，开始自动刷新');
+        this.loading = true;
+        try {
+          await Promise.all([
+            this.checkNginx(),
+            this.loadSites(),
+            this.checkNginxStatus()
+          ]);
+          console.log('[NginxManager] 自动刷新完成');
+        } catch (err) {
+          console.error('[NginxManager] 自动刷新失败', err);
+        } finally {
+          this.loading = false;
+        }
+      }
+    });
+  },
+  beforeUnmount() {
+    // 清理事件监听器，防止内存泄漏
+    eventBus.off('scan-start');
   },
   methods: {
     openInstallDrawer() {
       this.$emit('install');
+    },
+    async refreshAll() {
+      if (this.loading) return;
+      this.loading = true;
+      console.log('[NginxManager] 发送 scan-start 事件');
+      eventBus.emit('scan-start', 'Nginx');
+      try {
+        await Promise.all([
+          this.checkNginx(),
+          this.loadSites(),
+          this.checkNginxStatus()
+        ]);
+      } catch (err) {
+        console.error('Nginx 刷新失败', err);
+      } finally {
+        this.loading = false;
+        console.log('[NginxManager] 发送 scan-end 事件');
+        eventBus.emit('scan-end');
+      }
     },
     async checkNginx() {
       const res = await window.electronAPI.checkNginx();
@@ -184,23 +268,42 @@ export default {
       }
       this.addingSite = true;
       this.portConflict = false;
-      const res = await window.electronAPI.addNginxSite(this.newSite);
-      if (res.success) {
-        await this.loadSites();
-        this.closeAddDialog();
-        
-        // 如果 Nginx 正在运行，则重载配置
-        if (this.nginxRunning) {
-          await this.reloadNginx();
-          this.status = `✅ 站点已添加，端口：${res.port}，Nginx 已重载`;
+      console.log('[NginxManager] 开始添加站点:', this.newSite);
+      try {
+        // 将响应式对象转换为纯对象，避免 Electron IPC 克隆错误
+        const siteData = {
+          name: this.newSite.name,
+          path: this.newSite.path,
+          port: this.newSite.port
+        };
+        const res = await window.electronAPI.addNginxSite(siteData);
+        if (res.success) {
+          await this.loadSites();
+          this.closeAddDialog();
+          
+          // 如果 Nginx 正在运行，则重载配置
+          if (this.nginxRunning) {
+            await this.reloadNginx();
+            this.status = `✅ 站点已添加，端口：${res.port}，Nginx 已重载`;
+          } else {
+            this.status = `✅ 站点已添加，端口：${res.port}。请启动 Nginx 使配置生效。`;
+          }
+          console.log('[NginxManager] 站点添加成功');
         } else {
-          this.status = `✅ 站点已添加，端口：${res.port}。请启动 Nginx 使配置生效。`;
+          if (res.message.includes('端口')) {
+            this.portConflict = true;
+            console.log('[NginxManager] 端口冲突');
+          } else {
+            alert('添加失败：' + res.message);
+            console.error('[NginxManager] 添加失败:', res.message);
+          }
         }
-      } else {
-        if (res.message.includes('端口')) this.portConflict = true;
-        else alert('添加失败：' + res.message);
+      } catch (err) {
+        console.error('[NginxManager] 添加站点异常:', err);
+        alert('添加站点时发生错误：' + err.message);
+      } finally {
+        this.addingSite = false;
       }
-      this.addingSite = false;
     },
     async deleteSite(port) {
       if (!confirm('确定要删除该站点吗？')) return;
@@ -269,6 +372,32 @@ h3 {
   display: flex;
   gap: 12px;
   align-items: center;
+}
+
+.refresh-btn {
+  background-color: var(--bg-hover);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-medium);
+  padding: 8px 18px;
+  border-radius: 30px;
+  cursor: pointer;
+  font-weight: 500;
+  font-size: 0.9rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover:not(:disabled) {
+  background-color: var(--border-light);
+  border-color: var(--border-dark);
+  transform: scale(0.98);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .status-badge {
@@ -390,6 +519,96 @@ h3 {
   text-align: center;
   padding: 40px;
   color: var(--text-muted);
+}
+
+.empty-state {
+  text-align: center;
+  padding: 80px 20px;
+  background: var(--bg-card);
+  border-radius: 28px;
+  margin-top: 20px;
+  border: 1px dashed var(--border-medium);
+  position: relative;
+  overflow: hidden;
+}
+
+.empty-animation {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-icon {
+  width: 60px;
+  height: 60px;
+  z-index: 2;
+  animation: float 3s ease-in-out infinite;
+  filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.15));
+}
+
+.pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 3px solid var(--primary);
+  border-radius: 50%;
+  opacity: 0;
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.pulse-ring.delay-1 {
+  animation-delay: 0.4s;
+}
+
+.pulse-ring.delay-2 {
+  animation-delay: 0.8s;
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-10px) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(-12px) rotate(2deg);
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
+}
+
+.empty-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 12px;
+  background: linear-gradient(135deg, var(--text-primary), var(--primary));
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+}
+
+.empty-desc {
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+  line-height: 1.6;
 }
 
 .modal-overlay {
