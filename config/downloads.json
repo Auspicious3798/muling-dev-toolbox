@@ -1,7 +1,12 @@
 {
   "mirrors": [
     {
-      "name": "默认 (ghfast.top)",
+      "name": "GitHub 官方直连",
+      "url": "",
+      "recommended": false
+    },
+    {
+      "name": "ghfast.top",
       "url": "https://ghfast.top/",
       "recommended": true
     },
@@ -11,12 +16,27 @@
       "recommended": false
     },
     {
+      "name": "ghproxy.com",
+      "url": "http://ghproxy.com/",
+      "recommended": false
+    },
+    {
+      "name": "all.mk-proxy.tk",
+      "url": "https://all.mk-proxy.tk/",
+      "recommended": false
+    },
+    {
+      "name": "kgithub.com",
+      "url": "https://kgithub.com/",
+      "recommended": false
+    },
+    {
       "name": "github.moeyy.xyz",
       "url": "https://github.moeyy.xyz/",
       "recommended": false
     }
   ],
-  "currentMirror": "https://ghfast.top/",
+  "currentMirror": "",
   "tools": {
     "jdk": {
       "baseDir": "C:\\Program Files\\muling\\muling-env-box\\Java",

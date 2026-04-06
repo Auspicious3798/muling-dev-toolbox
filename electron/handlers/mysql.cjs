@@ -37,7 +37,7 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     let currentAbortController = null;
     let pendingLocalFile = null;
 
-    async function downloadFile(url, destPath, onProgress, signal) {
+    async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
         const writer = fs.createWriteStream(destPath);
         const response = await axios({
             method: 'GET',
@@ -48,6 +48,33 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         });
         const totalLength = response.headers['content-length'];
         let downloaded = 0;
+        let speedCheckInterval = null;
+        let lastDownloaded = 0;
+        let lastCheckTime = Date.now();
+        let slowSpeedNotified = false;
+        
+        speedCheckInterval = setInterval(() => {
+            const currentTime = Date.now();
+            const timeDiff = (currentTime - lastCheckTime) / 1000;
+            const bytesDiff = downloaded - lastDownloaded;
+            const speedBps = bytesDiff / timeDiff;
+            const speedKbps = speedBps / 1024;
+            
+            logToFile(`[MySQL下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
+            
+            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
+                slowSpeedNotified = true;
+                mainWindow.webContents.send('download-speed-warning', {
+                    type: 'mysql',
+                    speed: speedKbps.toFixed(2),
+                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
+                });
+            }
+            
+            lastDownloaded = downloaded;
+            lastCheckTime = currentTime;
+        }, 3000);
+        
         response.data.on('data', (chunk) => {
             downloaded += chunk.length;
             if (onProgress && totalLength) {
@@ -56,9 +83,16 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         });
         response.data.pipe(writer);
         return new Promise((resolve, reject) => {
-            writer.on('finish', resolve);
-            writer.on('error', reject);
+            writer.on('finish', () => {
+                clearInterval(speedCheckInterval);
+                resolve();
+            });
+            writer.on('error', (err) => {
+                clearInterval(speedCheckInterval);
+                reject(err);
+            });
             signal.addEventListener('abort', () => {
+                clearInterval(speedCheckInterval);
                 writer.destroy();
                 reject(new Error('下载已取消'));
             });
@@ -569,7 +603,7 @@ port=${port}
         try {
             if (!fs.existsSync(installerPath)) {
                 sendProgress(0, '下载安装包');
-                await downloadFile(url, installerPath, (p) => sendProgress(p * 0.3, '下载安装包'), abortController.signal);
+                await downloadFile(url, installerPath, (p) => sendProgress(p * 0.3, '下载安装包'), abortController.signal, true);
                 sendProgress(0.3, '解压中');
             } else {
                 sendProgress(0.3, '解压中');

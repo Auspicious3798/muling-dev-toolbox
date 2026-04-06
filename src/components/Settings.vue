@@ -30,11 +30,21 @@
     <div class="settings-section">
       <h2>下载与网络</h2>
       <div class="setting-item">
-        <label>下载镜像源</label>
+        <label>使用代理加速</label>
+        <div class="proxy-switch">
+          <label class="switch">
+            <input type="checkbox" v-model="useProxy" @change="onProxyToggle"/>
+            <span class="slider"></span>
+          </label>
+          <span class="switch-label">{{ useProxy ? '已开启（加速下载）' : '已关闭（直连 GitHub）' }}</span>
+        </div>
+      </div>
+      <div class="setting-item" v-if="useProxy">
+        <label>代理节点</label>
         <div class="mirror-selector">
           <select v-model="mirror" @change="saveMirror" :disabled="testingSpeed">
-            <option v-for="m in mirrors" :key="m.url" :value="m.url">
-              {{ m.name }}{{ m.recommended ? ' ⭐推荐' : '' }} ({{ speedResults[m.url] ? (speedResults[m.url].success ? speedResults[m.url].duration + 'ms' : '超时') : '未测试' }})
+            <option v-for="m in proxyMirrors" :key="m.url" :value="m.url">
+              {{ m.name }} ({{ speedResults[m.url] ? (speedResults[m.url].success ? speedResults[m.url].duration + 'ms' : '超时') : '未测试' }})
             </option>
           </select>
           <button @click="testSpeed" :disabled="testingSpeed" class="test-speed-btn">
@@ -101,6 +111,7 @@ export default {
       theme: 'system',
       autoCheckUpdate: true,
       closeBehavior: 'exit',
+      useProxy: true,
       mirror: 'https://ghfast.top/',
       mirrors: [],
       speedResults: {},
@@ -124,6 +135,11 @@ export default {
     this.loadCacheInfo();
     this.loadVersionInfo();
   },
+  computed: {
+    proxyMirrors() {
+      return this.mirrors.filter(m => m.url !== '');
+    }
+  },
   methods: {
     loadSettings() {
       const stored = localStorage.getItem('toolbox_settings');
@@ -134,6 +150,7 @@ export default {
         this.closeBehavior = settings.closeBehavior || 'exit';
         this.mirror = settings.mirror || 'https://ghfast.top/';
         this.proxy = settings.proxy || '';
+        this.useProxy = settings.useProxy !== false;
       }
       this.applyTheme();
     },
@@ -143,7 +160,8 @@ export default {
         autoCheckUpdate: this.autoCheckUpdate,
         closeBehavior: this.closeBehavior,
         mirror: this.mirror,
-        proxy: this.proxy
+        proxy: this.proxy,
+        useProxy: this.useProxy
       };
       localStorage.setItem('toolbox_settings', JSON.stringify(settings));
       this.applyTheme();
@@ -214,18 +232,18 @@ export default {
         if (!result || !Array.isArray(result) || result.length === 0) {
           console.warn('镜像列表为空，使用默认值');
           this.mirrors = [
-            { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
+            { name: 'GitHub 官方直连', url: '', recommended: false },
+            { name: 'ghfast.top', url: 'https://ghfast.top/', recommended: true },
+            { name: 'gh-proxy.com', url: 'https://gh-proxy.com/', recommended: false },
+            { name: 'ghproxy.com', url: 'http://ghproxy.com/', recommended: false },
+            { name: 'all.mk-proxy.tk', url: 'https://all.mk-proxy.tk/', recommended: false },
             { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
-            { name: 'hub.nuaa.cf', url: 'https://hub.nuaa.cf/', recommended: false },
-            { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false },
-            { name: 'github.com.cnpmjs.org', url: 'https://github.com.cnpmjs.org/', recommended: false },
-            { name: 'hub.fastgit.org', url: 'https://hub.fastgit.org/', recommended: false },
-            { name: 'gh.api.99988866.xyz', url: 'https://gh.api.99988866.xyz/', recommended: false }
+            { name: 'github.moeyy.xyz', url: 'https://github.moeyy.xyz/', recommended: false }
           ];
         } else {
           this.mirrors = result;
           // 自动选择推荐的镜像
-          const recommendedMirror = this.mirrors.find(m => m.recommended);
+          const recommendedMirror = this.mirrors.find(m => m.recommended && m.url !== '');
           if (recommendedMirror) {
             this.mirror = recommendedMirror.url;
           }
@@ -237,13 +255,13 @@ export default {
         console.error('加载镜像列表失败:', err);
         // 使用默认镜像列表
         this.mirrors = [
-          { name: '默认 (ghfast.top)', url: 'https://ghfast.top/', recommended: true },
+          { name: 'GitHub 官方直连', url: '', recommended: false },
+          { name: 'ghfast.top', url: 'https://ghfast.top/', recommended: true },
+          { name: 'gh-proxy.com', url: 'https://gh-proxy.com/', recommended: false },
+          { name: 'ghproxy.com', url: 'http://ghproxy.com/', recommended: false },
+          { name: 'all.mk-proxy.tk', url: 'https://all.mk-proxy.tk/', recommended: false },
           { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
-          { name: 'hub.nuaa.cf', url: 'https://hub.nuaa.cf/', recommended: false },
-          { name: 'mirror.ghproxy.com', url: 'https://mirror.ghproxy.com/', recommended: false },
-          { name: 'github.com.cnpmjs.org', url: 'https://github.com.cnpmjs.org/', recommended: false },
-          { name: 'hub.fastgit.org', url: 'https://hub.fastgit.org/', recommended: false },
-          { name: 'gh.api.99988866.xyz', url: 'https://gh.api.99988866.xyz/', recommended: false }
+          { name: 'github.moeyy.xyz', url: 'https://github.moeyy.xyz/', recommended: false }
         ];
       }
     },
@@ -273,6 +291,19 @@ export default {
         this.testingSpeed = false;
       }
     },
+    onProxyToggle() {
+      this.saveSettings();
+      // 同步更新主进程配置
+      if (this.useProxy) {
+        // 开启代理时，使用当前选择的镜像
+        this.saveMirror();
+      } else {
+        // 关闭代理时，使用直连（空字符串）
+        if (window.electronAPI && window.electronAPI.setMirror) {
+          window.electronAPI.setMirror('');
+        }
+      }
+    },
     async saveMirror() {
       if (!window.electronAPI || !window.electronAPI.setMirror) return;
       try {
@@ -295,6 +326,7 @@ export default {
       this.theme = 'system';
       this.autoCheckUpdate = true;
       this.closeBehavior = 'exit';
+      this.useProxy = true;
       this.mirror = 'https://ghfast.top/';
       this.proxy = '';
       this.saveSettings();
@@ -385,6 +417,65 @@ export default {
   border: 1px solid var(--border-medium);
   background: var(--bg-input);
   color: var(--text-primary);
+}
+
+.proxy-switch {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 24px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--bg-input);
+  transition: 0.3s;
+  border-radius: 24px;
+  border: 1px solid var(--border-medium);
+}
+
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 2px;
+  bottom: 2px;
+  background-color: var(--text-secondary);
+  transition: 0.3s;
+  border-radius: 50%;
+}
+
+input:checked + .slider {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+
+input:checked + .slider:before {
+  transform: translateX(24px);
+  background-color: white;
+}
+
+.switch-label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 .mirror-selector {

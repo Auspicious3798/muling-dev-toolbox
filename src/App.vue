@@ -84,12 +84,14 @@ export default {
     eventBus.on('theme-change', this.handleThemeChange);
     eventBus.on('scan-start', this.handleScanStart);
     eventBus.on('scan-end', this.handleScanEnd);
+    eventBus.on('navigate:settings', this.handleNavigateToSettings);
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
   },
   beforeUnmount() {
     eventBus.off('theme-change', this.handleThemeChange);
     eventBus.off('scan-start', this.handleScanStart);
     eventBus.off('scan-end', this.handleScanEnd);
+    eventBus.off('navigate:settings', this.handleNavigateToSettings);
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
@@ -196,6 +198,10 @@ export default {
       console.log('[App.vue] 收到 scan-end 事件');
       this.showScanOverlay = false;
       this.scanningTool = '';
+    },
+    handleNavigateToSettings() {
+      console.log('[App.vue] 收到 navigate:settings 事件');
+      this.activeTool = 'settings';
     },
   },
 };
