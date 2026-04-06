@@ -305,7 +305,8 @@ http {
             const nginxExe = path.join(installPath, 'nginx.exe');
             const running = await isNginxRunning();
             if (running) {
-                await execPromise(`"${nginxExe}" -s stop`, {windowsHide: true});
+                // 添加 -p 参数，与启动时的 prefix 保持一致
+                await execPromise(`"${nginxExe}" -p "${installPath}" -s stop`, {windowsHide: true});
             }
             if (fs.existsSync(installPath)) {
                 fs.rmSync(installPath, {recursive: true, force: true});
@@ -350,14 +351,14 @@ http {
             
             // 使用 spawn 在 Nginx 目录下启动
             const {spawn} = require('child_process');
-            const nginxProcess = spawn(nginxExe, [], {
-                cwd: installPath,  // 设置工作目录为 Nginx 安装目录
-                detached: true,    // 使子进程独立运行
-                stdio: 'ignore',   // 忽略标准输入输出
+            const nginxProcess = spawn(nginxExe, ['-p', installPath], {
+                cwd: installPath,
+                detached: true,
+                stdio: 'ignore',
                 windowsHide: true
             });
             
-            nginxProcess.unref();  // 允许父进程退出
+            nginxProcess.unref();
             
             logToFile(`尝试启动 Nginx，工作目录: ${installPath}`);
             
@@ -388,7 +389,8 @@ http {
             if (!fs.existsSync(nginxExe)) return {success: false, message: 'Nginx 未安装'};
             const running = await isNginxRunning();
             if (!running) return {success: false, message: 'Nginx 未运行'};
-            await execPromise(`"${nginxExe}" -s stop`, {windowsHide: true});
+            // 添加 -p 参数，与启动时的 prefix 保持一致
+            await execPromise(`"${nginxExe}" -p "${installPath}" -s stop`, {windowsHide: true});
             return {success: true, message: 'Nginx 已停止'};
         } catch (err) {
             return {success: false, message: err.message};
@@ -404,14 +406,23 @@ http {
                 installPath = path.join(userDataPath, installPath);
             }
             const nginxExe = path.join(installPath, 'nginx.exe');
+            const nginxConf = path.join(installPath, 'conf', 'nginx.conf');
+            
             if (!fs.existsSync(nginxExe)) return {success: false, message: 'Nginx 未安装'};
+            if (!fs.existsSync(nginxConf)) return {success: false, message: 'Nginx 配置文件不存在'};
+            
             const running = await isNginxRunning();
             if (!running) return {success: false, message: 'Nginx 未运行'};
+            
             const sites = await loadSites();
             await generateConfig(sites, installPath);
-            await execPromise(`"${nginxExe}" -s reload`, {windowsHide: true});
+            
+            // 重载时 master 已记住 prefix，只需发送 reload 信号
+            await execPromise(`"${nginxExe}" -p "${installPath}" -s reload`, {windowsHide: true});
+            logToFile('Nginx 重载成功');
             return {success: true, message: 'Nginx 配置已重载'};
         } catch (err) {
+            logToFile(`Nginx 重载失败: ${err.message}`);
             return {success: false, message: err.message};
         }
     });
