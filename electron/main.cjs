@@ -35,7 +35,7 @@ function createWindow() {
     Menu.setApplicationMenu(null);
 
     mainWindow = new BrowserWindow({
-        width: 1000,
+        width: 1200,
         height: 800,
         minWidth: 900,
         minHeight: 600,
@@ -51,7 +51,6 @@ function createWindow() {
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173').then(r => r);
-        mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadURL('app://index.html').then(r => r);
         mainWindow.webContents.closeDevTools();

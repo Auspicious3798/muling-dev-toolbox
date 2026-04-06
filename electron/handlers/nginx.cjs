@@ -496,4 +496,84 @@ http {
         await saveSites(newSites);
         return {success: true};
     });
+
+    // 更新站点信息
+    ipcMain.handle('update-nginx-site', async (event, {originalPort, name, path: distPath, port}) => {
+        logToFile(`尝试更新站点: originalPort=${originalPort}, name=${name}, path=${distPath}, port=${port}`);
+        
+        // 检查 Nginx 是否安装
+        const nginxConfig = getNginxConfig();
+        if (!nginxConfig) {
+            return {success: false, message: '无法获取 Nginx 配置'};
+        }
+        let installPath = nginxConfig.installDir || DEFAULT_INSTALL_DIR;
+        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
+        if (!path.isAbsolute(installPath)) {
+            installPath = path.join(userDataPath, installPath);
+        }
+        
+        const nginxExe = path.join(installPath, 'nginx.exe');
+        if (!fs.existsSync(nginxExe)) {
+            return {success: false, message: 'Nginx 未安装，请先安装 Nginx'};
+        }
+        
+        // 验证 dist 目录
+        if (!distPath || !fs.existsSync(distPath)) {
+            return {success: false, message: 'dist 目录不存在'};
+        }
+        
+        let sites = await loadSites();
+        
+        // 查找原始站点
+        const siteIndex = sites.findIndex(s => s.port === originalPort);
+        if (siteIndex === -1) {
+            return {success: false, message: '站点不存在'};
+        }
+        
+        // 如果修改了端口，需要检查新端口是否可用
+        let finalPort = port || originalPort;
+        if (finalPort !== originalPort) {
+            // 检查新端口是否被其他站点使用
+            if (sites.some(s => s.port === finalPort && s.port !== originalPort)) {
+                return {success: false, message: `端口 ${finalPort} 已被其他站点使用`};
+            }
+            // 检查端口是否被系统占用
+            if (!(await checkPortAvailable(finalPort, sites.filter(s => s.port !== originalPort)))) {
+                return {success: false, message: `端口 ${finalPort} 已被系统进程占用`};
+            }
+        }
+        
+        // 检查站点名称是否与其他站点重复（排除自己）
+        if (sites.some(s => s.name === name && s.port !== originalPort)) {
+            return {success: false, message: '站点名称已存在'};
+        }
+        
+        // 更新站点
+        sites[siteIndex] = {name, path: distPath, port: finalPort};
+        await saveSites(sites);
+        logToFile(`站点已更新: ${name}, 端口: ${finalPort}`);
+        
+        // 重新生成配置文件
+        try {
+            await generateConfig(sites, installPath);
+            logToFile('Nginx 配置文件已更新');
+        } catch (err) {
+            logToFile(`生成配置文件失败: ${err.message}`);
+            return {success: false, message: `生成配置文件失败: ${err.message}`};
+        }
+        
+        return {success: true, port: finalPort};
+    });
+
+    // 检查端口是否可用
+    ipcMain.handle('check-port-available', async (event, port) => {
+        try {
+            const sites = await loadSites();
+            const available = await checkPortAvailable(port, sites);
+            return {available};
+        } catch (err) {
+            logToFile(`检查端口失败: ${err.message}`);
+            return {available: true}; // 出错时默认认为可用
+        }
+    });
 };
