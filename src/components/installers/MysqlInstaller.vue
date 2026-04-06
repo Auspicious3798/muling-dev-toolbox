@@ -74,39 +74,41 @@
     </div>
 
     <div v-else>
+      <div class="version-selection">
+        <div class="version-options">
+          <label v-for="v in versionOptions" :key="v.value" class="version-option" :class="{ selected: localVersion === v.value }" @click="localVersion = v.value">
+            <input type="radio" :value="v.value" v-model="localVersion" class="radio-hidden"/>
+            <span class="version-name">{{ v.label }}</span>
+            <span v-if="v.recommended" class="recommend-tag">推荐</span>
+          </label>
+        </div>
+      </div>
+      
       <div class="import-area">
         <button @click="importLocalMySQL" class="import-btn">📁 选择 MySQL 压缩包</button>
         <div v-if="localFilePath" class="import-path">
           <span class="path-label">已选择：</span>
           <span class="path-display">{{ localFilePath }}</span>
         </div>
-        <div class="version-input">
-          <label>MySQL 版本：</label>
-          <div class="version-options-inline">
-            <label v-for="v in versionOptions" :key="v.value" class="version-option-small" :class="{ selected: localVersion === v.value }" @click="localVersion = v.value">
-              <input type="radio" :value="v.value" v-model="localVersion" class="radio-hidden"/>
-              <span>{{ v.label }}</span>
-              <span v-if="v.recommended" class="recommend-tag-small">推荐</span>
-            </label>
-          </div>
-          <button @click="validateLocalVersion" class="validate-btn">验证目录</button>
+      </div>
+      
+      <div class="password-input">
+        <label>root 密码（可选）：</label>
+        <div class="password-wrapper">
+          <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="留空则无密码"/>
+          <button type="button" @click="showPassword = !showPassword" class="toggle-password">
+            {{ showPassword ? '🙈' : '👁️' }}
+          </button>
         </div>
-        <div v-if="dirExistsWarning" class="warning-message">
-          ⚠️ 安装目录已存在文件！请删除或选择其他版本。
-        </div>
-        <div class="password-input">
-          <label>root 密码（可选）：</label>
-          <div class="password-wrapper">
-            <input :type="showPassword ? 'text' : 'password'" v-model="password" placeholder="留空则无密码"/>
-            <button type="button" @click="showPassword = !showPassword" class="toggle-password">
-              {{ showPassword ? '🙈' : '👁️' }}
-            </button>
-          </div>
-        </div>
-        <div class="install-path">
-          <span class="path-label">安装目录：</span>
-          <span class="path-display">{{ localInstallPath }}</span>
-        </div>
+      </div>
+      
+      <div class="install-path">
+        <span class="path-label">安装目录：</span>
+        <span class="path-display">{{ localInstallPath }}</span>
+      </div>
+      
+      <div v-if="dirExistsWarning" class="warning-message">
+        ⚠️ 安装目录已存在文件！请删除或选择其他版本。
       </div>
       
       <!-- 本地安装进度显示 -->
@@ -601,7 +603,7 @@ h3 {
 
 .version-option.selected {
   border-color: var(--primary);
-  background-color: var(--primary-bg);
+  background-color: var(--primary-light);
 }
 
 .version-option.selected .version-name {
@@ -640,50 +642,6 @@ h3 {
   font-size: 0.85rem;
   color: var(--text-secondary);
   line-height: 1.4;
-}
-
-/* Inline version options for local install */
-.version-options-inline {
-  display: flex;
-  gap: 8px;
-}
-
-.version-option-small {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--border-medium);
-  background-color: var(--bg-input);
-  cursor: pointer;
-  transition: all 0.2s;
-  font-size: 0.9rem;
-}
-
-.version-option-small:hover {
-  border-color: var(--primary);
-}
-
-.version-option-small.selected {
-  border-color: var(--primary);
-  background-color: var(--primary-bg);
-}
-
-.version-option-small .radio-hidden {
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.recommend-tag-small {
-  display: inline-block;
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 600;
-  padding: 1px 5px;
-  border-radius: 8px;
 }
 
 .install-path, .import-path {
@@ -730,22 +688,6 @@ h3 {
   padding: 0 4px;
 }
 
-.version-input {
-  margin: 1rem 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.validate-btn {
-  background-color: var(--text-muted);
-  color: white;
-  border: none;
-  padding: 4px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-
 .warning-message {
   margin-top: 8px;
   padding: 8px;
@@ -755,16 +697,38 @@ h3 {
   font-size: 0.8rem;
 }
 
+.import-area {
+  margin: 1rem 0;
+}
+
+.import-path {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background-color: var(--bg-secondary);
+  border-radius: 10px;
+  border: 1px solid var(--border-light);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
 .import-btn {
   width: 100%;
-  background-color: #8b5cf6;
-  color: white;
-  border: none;
-  padding: 0.8rem;
+  background: var(--bg-input);
+  color: var(--text-primary);
+  border: 2px dashed var(--border-medium);
+  padding: 1rem;
   border-radius: 12px;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
-  margin-bottom: 1rem;
+  transition: all 0.2s ease;
+}
+
+.import-btn:hover {
+  border-color: var(--primary);
+  background: var(--bg-hover);
+  color: var(--primary);
 }
 
 .button-group {

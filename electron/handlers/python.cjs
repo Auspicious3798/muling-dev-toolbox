@@ -124,15 +124,36 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             targetPipVersion = pythonPipVersionMap[pythonVersionKey] || 'latest';
 
             // 从本地资源文件夹复制 get-pip.py
-            const appRoot = path.join(__dirname, '..', '..');
-            const localGetPipPath = path.join(appRoot, 'public', 'resources', 'get-pip.py');
-            const destGetPipPath = path.join(installDir, 'get-pip.py');
+            const app = require('electron').app;
+            const appPath = app.getAppPath();
             
-            if (!fs.existsSync(localGetPipPath)) {
+            // 尝试多个可能的路径（开发环境 vs 生产环境）
+            const possiblePaths = [
+                path.join(appPath, 'public', 'resources', 'get-pip.py'),  // 开发环境
+                path.join(process.resourcesPath || '', 'app.asar.unpacked', 'public', 'resources', 'get-pip.py'),  // 生产环境解包后
+                path.join(process.resourcesPath || '', 'public', 'resources', 'get-pip.py'),  // 备用路径
+            ];
+            
+            logToFile(`尝试查找 get-pip.py:`);
+            logToFile(`  app.getAppPath(): ${appPath}`);
+            logToFile(`  process.resourcesPath: ${process.resourcesPath}`);
+            
+            let localGetPipPath = null;
+            for (const tryPath of possiblePaths) {
+                logToFile(`  检查路径: ${tryPath} (存在: ${fs.existsSync(tryPath)})`);
+                if (fs.existsSync(tryPath)) {
+                    localGetPipPath = tryPath;
+                    logToFile(`  ✅ 找到文件: ${localGetPipPath}`);
+                    break;
+                }
+            }
+            
+            if (!localGetPipPath) {
                 throw new Error('未找到 get-pip.py 文件，请确保已将其放置在 public/resources 目录下');
             }
             
-            logToFile(`从本地复制 get-pip.py: ${localGetPipPath} -> ${destGetPipPath}`);
+            const destGetPipPath = path.join(installDir, 'get-pip.py');
+            logToFile(`复制 get-pip.py: ${localGetPipPath} -> ${destGetPipPath}`);
             fs.copyFileSync(localGetPipPath, destGetPipPath);
 
             const installCmd = targetPipVersion === 'latest'
@@ -148,7 +169,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
                 if (pipErr.message.includes('getaddrinfo failed') || 
                     pipErr.message.includes('NewConnectionError') ||
                     pipErr.message.includes('Retrying')) {
-                    throw new Error('pip 安装失败：网络连接问题。请检查代理设置或前往阿里云盘下载已配置好 pip 的 Python 版本。');
+                    throw new Error('pip 安装失败：网络连接问题。请检查代理设置或前往夸克网盘下载已配置好 pip 的 Python 版本。');
                 }
                 // 检查是否是权限错误
                 if (pipErr.message.includes('WinError 32') || 

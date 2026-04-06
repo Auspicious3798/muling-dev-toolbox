@@ -628,13 +628,13 @@ port=${port}
             await refreshCurrentProcessEnv();
             
             // 等待服务完全就绪后再发送完成信号
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             sendProgress(1, '安装完成');
-            // 延迟发送 mysql-changed，确保进度 100% 先到达前端
+            // 延迟发送 mysql-changed，确保进度 100% 先到达前端，且服务已完全启动
             setTimeout(() => {
                 mainWindow.webContents.send('mysql-changed');
-            }, 500);
+            }, 1000);
             return {success: true, message: `MySQL ${version} 安装成功，端口: ${availablePort}`};
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
@@ -696,12 +696,14 @@ port=${port}
             await setPathForMySQL(suffix);
             await refreshCurrentProcessEnv();
             
-            await new Promise(resolve => setTimeout(resolve, 2000));
+            // 等待服务完全就绪
+            await new Promise(resolve => setTimeout(resolve, 3000));
             
             sendProgress(1, '安装完成');
+            // 延迟发送 mysql-changed，确保进度 100% 先到达前端，且服务已完全启动
             setTimeout(() => {
                 mainWindow.webContents.send('mysql-changed');
-            }, 500);
+            }, 1000);
             return {success: true, message: `MySQL ${version} 安装成功，端口: ${availablePort}`};
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);

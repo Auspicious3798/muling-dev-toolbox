@@ -160,6 +160,10 @@ export default {
           }
         }
       });
+      // 监听 maven-changed 事件，刷新状态
+      window.electronAPI.onMavenChanged(() => {
+        this.checkJDK();
+      });
     } else {
       this.status = '错误：未连接到主进程';
     }

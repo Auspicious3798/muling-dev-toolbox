@@ -40,10 +40,12 @@
     "files": [
       "dist/**/*",
       "electron/**/*",
-      "config/**/*"
+      "config/**/*",
+      "public/resources/**/*"
     ],
     "asarUnpack": [
-      "config/**/*"
+      "config/**/*",
+      "public/resources/**/*"
     ],
     "win": {
       "target": "nsis",
