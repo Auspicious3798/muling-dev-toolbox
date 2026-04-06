@@ -25,10 +25,19 @@
         <div class="toast-text">
           <p class="toast-message">{{ speedWarningMessage }}</p>
           <p class="toast-tip">建议前往「设置」页面更换更快的代理节点</p>
+          <div class="alipan-toast-box">
+            <input type="text" readonly :value="alipanUrl" class="alipan-toast-input" />
+            <button @click="copyAlipanLink" class="alipan-toast-copy-btn">
+              {{ copied ? '✅' : '📋' }}
+            </button>
+          </div>
         </div>
         <button class="toast-close" @click="showSpeedWarning = false">✕</button>
       </div>
-      <button class="toast-action" @click="goToSettings">前往设置</button>
+      <div class="toast-actions">
+        <button class="toast-action secondary" @click="showSpeedWarning = false">我知道了</button>
+        <button class="toast-action primary" @click="goToSettings">前往设置</button>
+      </div>
     </div>
   </Transition>
 </template>
@@ -61,6 +70,8 @@ export default {
     return {
       showSpeedWarning: false,
       speedWarningMessage: '',
+      copied: false,
+      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
     };
   },
   mounted() {
@@ -100,6 +111,31 @@ export default {
       this.$emit('update:visible', false);
       eventBus.emit('navigate:settings');
     },
+    copyAlipanLink() {
+      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+        this.copied = true;
+        setTimeout(() => {
+          this.copied = false;
+        }, 2000);
+      }).catch(err => {
+        console.error('复制失败:', err);
+        // 降级方案
+        const textArea = document.createElement('textarea');
+        textArea.value = this.alipanUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          this.copied = true;
+          setTimeout(() => {
+            this.copied = false;
+          }, 2000);
+        } catch (e) {
+          alert('复制失败，请手动复制链接');
+        }
+        document.body.removeChild(textArea);
+      });
+    },
   },
 };
 </script>
@@ -118,7 +154,7 @@ export default {
 }
 
 .drawer-container {
-  width: 500px;
+  width: 600px;
   height: 100%;
   background: var(--bg-card);
   box-shadow: -2px 0 8px rgba(0, 0, 0, 0.15);
@@ -222,6 +258,48 @@ export default {
   margin: 0;
 }
 
+.alipan-toast-box {
+  display: flex;
+  gap: 6px;
+  margin-top: 10px;
+  align-items: center;
+}
+
+.alipan-toast-input {
+  flex: 1;
+  background: var(--bg-input);
+  border: 1px solid var(--border-light);
+  border-radius: 6px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.alipan-toast-input:focus {
+  border-color: #007AFF;
+  box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
+}
+
+.alipan-toast-copy-btn {
+  background: #007AFF;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.alipan-toast-copy-btn:hover {
+  background: #0051D5;
+  transform: scale(1.05);
+}
+
 .toast-close {
   background: none;
   border: none;
@@ -257,9 +335,30 @@ export default {
   transition: all 0.2s;
 }
 
+.toast-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.toast-actions .toast-action {
+  flex: 1;
+}
+
+.toast-action.primary {
+  background: var(--primary);
+}
+
+.toast-action.secondary {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
 .toast-action:hover {
-  background: var(--primary-hover);
   transform: translateY(-1px);
+}
+
+.toast-action.primary:hover {
+  background: var(--primary-hover);
 }
 
 /* Toast 过渡动画 */

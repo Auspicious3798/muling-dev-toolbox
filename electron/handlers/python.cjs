@@ -123,33 +123,42 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             pythonVersionKey = versionOutput.stdout.trim();
             targetPipVersion = pythonPipVersionMap[pythonVersionKey] || 'latest';
 
-            let getPipUrl;
-            if (['3.5', '3.6', '3.7', '3.8'].includes(pythonVersionKey)) {
-                getPipUrl = 'https://mirrors.aliyun.com/pypi/get-pip.py';
-            } else {
-                getPipUrl = 'https://bootstrap.pypa.io/get-pip.py';
+            // 从本地资源文件夹复制 get-pip.py
+            const appRoot = path.join(__dirname, '..', '..');
+            const localGetPipPath = path.join(appRoot, 'public', 'resources', 'get-pip.py');
+            const destGetPipPath = path.join(installDir, 'get-pip.py');
+            
+            if (!fs.existsSync(localGetPipPath)) {
+                throw new Error('未找到 get-pip.py 文件，请确保已将其放置在 public/resources 目录下');
             }
-
-            const getPipPath = path.join(installDir, 'get-pip.py');
-            const writer = fs.createWriteStream(getPipPath);
-            const response = await axios({
-                method: 'GET',
-                url: getPipUrl,
-                responseType: 'stream',
-                timeout: 30000
-            });
-            response.data.pipe(writer);
-            await new Promise((resolve, reject) => {
-                writer.on('finish', resolve);
-                writer.on('error', reject);
-            });
+            
+            logToFile(`从本地复制 get-pip.py: ${localGetPipPath} -> ${destGetPipPath}`);
+            fs.copyFileSync(localGetPipPath, destGetPipPath);
 
             const installCmd = targetPipVersion === 'latest'
-                ? `"${pythonExe}" "${getPipPath}"`
-                : `"${pythonExe}" "${getPipPath}" pip==${targetPipVersion}`;
+                ? `"${pythonExe}" "${destGetPipPath}" --index-url ${mirror} --trusted-host ${new URL(mirror).hostname}`
+                : `"${pythonExe}" "${destGetPipPath}" pip==${targetPipVersion} --index-url ${mirror} --trusted-host ${new URL(mirror).hostname}`;
 
-            await execPromise(installCmd);
-            fs.unlinkSync(getPipPath);
+            logToFile(`执行 get-pip.py: ${installCmd}`);
+            try {
+                await execPromise(installCmd);
+            } catch (pipErr) {
+                logToFile(`get-pip.py 安装失败: ${pipErr.message}`);
+                // 检查是否是网络错误
+                if (pipErr.message.includes('getaddrinfo failed') || 
+                    pipErr.message.includes('NewConnectionError') ||
+                    pipErr.message.includes('Retrying')) {
+                    throw new Error('pip 安装失败：网络连接问题。请检查代理设置或前往阿里云盘下载已配置好 pip 的 Python 版本。');
+                }
+                // 检查是否是权限错误
+                if (pipErr.message.includes('WinError 32') || 
+                    pipErr.message.includes('Permission denied') ||
+                    pipErr.message.includes('EPERM')) {
+                    throw new Error('pip 安装失败：文件被占用或权限不足。请以管理员身份运行应用后重试。');
+                }
+                throw pipErr;
+            }
+            fs.unlinkSync(destGetPipPath);
         }
 
         try {

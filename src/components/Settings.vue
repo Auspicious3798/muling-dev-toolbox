@@ -51,6 +51,16 @@
             {{ testingSpeed ? '测试中...' : '测速' }}
           </button>
         </div>
+        <p class="proxy-tip">💡 如果所有代理节点都失效，可使用阿里云盘获取资源</p>
+      </div>
+      <div class="alipan-banner" v-if="useProxy">
+        <div class="alipan-banner-content">
+          <span class="banner-icon">☁️</span>
+          <span class="banner-text">沐柠环境盒 - 阿里云盘备用下载</span>
+          <button @click="copyAlipanLink" class="banner-copy-btn">
+            {{ copied ? '✅ 已复制' : '📋 复制链接' }}
+          </button>
+        </div>
       </div>
       <div class="setting-item">
         <label>代理设置</label>
@@ -121,6 +131,8 @@ export default {
       logsSize: 0,
       clearingCache: false,
       clearingLogs: false,
+      copied: false,
+      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
       versionInfo: {
         version: '',
         electron: '',
@@ -340,6 +352,31 @@ export default {
       const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    },
+    copyAlipanLink() {
+      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+        this.copied = true;
+        setTimeout(() => {
+          this.copied = false;
+        }, 2000);
+      }).catch(err => {
+        console.error('复制失败:', err);
+        // 降级方案
+        const textArea = document.createElement('textarea');
+        textArea.value = this.alipanUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          this.copied = true;
+          setTimeout(() => {
+            this.copied = false;
+          }, 2000);
+        } catch (e) {
+          alert('复制失败，请手动复制链接');
+        }
+        document.body.removeChild(textArea);
+      });
     }
   },
   watch: {
@@ -517,6 +554,58 @@ input:checked + .slider:before {
   color: var(--text-secondary);
   font-size: 0.75rem;
   margin-left: 8px;
+}
+
+.proxy-tip {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+.alipan-banner {
+  margin-top: 12px;
+  padding: 0;
+}
+
+.alipan-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+  color: white;
+  padding: 14px 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.banner-icon {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex: 1;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.banner-copy-btn {
+  background: white;
+  color: #007AFF;
+  border: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.banner-copy-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
 .cache-info {
