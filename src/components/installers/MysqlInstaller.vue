@@ -196,10 +196,10 @@ export default {
   },
   computed: {
     installPath() {
-      return `C:\\Program Files\\MySQL\\mysql-${this.selectedVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\MySQL\\mysql-${this.selectedVersion}`;
     },
     localInstallPath() {
-      return `C:\\Program Files\\MySQL\\mysql-${this.localVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\MySQL\\mysql-${this.localVersion}`;
     },
     serviceStatusText() {
       if (!this.serviceStatus) return '未知';

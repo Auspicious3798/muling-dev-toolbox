@@ -594,6 +594,13 @@ port=${port}
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
             logToFile(`安装失败: ${err.message}`);
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (currentAbortController === abortController) currentAbortController = null;
@@ -610,9 +617,14 @@ port=${port}
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 MySQL 安装包，请先导入'};
         const cfg = getMySQLVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 MySQL 版本: ${version}`};
+        
+        // 获取配置中的 baseDir，与在线安装保持一致
+        const toolConfig = configManager.getToolConfig('mysql', version);
+        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\MySQL';
+        
         const {suffix, defaultPort} = cfg;
         const zipPath = pendingLocalFile;
-        const installPath = `C:\\Program Files\\MySQL\\mysql-${version}`;
+        const installPath = path.join(baseDir, `mysql-${version}`);
         const sendProgress = (progress, stage = '') => {
             setImmediate(() => {
                 mainWindow.webContents.send('mysql-progress', {type: 'mysql', version, progress, stage});
@@ -648,6 +660,13 @@ port=${port}
             return {success: true, message: `MySQL ${version} 安装成功，端口: ${availablePort}`};
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (fs.existsSync(zipPath)) {

@@ -85,7 +85,7 @@ export default {
   },
   computed: {
     installPath() {
-      return 'C:\\Program Files\\Maven';
+      return 'C:\\Program Files\\muling\\muling-env-box\\Maven';
     }
   },
   mounted() {

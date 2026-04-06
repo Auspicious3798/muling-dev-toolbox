@@ -11,6 +11,7 @@
       <Settings v-else-if="activeTool === 'settings'"/>
       <AboutLemon v-else-if="activeTool === 'about'"/>
       <AIAssistant v-else-if="activeTool === 'ai-assistant'"/>
+      <NginxManager v-else-if="activeTool === 'nginx'" @install="openDrawer"/>
       <ComingSoon v-else-if="isComingSoon(activeTool)" :tool="activeTool"/>
       <EnvironmentPanel v-else ref="envPanel" :tool="activeTool" @install="openDrawer"/>
     </div>
@@ -31,6 +32,7 @@ import AIAssistant from './components/AIAssistant.vue';
 import ComingSoon from './components/ComingSoon.vue';
 import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
+import NginxManager from './components/NginxManager.vue';
 import eventBus from './eventBus';
 import '@/styles/theme.css';
 
@@ -45,6 +47,7 @@ export default {
     ComingSoon,
     Dashboard,
     Settings,
+    NginxManager,
   },
   data() {
     return {
@@ -74,13 +77,15 @@ export default {
       this.drawerVisible = true;
     },
     onInstalled() {
-      this.$refs.envPanel?.refresh();
+      if (this.$refs.envPanel) {
+        this.$refs.envPanel.refresh();
+      }
       setTimeout(() => {
         this.drawerVisible = false;
       }, 1000);
     },
     isComingSoon(tool) {
-      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'ai-assistant'];
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
       return !implemented.includes(tool);
     },
     applyTheme(theme) {
@@ -103,7 +108,6 @@ export default {
       localStorage.setItem('theme', theme);
     },
     initTheme() {
-      // 优先从 toolbox_settings 读取主题设置
       let savedTheme = localStorage.getItem('theme');
       const stored = localStorage.getItem('toolbox_settings');
       if (stored) {
@@ -111,10 +115,9 @@ export default {
           const settings = JSON.parse(stored);
           savedTheme = settings.theme || savedTheme;
         } catch (e) {
-          // ignore parse error
         }
       }
-      
+
       if (savedTheme) {
         this.applyTheme(savedTheme);
       } else {

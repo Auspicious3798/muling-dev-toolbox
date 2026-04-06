@@ -90,5 +90,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
     setMirror: (mirrorUrl) => ipcRenderer.invoke('set-mirror', mirrorUrl),
     getMirrors: () => ipcRenderer.invoke('get-mirrors'),
     getToolConfig: (toolName, version) => ipcRenderer.invoke('get-tool-config', toolName, version),
-    testMirrorSpeed: () => ipcRenderer.invoke('test-mirror-speed')
+    testMirrorSpeed: () => ipcRenderer.invoke('test-mirror-speed'),
+
+    installNginx: () => ipcRenderer.invoke('install-nginx'),
+    uninstallNginx: () => ipcRenderer.invoke('uninstall-nginx'),
+    checkNginx: () => ipcRenderer.invoke('check-nginx'),
+    getNginxSites: () => ipcRenderer.invoke('get-nginx-sites'),
+    getNginxStatus: () => ipcRenderer.invoke('get-nginx-status'),
+    startNginx: () => ipcRenderer.invoke('start-nginx'),
+    stopNginx: () => ipcRenderer.invoke('stop-nginx'),
+    reloadNginx: () => ipcRenderer.invoke('reload-nginx'),
+    addNginxSite: (site) => ipcRenderer.invoke('add-nginx-site', site),
+    deleteNginxSite: (port) => ipcRenderer.invoke('delete-nginx-site', port),
+    cancelNginxDownload: () => ipcRenderer.send('cancel-nginx-download'),
+    onNginxProgress: (callback) => ipcRenderer.on('nginx-progress', (_, data) => callback(data)),
+    onNginxChanged: (callback) => ipcRenderer.on('nginx-changed', callback),
 });

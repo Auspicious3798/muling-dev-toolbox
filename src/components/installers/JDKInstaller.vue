@@ -35,10 +35,33 @@
         <span class="path-label">安装目录：</span>
         <span class="path-display">{{ installPath }}</span>
       </div>
+      <div class="install-status" v-if="installing">
+        <div class="status-header">
+          <span class="phase-label">
+            {{ downloading ? '📥 下载中' : '🔧 安装中' }}
+          </span>
+          <span class="stage-label">{{ currentStage }}</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-bar" :class="{ 'downloading': downloading, 'installing': !downloading }">
+            <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+          </div>
+          <span class="progress-percent">{{ Math.round(progressPercent) }}%</span>
+        </div>
+        <div class="steps-log">
+          <div v-for="(step, idx) in installSteps" :key="idx" class="step-item">
+            <span class="step-icon">✅</span>
+            <span class="step-text">{{ step }}</span>
+          </div>
+          <div v-if="currentStage && !installSteps.includes(getStepLabel(currentStage))" class="step-item current">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">{{ getStepLabel(currentStage) }}</span>
+          </div>
+        </div>
+      </div>
       <div class="button-group">
         <button @click="installJDK" :disabled="installing" class="install-btn">
-          <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
-          <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
+          {{ installing ? (downloading ? '下载中...' : '安装中...') : '开始安装' }}
         </button>
         <button v-if="downloading" @click="cancelDownload" class="cancel-btn">
           取消下载
@@ -77,7 +100,7 @@
     <div class="status" :class="{ 'status-success': status.includes('✅'), 'status-error': status.includes('❌') }">
       {{ status }}
     </div>
-    <div class="progress-bar" v-if="showProgress">
+    <div class="progress-bar" v-if="showProgress && !installing">
       <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
     </div>
   </div>
@@ -116,6 +139,8 @@ export default {
       installing: false,
       downloading: false,
       status: '未安装',
+      currentStage: '',
+      installSteps: [],
       showProgress: false,
       progressPercent: 0,
       localFilePath: '',
@@ -125,10 +150,10 @@ export default {
   },
   computed: {
     installPath() {
-      return `C:\\Program Files\\Java\\jdk-${this.selectedVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Java\\jdk-${this.selectedVersion}`;
     },
     localInstallPath() {
-      return `C:\\Program Files\\Java\\jdk-${this.localVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Java\\jdk-${this.localVersion}`;
     }
   },
   mounted() {
@@ -136,8 +161,19 @@ export default {
       window.electronAPI.onDownloadProgress((data) => {
         if (data.type === 'jdk' && data.version === this.selectedVersion) {
           this.progressPercent = data.progress * 100;
+          if (data.stage) {
+            this.currentStage = data.stage;
+            // 将每一步添加到步骤日志中（去重）
+            const stepLabel = this.getStepLabel(data.stage);
+            if (stepLabel && !this.installSteps.includes(stepLabel)) {
+              this.installSteps.push(stepLabel);
+            }
+          }
           if (data.progress === 1) {
-            this.status = '下载完成，正在安装...';
+            this.status = '✅ JDK 安装成功';
+            setTimeout(() => {
+              this.showProgress = false;
+            }, 1500);
           }
         }
       });
@@ -146,6 +182,15 @@ export default {
     }
   },
   methods: {
+    getStepLabel(stage) {
+      if (!stage) return '';
+      const map = {
+        '下载安装包': '下载 JDK 安装包',
+        '解压中': '解压安装包',
+        '配置环境变量': '配置系统环境变量'
+      };
+      return map[stage] || stage;
+    },
     switchMode(mode) {
       this.activeMode = mode;
       if (mode === 'local') {
@@ -162,17 +207,18 @@ export default {
         this.showProgress = false;
       }
     },
-    async installJDK() {
+    installJDK() {
       if (this.installing) return;
       this.installing = true;
       this.showProgress = true;
       this.progressPercent = 0;
-      this.status = '⏳ 正在安装...';
+      this.currentStage = '';
+      this.installSteps = [];
+      this.status = '准备安装...';
       eventBus.emit('install:start');
 
-      try {
-        this.downloading = true;
-        const result = await window.electronAPI.installJDK(this.selectedVersion);
+      this.downloading = true;
+      window.electronAPI.installJDK(this.selectedVersion).then((result) => {
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.$emit('installed');
@@ -183,18 +229,18 @@ export default {
           this.status = `❌ 安装失败：${result.message}`;
           this.showProgress = false;
         }
-      } catch (err) {
+      }).catch((err) => {
         if (err.message && err.message.includes('canceled')) {
           this.status = '⏸️ 下载已取消';
         } else {
           this.status = `❌ 安装失败：${err.message}`;
         }
         this.showProgress = false;
-      } finally {
+      }).finally(() => {
         this.installing = false;
         this.downloading = false;
         eventBus.emit('install:end');
-      }
+      });
     },
     async importLocalJDK() {
       const filePath = await window.electronAPI.openFileDialog({
@@ -605,17 +651,30 @@ h3 {
   color: var(--danger-text);
 }
 
+.progress-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .progress-bar {
-  width: 100%;
+  flex: 1;
   background-color: var(--border-light);
   border-radius: 999px;
   overflow: hidden;
   height: 8px;
 }
 
+.progress-percent {
+  min-width: 45px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-align: right;
+}
+
 .progress-fill {
   height: 100%;
-  background-color: var(--primary);
   width: 0%;
   transition: width 0.2s linear;
   border-radius: 999px;
@@ -627,6 +686,71 @@ h3 {
       rgba(255, 255, 255, 0.1) 100%
   );
   background-size: 200% 100%;
+}
+
+/* 下载时绿色 */
+.progress-bar.downloading .progress-fill {
+  background-color: #10b981;
+}
+
+/* 安装时蓝色 */
+.progress-bar.installing .progress-fill {
+  background-color: var(--primary);
+}
+
+.install-status {
+  margin: 1rem 0;
+  padding: 1rem;
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  border: 1px solid var(--border-light);
+}
+
+.status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.phase-label {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.stage-label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}
+
+.steps-log {
+  margin-top: 0.75rem;
+  max-height: 180px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  background-color: var(--bg-card);
+}
+
+.step-item.current {
+  color: var(--primary);
+  font-weight: 500;
+}
+
+.step-icon {
+  font-size: 0.9rem;
 }
 
 @keyframes shimmer {

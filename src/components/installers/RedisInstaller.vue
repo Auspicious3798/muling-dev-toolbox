@@ -175,10 +175,10 @@ export default {
   },
   computed: {
     installPath() {
-      return `C:\\Program Files\\Redis\\redis-${this.selectedVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Redis\\redis-${this.selectedVersion}`;
     },
     localInstallPath() {
-      return `C:\\Program Files\\Redis\\redis-${this.localVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Redis\\redis-${this.localVersion}`;
     }
   },
   mounted() {
