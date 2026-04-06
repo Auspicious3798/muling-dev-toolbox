@@ -1,6 +1,7 @@
 const {app, BrowserWindow, ipcMain, protocol, dialog, Menu} = require('electron');
 const path = require('path');
 const fs = require('fs');
+const {execSync} = require('child_process');
 const configManager = require('./configManager.cjs');
 const registerJDKHandlers = require('./handlers/jdk.cjs');
 const registerPythonHandlers = require('./handlers/python.cjs');
@@ -16,6 +17,41 @@ const logFile = path.join(app.getPath('userData'), 'app_protocol.log');
 function logToFile(message) {
     const timestamp = new Date().toISOString();
     fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
+}
+
+// 检查是否以管理员身份运行
+function isAdmin() {
+    try {
+        if (process.platform === 'win32') {
+            // Windows: 使用 net session 命令检测
+            execSync('net session', {stdio: 'ignore'});
+            return true;
+        } else {
+            // macOS/Linux: 检查 uid
+            return process.getuid() === 0;
+        }
+    } catch (err) {
+        return false;
+    }
+}
+
+// 在应用启动最早期检测管理员权限
+// 开发环境下跳过检测,方便调试
+const isDev = process.env.NODE_ENV === 'development';
+if (!isDev && !isAdmin()) {
+    // 等待 app ready 后再显示对话框
+    app.whenReady().then(() => {
+        dialog.showMessageBoxSync({
+            type: 'error',
+            title: '权限不足',
+            message: '需要管理员权限',
+            detail: '本程序需要管理员权限才能正常运行。\n\n请使用以下方式重新启动：\n1. 关闭当前程序\n2. 右键点击程序图标\n3. 选择「以管理员身份运行」',
+            buttons: ['知道了']
+        });
+        app.quit();
+    });
+    // 阻止后续代码继续执行
+    return;
 }
 
 protocol.registerSchemesAsPrivileged([
@@ -51,6 +87,7 @@ function createWindow() {
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
         mainWindow.loadURL('http://localhost:5173').then(r => r);
+        mainWindow.webContents.openDevTools();
     } else {
         mainWindow.loadURL('app://index.html').then(r => r);
         mainWindow.webContents.closeDevTools();
@@ -272,6 +309,8 @@ app.whenReady().then(() => {
     // 测试镜像源速度
     ipcMain.handle('test-mirror-speed', async () => {
         const https = require('https');
+        const http = require('http');
+        const {URL} = require('url');
         let mirrors = configManager.getMirrors();
         
         // 确保有镜像可测
@@ -287,14 +326,39 @@ app.whenReady().then(() => {
 
         const testMirror = (mirror) => {
             return new Promise((resolve) => {
+                // 跳过空URL的镜像（直连选项不需要测速）
+                if (!mirror.url || mirror.url.trim() === '') {
+                    resolve({ url: mirror.url, name: mirror.name, duration: -1, success: false, error: '直连模式无需测速' });
+                    return;
+                }
+                
                 const startTime = Date.now();
                 // 尝试获取一个小文件来测试延迟和带宽
                 const testUrl = mirror.url.replace(/\/$/, '') + '/https://github.com/robots.txt';
                 
-                const req = https.get(testUrl, {
+                // 根据 URL 协议选择合适的模块
+                let clientModule;
+                let agentOptions;
+                try {
+                    const parsedUrl = new URL(testUrl);
+                    if (parsedUrl.protocol === 'https:') {
+                        clientModule = https;
+                        agentOptions = { rejectUnauthorized: false };
+                    } else {
+                        clientModule = http;
+                        agentOptions = {};
+                    }
+                } catch (e) {
+                    console.error(`[Mirror Test] URL 解析失败:`, testUrl, e.message);
+                    resolve({ url: mirror.url, name: mirror.name, duration: -1, success: false, error: 'URL 无效' });
+                    return;
+                }
+                
+                const req = clientModule.get(testUrl, {
                     timeout: 5000,
                     rejectUnauthorized: false, // 忽略可能的证书问题
-                    headers: { 'User-Agent': 'Mozilla/5.0' }
+                    headers: { 'User-Agent': 'Mozilla/5.0' },
+                    agent: new clientModule.Agent(agentOptions)
                 }, (res) => {
                     const endTime = Date.now();
                     const duration = endTime - startTime;

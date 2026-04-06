@@ -9,39 +9,56 @@ let configPath = null;
  */
 function initConfig(userDataPath) {
     configPath = path.join(userDataPath, 'downloads.json');
+    console.log('[Config] ========== 配置初始化开始 ==========');
     console.log('[Config] 用户数据目录:', userDataPath);
     console.log('[Config] 配置文件路径:', configPath);
     
-    // 如果配置文件不存在，从默认配置复制
-    if (!fs.existsSync(configPath)) {
-        // 处理 asar 打包后的路径
-        let defaultConfigPath;
-        if (process.resourcesPath) {
-            // 生产环境（打包后）
-            defaultConfigPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'downloads.json');
-            if (!fs.existsSync(defaultConfigPath)) {
-                // 尝试其他可能的路径
-                defaultConfigPath = path.join(process.resourcesPath, 'config', 'downloads.json');
-            }
-        } else {
-            // 开发环境
-            defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+    // 获取源码中的默认配置路径
+    let defaultConfigPath;
+    if (process.env.NODE_ENV === 'development') {
+        // 开发环境：直接指向项目源码目录
+        defaultConfigPath = path.join(__dirname, '..', 'config', 'downloads.json');
+    } else {
+        // 生产环境（打包后）
+        defaultConfigPath = path.join(process.resourcesPath, 'app.asar.unpacked', 'config', 'downloads.json');
+    }
+
+    console.log('[Config] 默认配置文件路径:', defaultConfigPath);
+    console.log('[Config] 默认配置文件存在:', fs.existsSync(defaultConfigPath));
+    console.log('[Config] 当前模式:', process.env.NODE_ENV);
+    
+    // 开发模式下强制每次启动同步源码配置
+    if (process.env.NODE_ENV === 'development' && fs.existsSync(defaultConfigPath)) {
+        try {
+            const sourceContent = fs.readFileSync(defaultConfigPath, 'utf-8');
+            const sourceConfig = JSON.parse(sourceContent);
+            console.log('[Config] 源码配置文件镜像数量:', sourceConfig.mirrors ? sourceConfig.mirrors.length : 0);
+            
+            // 直接覆盖用户目录配置
+            fs.writeFileSync(configPath, sourceContent, 'utf-8');
+            console.log('[Config] ✓ 已强制同步源码配置到用户目录');
+            
+            // 验证写入结果
+            const verifyContent = fs.readFileSync(configPath, 'utf-8');
+            const verifyConfig = JSON.parse(verifyContent);
+            console.log('[Config] ✓ 验证：用户配置镜像数量:', verifyConfig.mirrors ? verifyConfig.mirrors.length : 0);
+        } catch (err) {
+            console.error('[Config] ✗ 同步配置失败:', err);
         }
-        
-        console.log('[Config] 默认配置文件路径:', defaultConfigPath);
-        console.log('[Config] 默认配置文件存在:', fs.existsSync(defaultConfigPath));
-        if (fs.existsSync(defaultConfigPath)) {
-            try {
-                const defaultConfig = fs.readFileSync(defaultConfigPath, 'utf-8');
-                fs.writeFileSync(configPath, defaultConfig, 'utf-8');
-                console.log('[Config] 已创建默认配置文件');
-            } catch (err) {
-                console.error('[Config] 创建默认配置文件失败:', err);
-            }
+    } else if (!fs.existsSync(configPath) && fs.existsSync(defaultConfigPath)) {
+        // 首次启动：复制默认配置
+        try {
+            const defaultConfig = fs.readFileSync(defaultConfigPath, 'utf-8');
+            fs.writeFileSync(configPath, defaultConfig, 'utf-8');
+            console.log('[Config] ✓ 已创建初始配置文件');
+        } catch (err) {
+            console.error('[Config] ✗ 创建配置文件失败:', err);
         }
     } else {
-        console.log('[Config] 配置文件已存在，跳过创建');
+        console.log('[Config] 使用已存在的配置文件');
     }
+    
+    console.log('[Config] ========== 配置初始化完成 ==========\n');
     
     // 加载配置
     loadConfig();
@@ -178,6 +195,15 @@ function getMirrors() {
  */
 function resolveUrl(urlTemplate) {
     const mirror = getCurrentMirror();
+    
+    // 如果镜像为空（直连模式），移除 {mirror} 占位符，直接使用原始 GitHub URL
+    if (!mirror || mirror === '') {
+        // 配置中的 URL 格式为：{mirror}https://github.com/...
+        // 直连时移除 {mirror}，得到 https://github.com/...
+        return urlTemplate.replace('{mirror}', '');
+    }
+    
+    // 使用代理时，替换 {mirror} 为代理地址
     return urlTemplate.replace('{mirror}', mirror);
 }
 

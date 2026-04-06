@@ -107,4 +107,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelNginxDownload: () => ipcRenderer.send('cancel-nginx-download'),
     onNginxProgress: (callback) => ipcRenderer.on('nginx-progress', (_, data) => callback(data)),
     onNginxChanged: (callback) => ipcRenderer.on('nginx-changed', callback),
+    
+    // 下载速度警告
+    onDownloadSpeedWarning: (callback) => ipcRenderer.on('download-speed-warning', (_, data) => callback(data)),
 });
