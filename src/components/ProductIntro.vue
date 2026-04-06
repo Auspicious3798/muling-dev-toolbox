@@ -119,6 +119,30 @@
           </div>
         </section>
 
+        <section class="intro-section">
+          <h2>☁️ 备用下载方式</h2>
+          <div class="cloud-download">
+            <p>如果代理节点失效或下载速度过慢，您可以使用阿里云盘获取资源：</p>
+            <div class="alipan-card">
+              <div class="alipan-info">
+                <span class="alipan-icon">☁️</span>
+                <div class="alipan-text">
+                  <strong>沐柠环境盒 - 阿里云盘</strong>
+                  <p>点击下方按钮复制链接，打开「阿里云盘」APP 即可访问</p>
+                </div>
+              </div>
+              <button @click="copyAlipanLink" class="alipan-link">
+                {{ copied ? '✅ 已复制' : '📋 复制链接' }}
+              </button>
+            </div>
+            <div class="alipan-url-box">
+              <input type="text" readonly :value="alipanUrl" class="alipan-url-input" />
+              <button @click="copyAlipanLink" class="copy-btn">{{ copied ? '已复制' : '复制' }}</button>
+            </div>
+            <p class="alipan-tip">💡 提示：阿里云盘支持原画倍速播放，下载速度更快更稳定</p>
+          </div>
+        </section>
+
         <div class="tagline">
           <span class="quote">✨</span> 沐柠相伴，万物可期 <span class="quote">✨</span>
         </div>
@@ -130,6 +154,39 @@
 <script>
 export default {
   name: 'ProductIntro',
+  data() {
+    return {
+      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
+      copied: false,
+    };
+  },
+  methods: {
+    copyAlipanLink() {
+      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+        this.copied = true;
+        setTimeout(() => {
+          this.copied = false;
+        }, 2000);
+      }).catch(err => {
+        console.error('复制失败:', err);
+        // 降级方案
+        const textArea = document.createElement('textarea');
+        textArea.value = this.alipanUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        try {
+          document.execCommand('copy');
+          this.copied = true;
+          setTimeout(() => {
+            this.copied = false;
+          }, 2000);
+        } catch (e) {
+          alert('复制失败，请手动复制链接');
+        }
+        document.body.removeChild(textArea);
+      });
+    },
+  },
 };
 </script>
 
@@ -356,5 +413,132 @@ h1 {
 .quote {
   font-size: 1.2rem;
   opacity: 0.7;
+}
+
+/* 阿里云盘下载卡片 */
+.cloud-download {
+  margin-top: 20px;
+}
+
+.cloud-download > p {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  margin-bottom: 16px;
+}
+
+.alipan-card {
+  background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  box-shadow: 0 4px 16px rgba(0, 122, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+.alipan-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 24px rgba(0, 122, 255, 0.4);
+}
+
+.alipan-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.alipan-icon {
+  font-size: 2.5rem;
+  flex-shrink: 0;
+}
+
+.alipan-text {
+  flex: 1;
+}
+
+.alipan-text strong {
+  display: block;
+  font-size: 1.1rem;
+  color: white;
+  margin-bottom: 6px;
+}
+
+.alipan-text p {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.alipan-link {
+  background: white;
+  color: #007AFF;
+  border: none;
+  padding: 12px 24px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.alipan-link:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.alipan-url-box {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.alipan-url-input {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  font-family: 'Courier New', monospace;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.alipan-url-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
+}
+
+.copy-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s ease;
+}
+
+.copy-btn:hover {
+  background: var(--primary-hover);
+  transform: translateY(-1px);
+}
+
+.alipan-tip {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin-top: 12px;
+  font-style: italic;
 }
 </style>

@@ -100,6 +100,31 @@
           <span class="path-display">{{ localInstallPath }}</span>
         </div>
       </div>
+      
+      <!-- 本地安装进度显示 -->
+      <div class="install-status" v-if="installing && activeMode === 'local'">
+        <div class="status-header">
+          <span class="phase-label">🔧 安装中</span>
+          <span class="stage-label">{{ currentStage }}</span>
+        </div>
+        <div class="progress-wrapper">
+          <div class="progress-bar installing">
+            <div class="progress-fill" :style="{ width: progressPercent + '%' }"></div>
+          </div>
+          <span class="progress-percent">{{ Math.round(progressPercent) }}%</span>
+        </div>
+        <div class="steps-log">
+          <div v-for="(step, idx) in installSteps" :key="idx" class="step-item">
+            <span class="step-icon">✅</span>
+            <span class="step-text">{{ step }}</span>
+          </div>
+          <div v-if="currentStage && !installSteps.includes(getStepLabel(currentStage))" class="step-item current">
+            <span class="step-icon">⏳</span>
+            <span class="step-text">{{ getStepLabel(currentStage) }}</span>
+          </div>
+        </div>
+      </div>
+      
       <div class="button-group">
         <button @click="installFromLocal" :disabled="installing || !localFilePath || dirExistsWarning"
                 class="install-btn">
@@ -325,6 +350,8 @@ export default {
       this.installing = true;
       this.showProgress = true;
       this.progressPercent = 0;
+      this.currentStage = '';
+      this.installSteps = [];
       this.status = '准备安装...';
       eventBus.emit('install:start');
 
