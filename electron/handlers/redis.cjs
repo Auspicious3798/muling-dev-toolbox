@@ -419,6 +419,11 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('install-redis', async (event, version, password = '', maxmemory = 0, customPort = null) => {
         const cfg = getRedisVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
+        
+        // 获取配置中的 baseDir
+        const toolConfig = configManager.getToolConfig('redis', version);
+        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Redis';
+        
         const {url, suffix, defaultPort} = cfg;
         let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
         if (await isPortInUse(targetPort)) {
@@ -430,7 +435,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         }
         const fileName = url.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = `C:\\Program Files\\Redis\\redis-${version}`;
+        const installPath = path.join(baseDir, `redis-${version}`);
         const sendProgress = (progress, stage = '') => {
             mainWindow.webContents.send('redis-progress', {type: 'redis', version, progress, stage});
         };
@@ -457,6 +462,13 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
             logToFile(`安装失败: ${err.message}`);
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (currentAbortController === abortController) currentAbortController = null;
@@ -473,6 +485,11 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 Redis 安装包，请先导入'};
         const cfg = getRedisVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
+        
+        // 获取配置中的 baseDir，与在线安装保持一致
+        const toolConfig = configManager.getToolConfig('redis', version);
+        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Redis';
+        
         const {suffix, defaultPort} = cfg;
         let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
         if (await isPortInUse(targetPort)) {
@@ -483,7 +500,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             }
         }
         const zipPath = pendingLocalFile;
-        const installPath = `C:\\Program Files\\Redis\\redis-${version}`;
+        const installPath = path.join(baseDir, `redis-${version}`);
         const sendProgress = (progress, stage = '') => {
             mainWindow.webContents.send('redis-progress', {type: 'redis', version, progress, stage});
         };
@@ -501,6 +518,13 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             return {success: true, message: `Redis ${version} 安装成功，端口: ${targetPort}`};
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (fs.existsSync(zipPath)) {

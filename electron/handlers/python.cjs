@@ -454,8 +454,13 @@ trusted-host = ${new URL(mirror).hostname}
     ipcMain.handle('install-from-local-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 Python 安装包，请先导入'};
         if (!version) return {success: false, message: '未指定 Python 版本'};
+        
+        // 获取配置中的 baseDir，与在线安装保持一致
+        const toolConfig = configManager.getToolConfig('python', version);
+        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Python';
+        
         const zipPath = pendingLocalFile;
-        const installPath = `C:\\Program Files\\Python\\python-${version}`;
+        const installPath = path.join(baseDir, `python-${version}`);
         const sendProgress = (progress, stage = '') => {
             mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
         };
@@ -475,6 +480,13 @@ trusted-host = ${new URL(mirror).hostname}
             mainWindow.webContents.send('python-changed');
             return {success: true, message: 'Python 安装成功，pip 已配置'};
         } catch (err) {
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
@@ -519,6 +531,13 @@ trusted-host = ${new URL(mirror).hostname}
             return {success: true, message: 'Python 安装成功，pip 已配置'};
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (currentAbortController === abortController) currentAbortController = null;

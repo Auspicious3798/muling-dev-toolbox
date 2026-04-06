@@ -1,8 +1,8 @@
 <template>
-  <div class="maven-installer">
+  <div class="nginx-installer">
     <h3>
-      <img :src="MavenIcon" class="title-icon" alt=""/>
-      Maven 安装
+      <img :src="NginxIcon" class="title-icon" alt=""/>
+      Nginx 安装
     </h3>
 
     <div class="mode-switch">
@@ -20,7 +20,7 @@
         <span class="path-display">{{ installPath }}</span>
       </div>
       <div class="button-group">
-        <button @click="installMaven" :disabled="installing || jdkMissing" class="install-btn">
+        <button @click="installNginx" :disabled="installing" class="install-btn">
           <span v-if="downloading">{{ `安装中 ${Math.round(progressPercent)}%` }}</span>
           <span v-else>{{ installing ? '安装中...' : '开始安装' }}</span>
         </button>
@@ -28,14 +28,11 @@
           取消下载
         </button>
       </div>
-      <div v-if="jdkMissing" class="warning-message">
-        ⚠️ 未检测到 JDK，请先安装 JDK 后再安装 Maven。
-      </div>
     </div>
 
     <div v-else>
       <div class="import-area">
-        <button @click="importLocalMaven" class="import-btn">📁 选择 Maven 压缩包</button>
+        <button @click="importLocalNginx" class="import-btn">📁 选择 Nginx 压缩包</button>
         <div v-if="localFilePath" class="import-path">
           <span class="path-label">已选择：</span>
           <span class="path-display">{{ localFilePath }}</span>
@@ -46,12 +43,9 @@
         </div>
       </div>
       <div class="button-group">
-        <button @click="installMavenLocal" :disabled="installing || !localFilePath || jdkMissing" class="install-btn">
+        <button @click="installNginxLocal" :disabled="installing || !localFilePath" class="install-btn">
           {{ installing ? '安装中...' : '开始安装' }}
         </button>
-      </div>
-      <div v-if="jdkMissing" class="warning-message">
-        ⚠️ 未检测到 JDK，请先安装 JDK 后再安装 Maven。
       </div>
     </div>
 
@@ -66,13 +60,13 @@
 
 <script>
 import eventBus from '@/eventBus';
-import MavenIcon from '../../../public/icons/maven.svg?url';
+import NginxIcon from '../../../public/icons/nginx.svg?url';
 
 export default {
-  name: 'MavenInstaller',
+  name: 'NginxInstaller',
   data() {
     return {
-      MavenIcon,
+      NginxIcon,
       activeMode: 'online',
       installing: false,
       downloading: false,
@@ -80,36 +74,34 @@ export default {
       showProgress: false,
       progressPercent: 0,
       localFilePath: '',
-      jdkMissing: false
+      userDataPath: ''
     };
   },
   computed: {
     installPath() {
-      return 'C:\\Program Files\\muling\\muling-env-box\\Maven';
+      return 'C:\\Program Files\\muling\\muling-env-box\\Nginx';
     }
   },
   mounted() {
-    this.checkJDK();
+    this.getUserDataPath();
     if (window.electronAPI) {
-      window.electronAPI.onMavenProgress((data) => {
-        if (data.type === 'maven') {
-          this.progressPercent = data.progress * 100;
-          if (data.progress === 1) {
-            this.status = '下载完成，正在安装...';
-          }
+      window.electronAPI.onNginxProgress((data) => {
+        this.progressPercent = data.progress * 100;
+        if (data.progress === 1) {
+          this.status = '下载完成，正在安装...';
         }
+        this.showProgress = true;
       });
     } else {
       this.status = '错误：未连接到主进程';
     }
   },
   methods: {
-    async checkJDK() {
-      try {
-        const result = await window.electronAPI.checkJDK();
-        this.jdkMissing = !result.versions || result.versions.length === 0;
-      } catch (err) {
-        this.jdkMissing = true;
+    async getUserDataPath() {
+      if (window.electronAPI && window.electronAPI.getUserDataPath) {
+        this.userDataPath = await window.electronAPI.getUserDataPath();
+      } else {
+        this.userDataPath = 'C:\\Users\\' + (process.env.USERNAME || 'User') + '\\AppData\\Roaming\\沐柠工具箱';
       }
     },
     switchMode(mode) {
@@ -119,14 +111,14 @@ export default {
       }
     },
     cancelDownload() {
-      if (window.electronAPI && window.electronAPI.cancelMavenDownload) {
-        window.electronAPI.cancelMavenDownload();
+      if (window.electronAPI && window.electronAPI.cancelNginxDownload) {
+        window.electronAPI.cancelNginxDownload();
         this.status = '⏸️ 已取消下载';
         this.downloading = false;
         this.showProgress = false;
       }
     },
-    async installMaven() {
+    async installNginx() {
       if (this.installing) return;
       this.installing = true;
       this.showProgress = true;
@@ -136,7 +128,7 @@ export default {
 
       try {
         this.downloading = true;
-        const result = await window.electronAPI.installMaven(false);
+        const result = await window.electronAPI.installNginx();
         if (result.success) {
           this.status = `✅ ${result.message}`;
           this.$emit('installed');
@@ -160,11 +152,11 @@ export default {
         eventBus.emit('install:end');
       }
     },
-    async importLocalMaven() {
+    async importLocalNginx() {
       const filePath = await window.electronAPI.openFileDialog({
-        title: '选择 Maven 压缩包',
+        title: '选择 Nginx 压缩包',
         filters: [
-          {name: 'Maven 安装包', extensions: ['zip']},
+          {name: 'Nginx 安装包', extensions: ['zip']},
           {name: '所有文件', extensions: ['*']}
         ]
       });
@@ -175,15 +167,15 @@ export default {
 
       this.installing = true;
       this.showProgress = false;
-      this.status = '⏳ 正在导入 Maven 安装包...';
+      this.status = '⏳ 正在导入 Nginx 安装包...';
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.importLocalMaven(filePath);
-        if (result.success) {
+        const result = await window.electronAPI.importLocalNginx(filePath);
+        if (result && result.success) {
           this.status = `✅ ${result.message}，请点击“开始安装”完成配置。`;
         } else {
-          this.status = `❌ 导入失败：${result.message}`;
+          this.status = `❌ 导入失败：${result?.message || '未知错误'}`;
           this.localFilePath = '';
         }
       } catch (err) {
@@ -194,7 +186,7 @@ export default {
         eventBus.emit('install:end');
       }
     },
-    async installMavenLocal() {
+    async installNginxLocal() {
       if (this.installing) return;
       this.installing = true;
       this.showProgress = true;
@@ -203,8 +195,8 @@ export default {
       eventBus.emit('install:start');
 
       try {
-        const result = await window.electronAPI.installMaven(true);
-        if (result.success) {
+        const result = await window.electronAPI.installNginxFromLocal();
+        if (result && result.success) {
           this.status = `✅ ${result.message}`;
           this.$emit('installed');
           setTimeout(() => {
@@ -212,7 +204,7 @@ export default {
           }, 2000);
           this.localFilePath = '';
         } else {
-          this.status = `❌ 安装失败：${result.message}`;
+          this.status = `❌ 安装失败：${result?.message || '未知错误'}`;
           this.showProgress = false;
         }
       } catch (err) {
@@ -228,7 +220,7 @@ export default {
 </script>
 
 <style scoped>
-.maven-installer {
+.nginx-installer {
   background: var(--bg-card);
   border-radius: 20px;
   padding: 24px;
@@ -243,7 +235,7 @@ export default {
   margin-right: 8px;
 }
 
-.maven-installer:hover {
+.nginx-installer:hover {
   box-shadow: var(--shadow-md);
 }
 
@@ -430,14 +422,5 @@ h3 {
   100% {
     background-position: -100% 0;
   }
-}
-
-.warning-message {
-  margin-top: 12px;
-  padding: 8px;
-  background-color: var(--danger-bg);
-  border-radius: 8px;
-  color: var(--danger-text);
-  font-size: 0.8rem;
 }
 </style>

@@ -7,6 +7,7 @@ const registerPythonHandlers = require('./handlers/python.cjs');
 const registerMysqlHandlers = require('./handlers/mysql.cjs');
 const registerRedisHandlers = require('./handlers/redis.cjs');
 const registerMavenHandlers = require('./handlers/maven.cjs');
+const registerNginxHandlers = require('./handlers/nginx.cjs');
 
 let mainWindow;
 
@@ -72,7 +73,7 @@ function createWindow() {
 app.whenReady().then(() => {
     // 初始化配置管理器
     configManager.initConfig(app.getPath('userData'));
-    
+    registerNginxHandlers(mainWindow, app.getPath('userData'));
     protocol.handle('app', async (request) => {
         let filePath = request.url.slice('app://'.length);
         if (filePath.includes('?')) filePath = filePath.split('?')[0];
@@ -108,6 +109,7 @@ app.whenReady().then(() => {
             status: 200,
             headers: {'Content-Type': mimeType}
         });
+
     });
 
     createWindow();

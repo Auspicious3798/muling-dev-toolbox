@@ -384,6 +384,13 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
             return {success: true, message: 'Maven 安装成功'};
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);
+            // 检查是否是权限错误
+            if (err.code === 'EPERM' || err.code === 'EACCES') {
+                return {
+                    success: false,
+                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
+                };
+            }
             return {success: false, message: `安装失败: ${err.message}`};
         }
     });

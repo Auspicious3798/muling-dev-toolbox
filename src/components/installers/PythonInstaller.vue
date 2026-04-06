@@ -130,11 +130,11 @@ export default {
   },
   computed: {
     installPath() {
-      return `C:\\Program Files\\Python\\python-${this.selectedVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Python\\python-${this.selectedVersion}`;
     },
     localInstallPath() {
       if (!this.localVersion) return '';
-      return `C:\\Program Files\\Python\\python-${this.localVersion}`;
+      return `C:\\Program Files\\muling\\muling-env-box\\Python\\python-${this.localVersion}`;
     }
   },
   mounted() {
