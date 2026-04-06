@@ -51,13 +51,13 @@
             {{ testingSpeed ? '测试中...' : '测速' }}
           </button>
         </div>
-        <p class="proxy-tip">💡 如果所有代理节点都失效，可使用阿里云盘获取资源</p>
+        <p class="proxy-tip">💡 如果所有代理节点都失效，可使用夸克网盘获取资源</p>
       </div>
-      <div class="alipan-banner" v-if="useProxy">
-        <div class="alipan-banner-content">
+      <div class="quarkpan-banner" v-if="useProxy">
+        <div class="quarkpan-banner-content">
           <span class="banner-icon">☁️</span>
-          <span class="banner-text">沐柠环境盒 - 阿里云盘备用下载</span>
-          <button @click="copyAlipanLink" class="banner-copy-btn">
+          <span class="banner-text">沐柠环境盒 - 夸克网盘备用下载</span>
+          <button @click="copyQuarkpanLink" class="banner-copy-btn">
             {{ copied ? '✅ 已复制' : '📋 复制链接' }}
           </button>
         </div>
@@ -132,7 +132,7 @@ export default {
       clearingCache: false,
       clearingLogs: false,
       copied: false,
-      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
+      quarkpanUrl: 'https://pan.quark.cn/s/93eb50a2e3e3',
       versionInfo: {
         version: '',
         electron: '',
@@ -353,8 +353,8 @@ export default {
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
-    copyAlipanLink() {
-      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+    copyQuarkpanLink() {
+      navigator.clipboard.writeText(this.quarkpanUrl).then(() => {
         this.copied = true;
         setTimeout(() => {
           this.copied = false;
@@ -363,7 +363,7 @@ export default {
         console.error('复制失败:', err);
         // 降级方案
         const textArea = document.createElement('textarea');
-        textArea.value = this.alipanUrl;
+        textArea.value = this.quarkpanUrl;
         document.body.appendChild(textArea);
         textArea.select();
         try {
@@ -563,12 +563,12 @@ input:checked + .slider:before {
   margin-bottom: 0;
 }
 
-.alipan-banner {
+.quarkpan-banner {
   margin-top: 12px;
   padding: 0;
 }
 
-.alipan-banner-content {
+.quarkpan-banner-content {
   display: flex;
   align-items: center;
   gap: 12px;

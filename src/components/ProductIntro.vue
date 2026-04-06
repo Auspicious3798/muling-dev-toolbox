@@ -122,24 +122,24 @@
         <section class="intro-section">
           <h2>☁️ 备用下载方式</h2>
           <div class="cloud-download">
-            <p>如果代理节点失效或下载速度过慢，您可以使用阿里云盘获取资源：</p>
-            <div class="alipan-card">
-              <div class="alipan-info">
-                <span class="alipan-icon">☁️</span>
-                <div class="alipan-text">
-                  <strong>沐柠环境盒 - 阿里云盘</strong>
-                  <p>点击下方按钮复制链接，打开「阿里云盘」APP 即可访问</p>
+            <p>如果代理节点失效或下载速度过慢，您可以使用夸克网盘获取资源：</p>
+            <div class="quarkpan-card">
+              <div class="quarkpan-info">
+                <span class="quarkpan-icon">☁️</span>
+                <div class="quarkpan-text">
+                  <strong>沐柠环境盒 - 夸克网盘</strong>
+                  <p>点击下方按钮复制链接，打开「夸克APP」即可访问</p>
                 </div>
               </div>
-              <button @click="copyAlipanLink" class="alipan-link">
+              <button @click="copyQuarkpanLink" class="quarkpan-link">
                 {{ copied ? '✅ 已复制' : '📋 复制链接' }}
               </button>
             </div>
-            <div class="alipan-url-box">
-              <input type="text" readonly :value="alipanUrl" class="alipan-url-input" />
-              <button @click="copyAlipanLink" class="copy-btn">{{ copied ? '已复制' : '复制' }}</button>
+            <div class="quarkpan-url-box">
+              <input type="text" readonly :value="quarkpanUrl" class="quarkpan-url-input" />
+              <button @click="copyQuarkpanLink" class="copy-btn">{{ copied ? '已复制' : '复制' }}</button>
             </div>
-            <p class="alipan-tip">💡 提示：阿里云盘支持原画倍速播放，下载速度更快更稳定</p>
+            <p class="quarkpan-tip">💡 提示：夸克网盘下载速度更快更稳定</p>
           </div>
         </section>
 
@@ -156,13 +156,13 @@ export default {
   name: 'ProductIntro',
   data() {
     return {
-      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
+      quarkpanUrl: 'https://pan.quark.cn/s/93eb50a2e3e3',
       copied: false,
     };
   },
   methods: {
-    copyAlipanLink() {
-      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+    copyQuarkpanLink() {
+      navigator.clipboard.writeText(this.quarkpanUrl).then(() => {
         this.copied = true;
         setTimeout(() => {
           this.copied = false;
@@ -171,7 +171,7 @@ export default {
         console.error('复制失败:', err);
         // 降级方案
         const textArea = document.createElement('textarea');
-        textArea.value = this.alipanUrl;
+        textArea.value = this.quarkpanUrl;
         document.body.appendChild(textArea);
         textArea.select();
         try {
@@ -415,7 +415,7 @@ h1 {
   opacity: 0.7;
 }
 
-/* 阿里云盘下载卡片 */
+/* 夸克网盘下载卡片 */
 .cloud-download {
   margin-top: 20px;
 }
@@ -426,7 +426,7 @@ h1 {
   margin-bottom: 16px;
 }
 
-.alipan-card {
+.quarkpan-card {
   background: linear-gradient(135deg, #007AFF 0%, #5856D6 100%);
   border-radius: 16px;
   padding: 20px;
@@ -438,42 +438,42 @@ h1 {
   transition: all 0.3s ease;
 }
 
-.alipan-card:hover {
+.quarkpan-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 6px 24px rgba(0, 122, 255, 0.4);
 }
 
-.alipan-info {
+.quarkpan-info {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: 1;
 }
 
-.alipan-icon {
+.quarkpan-icon {
   font-size: 2.5rem;
   flex-shrink: 0;
 }
 
-.alipan-text {
+.quarkpan-text {
   flex: 1;
 }
 
-.alipan-text strong {
+.quarkpan-text strong {
   display: block;
   font-size: 1.1rem;
   color: white;
   margin-bottom: 6px;
 }
 
-.alipan-text p {
+.quarkpan-text p {
   font-size: 0.85rem;
   color: rgba(255, 255, 255, 0.9);
   margin: 0;
   line-height: 1.5;
 }
 
-.alipan-link {
+.quarkpan-link {
   background: white;
   color: #007AFF;
   border: none;
@@ -487,19 +487,19 @@ h1 {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
-.alipan-link:hover {
+.quarkpan-link:hover {
   transform: scale(1.05);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.alipan-url-box {
+.quarkpan-url-box {
   display: flex;
   gap: 8px;
   margin-top: 12px;
   align-items: center;
 }
 
-.alipan-url-input {
+.quarkpan-url-input {
   flex: 1;
   background: var(--bg-card);
   border: 1px solid var(--border-light);
@@ -512,7 +512,7 @@ h1 {
   transition: all 0.2s ease;
 }
 
-.alipan-url-input:focus {
+.quarkpan-url-input:focus {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.1);
 }
@@ -535,7 +535,7 @@ h1 {
   transform: translateY(-1px);
 }
 
-.alipan-tip {
+.quarkpan-tip {
   font-size: 0.85rem;
   color: var(--text-muted);
   margin-top: 12px;

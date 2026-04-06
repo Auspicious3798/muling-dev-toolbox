@@ -25,9 +25,9 @@
         <div class="toast-text">
           <p class="toast-message">{{ speedWarningMessage }}</p>
           <p class="toast-tip">建议前往「设置」页面更换更快的代理节点</p>
-          <div class="alipan-toast-box">
-            <input type="text" readonly :value="alipanUrl" class="alipan-toast-input" />
-            <button @click="copyAlipanLink" class="alipan-toast-copy-btn">
+          <div class="quarkpan-toast-box">
+            <input type="text" readonly :value="quarkpanUrl" class="quarkpan-toast-input" />
+            <button @click="copyQuarkpanLink" class="quarkpan-toast-copy-btn">
               {{ copied ? '✅' : '📋' }}
             </button>
           </div>
@@ -71,7 +71,7 @@ export default {
       showSpeedWarning: false,
       speedWarningMessage: '',
       copied: false,
-      alipanUrl: 'https://www.alipan.com/s/qJWiQqF1FdB',
+      quarkpanUrl: 'https://pan.quark.cn/s/93eb50a2e3e3',
     };
   },
   mounted() {
@@ -111,8 +111,8 @@ export default {
       this.$emit('update:visible', false);
       eventBus.emit('navigate:settings');
     },
-    copyAlipanLink() {
-      navigator.clipboard.writeText(this.alipanUrl).then(() => {
+    copyQuarkpanLink() {
+      navigator.clipboard.writeText(this.quarkpanUrl).then(() => {
         this.copied = true;
         setTimeout(() => {
           this.copied = false;
@@ -121,7 +121,7 @@ export default {
         console.error('复制失败:', err);
         // 降级方案
         const textArea = document.createElement('textarea');
-        textArea.value = this.alipanUrl;
+        textArea.value = this.quarkpanUrl;
         document.body.appendChild(textArea);
         textArea.select();
         try {
@@ -258,14 +258,14 @@ export default {
   margin: 0;
 }
 
-.alipan-toast-box {
+.quarkpan-toast-box {
   display: flex;
   gap: 6px;
   margin-top: 10px;
   align-items: center;
 }
 
-.alipan-toast-input {
+.quarkpan-toast-input {
   flex: 1;
   background: var(--bg-input);
   border: 1px solid var(--border-light);
@@ -278,12 +278,12 @@ export default {
   transition: all 0.2s ease;
 }
 
-.alipan-toast-input:focus {
+.quarkpan-toast-input:focus {
   border-color: #007AFF;
   box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.1);
 }
 
-.alipan-toast-copy-btn {
+.quarkpan-toast-copy-btn {
   background: #007AFF;
   color: white;
   border: none;
@@ -295,7 +295,7 @@ export default {
   flex-shrink: 0;
 }
 
-.alipan-toast-copy-btn:hover {
+.quarkpan-toast-copy-btn:hover {
   background: #0051D5;
   transform: scale(1.05);
 }
