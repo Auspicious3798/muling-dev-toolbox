@@ -198,6 +198,7 @@ import DashboardIcon from '../../public/icons/Dashboard.svg?url';
 import LemonIcon from '../../public/icons/lemon.svg?url';
 import SettingsIcon from '../../public/icons/setting.svg?url';
 import PackageManager from './PackageManager.vue';
+import eventBus from '../eventBus';
 
 export default {
   name: 'EnvironmentPanel',
@@ -391,10 +392,15 @@ export default {
       if (this.loading) return;
       this.loading = true;
       this.apiMissing = false;
+      // 通知全局显示扫描遮罩
+      console.log('[EnvironmentPanel] 发送 scan-start 事件，工具:', this.toolLabel);
+      eventBus.emit('scan-start', this.toolLabel);
       try {
         const api = window.electronAPI[this.checkMethod];
         if (!api) {
           this.apiMissing = true;
+          console.log('[EnvironmentPanel] API 不存在，发送 scan-end');
+          eventBus.emit('scan-end');
           return;
         }
         if (this.tool === 'maven') {
@@ -422,6 +428,9 @@ export default {
         }
       } finally {
         this.loading = false;
+        // 通知全局隐藏扫描遮罩
+        console.log('[EnvironmentPanel] 扫描完成，发送 scan-end');
+        eventBus.emit('scan-end');
       }
     },
     async refreshAllServiceStatus() {

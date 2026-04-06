@@ -335,15 +335,20 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 }
             }
         }
-        const baseDir = 'C:\\Program Files\\Redis';
-        if (fs.existsSync(baseDir)) {
-            const dirs = fs.readdirSync(baseDir);
-            for (const dir of dirs) {
-                const fullPath = path.join(baseDir, dir);
-                if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'redis-server.exe'))) {
-                    const match = dir.match(/redis-(\d+\.\d+)/);
-                    if (match && getRedisVersionConfig(match[1])) {
-                        versions.add(match[1]);
+        const baseDirs = [
+            'C:\\Program Files\\Redis',
+            'C:\\Program Files\\muling\\muling-env-box\\Redis'
+        ];
+        for (const baseDir of baseDirs) {
+            if (fs.existsSync(baseDir)) {
+                const dirs = fs.readdirSync(baseDir);
+                for (const dir of dirs) {
+                    const fullPath = path.join(baseDir, dir);
+                    if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'redis-server.exe'))) {
+                        const match = dir.match(/redis-(\d+\.\d+)/);
+                        if (match && getRedisVersionConfig(match[1])) {
+                            versions.add(match[1]);
+                        }
                     }
                 }
             }
@@ -364,9 +369,14 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             if (home && fs.existsSync(home)) return home;
         } catch (err) {
         }
-        const installDir = `C:\\Program Files\\Redis\\redis-${version}`;
-        if (fs.existsSync(installDir) && fs.existsSync(path.join(installDir, 'redis-server.exe'))) {
-            return installDir;
+        const installDirs = [
+            `C:\\Program Files\\Redis\\redis-${version}`,
+            `C:\\Program Files\\muling\\muling-env-box\\Redis\\redis-${version}`
+        ];
+        for (const installDir of installDirs) {
+            if (fs.existsSync(installDir) && fs.existsSync(path.join(installDir, 'redis-server.exe'))) {
+                return installDir;
+            }
         }
         return null;
     }

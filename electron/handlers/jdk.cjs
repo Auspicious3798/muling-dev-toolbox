@@ -223,7 +223,8 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         const knownDirs = [
             'C:\\Program Files\\Java',
             'C:\\Program Files\\Eclipse Adoptium',
-            'C:\\Program Files\\OpenJDK'
+            'C:\\Program Files\\OpenJDK',
+            'C:\\Program Files\\muling\\muling-env-box\\Java'
         ];
         for (const base of knownDirs) {
             if (fs.existsSync(base)) {
@@ -260,7 +261,8 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         const knownDirs = [
             'C:\\Program Files\\Java',
             'C:\\Program Files\\Eclipse Adoptium',
-            'C:\\Program Files\\OpenJDK'
+            'C:\\Program Files\\OpenJDK',
+            'C:\\Program Files\\muling\\muling-env-box\\Java'
         ];
         for (const base of knownDirs) {
             if (fs.existsSync(base)) {
