@@ -140,13 +140,13 @@ export default {
       if (isDark) {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');
-        document.body.style.backgroundColor = '#0f172a';
+        document.body.style.backgroundColor = '#0b1120';
         document.body.style.color = '#f1f5f9';
       } else {
         document.documentElement.classList.remove('dark');
         document.documentElement.classList.add('light');
-        document.body.style.backgroundColor = '#f8fafc';
-        document.body.style.color = '#1e293b';
+        document.body.style.backgroundColor = '#f1f5f9';
+        document.body.style.color = '#0f172a';
       }
       localStorage.setItem('theme', theme);
     },
@@ -211,24 +211,46 @@ export default {
 </script>
 
 <style>
+/* ── Reset & Base ── */
 * {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
-
-*::-webkit-scrollbar {
-  display: none;
 }
 
 body {
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.6;
   overflow: hidden;
-  transition: background-color 0.3s, color 0.3s;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  transition: background-color var(--transition-slow), color var(--transition-slow);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
+/* ── Minimal Scrollbar ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+}
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: var(--border-dark);
+}
+
+/* ── Layout ── */
 .app-layout {
   display: flex;
   height: 100vh;
@@ -238,18 +260,20 @@ body {
 .right-panel {
   flex: 1;
   overflow-y: auto;
-  padding: 20px;
-  background-color: transparent !important;
+  padding: var(--space-6);
+  background-color: var(--bg-primary);
   position: relative;
 }
 
+/* ── Window Controls ── */
 .window-controls {
   position: absolute;
   top: 0;
   right: 0;
   display: flex;
-  height: 32px;
+  height: 36px;
   z-index: 100;
+  -webkit-app-region: no-drag;
 }
 
 .control-btn {
@@ -259,30 +283,34 @@ body {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 14px;
-  transition: background-color 0.2s;
+  font-size: 12px;
+  color: var(--text-secondary);
+  transition: all var(--transition-fast);
   -webkit-app-region: no-drag;
+  user-select: none;
+  font-family: var(--font-sans);
 }
 
 .control-btn:hover {
-  background-color: rgba(255, 255, 255, 0.1);
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .control-btn.close-btn:hover {
-  background-color: #e81123;
+  background-color: #ef4444;
   color: white;
 }
 
-/* 全局扫描遮罩 */
+/* ── Global Scan Overlay ── */
 .global-scan-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: var(--overlay-bg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -296,15 +324,15 @@ body {
   gap: 24px;
   padding: 48px 64px;
   background: var(--bg-card);
-  border-radius: 24px;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
   border: 1px solid var(--border-light);
 }
 
 .scan-spinner {
   position: relative;
-  width: 80px;
-  height: 80px;
+  width: 72px;
+  height: 72px;
 }
 
 .spinner-ring {
@@ -313,39 +341,31 @@ body {
   height: 100%;
   border: 3px solid transparent;
   border-radius: 50%;
-  animation: spin 1.5s linear infinite;
+  animation: spin 1.2s linear infinite;
 }
 
 .spinner-ring:nth-child(1) {
-  border-top-color: #3b82f6;
-  animation-delay: 0s;
+  border-top-color: var(--primary);
 }
-
 .spinner-ring:nth-child(2) {
-  border-right-color: #8b5cf6;
+  border-right-color: var(--accent);
   animation-delay: 0.15s;
-  width: 90%;
-  height: 90%;
-  top: 5%;
-  left: 5%;
+  width: 88%;
+  height: 88%;
+  top: 6%;
+  left: 6%;
 }
-
 .spinner-ring:nth-child(3) {
-  border-bottom-color: #06b6d4;
+  border-bottom-color: var(--info);
   animation-delay: 0.3s;
-  width: 80%;
-  height: 80%;
-  top: 10%;
-  left: 10%;
+  width: 76%;
+  height: 76%;
+  top: 12%;
+  left: 12%;
 }
 
 @keyframes spin {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
+  to { transform: rotate(360deg); }
 }
 
 .scan-text {
@@ -353,14 +373,15 @@ body {
 }
 
 .scan-title {
-  font-size: 1.5rem;
-  font-weight: 600;
+  font-size: 1.25rem;
+  font-weight: 700;
   color: var(--text-primary);
-  margin: 0 0 8px 0;
+  margin: 0 0 6px 0;
+  letter-spacing: -0.3px;
 }
 
 .scan-subtitle {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-secondary);
   margin: 0;
 }
@@ -375,45 +396,31 @@ body {
   height: 10px;
   background: var(--primary);
   border-radius: 50%;
-  animation: pulse 1.4s ease-in-out infinite;
+  animation: dotPulse 1.4s ease-in-out infinite;
 }
 
-.scan-dots span:nth-child(1) {
-  animation-delay: 0s;
+.scan-dots span:nth-child(1) { animation-delay: 0s; }
+.scan-dots span:nth-child(2) { animation-delay: 0.2s; }
+.scan-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes dotPulse {
+  0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+  40% { transform: scale(1); opacity: 1; }
 }
 
-.scan-dots span:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.scan-dots span:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
-@keyframes pulse {
-  0%, 80%, 100% {
-    transform: scale(0.6);
-    opacity: 0.4;
-  }
-  40% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-
-/* 遮罩过渡动画 */
+/* ── Overlay transitions ── */
 .scan-overlay-enter-active,
 .scan-overlay-leave-active {
-  transition: opacity 0.3s ease;
+  transition: opacity 0.25s ease;
 }
-
 .scan-overlay-enter-from,
 .scan-overlay-leave-to {
   opacity: 0;
 }
 
-.scan-overlay-enter-to,
-.scan-overlay-leave-from {
-  opacity: 1;
+/* ── Selection ── */
+::selection {
+  background-color: var(--primary);
+  color: white;
 }
 </style>
