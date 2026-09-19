@@ -1,8 +1,8 @@
 const {contextBridge, ipcRenderer, shell} = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-    installJDK: (version) => ipcRenderer.invoke('install-jdk', version),
-    installFromLocal: (version) => ipcRenderer.invoke('install-from-local', version),
+    installJDK: (version, customPath) => ipcRenderer.invoke('install-jdk', version, customPath),
+    installFromLocal: (version, customPath) => ipcRenderer.invoke('install-from-local', version, customPath),
     importLocalJDK: (filePath) => ipcRenderer.invoke('import-local-jdk', filePath),
     checkJDK: () => ipcRenderer.invoke('check-jdk'),
     switchJDK: (version) => ipcRenderer.invoke('switch-jdk', version),
@@ -80,6 +80,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openExternal: (url) => shell.openExternal(url),
     getUserDataPath: () => ipcRenderer.invoke('get-user-data-path'),
     openFileDialog: (options) => ipcRenderer.invoke('open-file-dialog', options),
+    selectDirectory: (title) => ipcRenderer.invoke('select-directory', title),
     checkPathExists: (path) => ipcRenderer.invoke('check-path-exists', path),
     minimizeWindow: () => ipcRenderer.send('minimize-window'),
     maximizeWindow: () => ipcRenderer.send('maximize-window'),

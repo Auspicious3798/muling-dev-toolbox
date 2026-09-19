@@ -109,9 +109,9 @@
 
         <!-- Actions row -->
         <div class="tile-actions">
-          <button v-if="v !== defaultVersion" @click="switchVersion(v)" class="act-btn ghost" :disabled="actionLoading">
+          <button v-if="v !== defaultVersion" @click="switchVersion(v)" class="act-btn primary" :disabled="actionLoading" title="设为默认版本">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
-            切换
+            设为默认
           </button>
           <button v-if="tool === 'mysql' || tool === 'redis'" @click="toggleService(v)"
                   :class="['act-btn', serviceStatus[v] === 'running' ? 'ghost danger' : 'ghost success']" :disabled="actionLoading">
@@ -465,6 +465,8 @@ export default {
 }
 .act-btn.ghost { color: var(--text-secondary); }
 .act-btn.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.act-btn.primary { background: var(--primary); color: white; }
+.act-btn.primary:hover:not(:disabled) { background: var(--primary-hover); }
 .act-btn.ghost.success { color: var(--success-text); }
 .act-btn.ghost.success:hover:not(:disabled) { background: var(--success-bg); }
 .act-btn.ghost.danger { color: var(--text-muted); }

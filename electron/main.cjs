@@ -259,14 +259,13 @@ app.whenReady().then(() => {
         return {success: true};
     });
 
-    ipcMain.on('select-install-path', async (event) => {
+    ipcMain.handle('select-directory', async (event, title) => {
         const result = await dialog.showOpenDialog(mainWindow, {
             properties: ['openDirectory'],
-            title: '选择 JDK 安装目录'
+            title: title || '选择安装目录'
         });
-        if (!result.canceled && result.filePaths.length > 0) {
-            event.reply('selected-install-path', result.filePaths[0]);
-        }
+        if (result.canceled || result.filePaths.length === 0) return null;
+        return result.filePaths[0];
     });
 
     ipcMain.handle('open-file-dialog', async (event, options) => {

@@ -28,7 +28,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             method: 'GET',
             url: url,
             responseType: 'stream',
-            timeout: 60000,
+            timeout: 600000,
             signal
         });
         const totalLength = response.headers['content-length'];

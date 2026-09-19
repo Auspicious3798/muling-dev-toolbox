@@ -22,13 +22,29 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
     let currentAbortController = null;
     let pendingLocalFile = null;
 
+    // 获取远程文件大小（HEAD 请求）
+    async function getRemoteFileSize(url, signal) {
+        try {
+            const response = await axios({ method: 'HEAD', url, timeout: 15000, signal });
+            const length = response.headers['content-length'];
+            return length ? parseInt(length, 10) : null;
+        } catch { return null; }
+    }
+
     async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
         const writer = fs.createWriteStream(destPath);
+        const totalSizeBytes = await getRemoteFileSize(url, signal).catch(() => null);
+        // 按 100KB/s 最低速度估算超时：文件大小 / 100KB/s + 120s 缓冲，最少 600s
+        const estimatedTimeout = totalSizeBytes
+            ? Math.max(600, Math.ceil(totalSizeBytes / (100 * 1024)) + 120) * 1000
+            : 600000;
+        logToFile(`[JDK下载] 预估超时: ${estimatedTimeout/1000}s, 文件大小: ${totalSizeBytes ? (totalSizeBytes/1024/1024).toFixed(1)+'MB' : '未知'}`);
+
         const response = await axios({
             method: 'GET',
             url: url,
             responseType: 'stream',
-            timeout: 60000,
+            timeout: estimatedTimeout,
             signal
         });
         const totalLength = response.headers['content-length'];
@@ -37,35 +53,36 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         let lastDownloaded = 0;
         let lastCheckTime = Date.now();
         let slowSpeedNotified = false;
-        
-        // 每3秒检查一次下载速度
+        let currentSpeedKbps = 0;
+
+        // 每2秒检查一次下载速度
         speedCheckInterval = setInterval(() => {
             const currentTime = Date.now();
-            const timeDiff = (currentTime - lastCheckTime) / 1000; // 秒
+            const timeDiff = (currentTime - lastCheckTime) / 1000;
             const bytesDiff = downloaded - lastDownloaded;
-            const speedBps = bytesDiff / timeDiff; // 字节/秒
-            const speedKbps = speedBps / 1024; // KB/s
-            
-            logToFile(`[JDK下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
-            
-            // 如果速度低于 50 KB/s 且下载量超过 1 MB,触发慢速警告
-            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
+            const speedBps = bytesDiff / (timeDiff || 1);
+            currentSpeedKbps = speedBps / 1024;
+
+            logToFile(`[JDK下载] 速度: ${currentSpeedKbps.toFixed(1)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
+
+            // 速度低于 50 KB/s 且下载量超过 1 MB，触发慢速警告
+            if (onSlowSpeed && currentSpeedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
                 slowSpeedNotified = true;
                 mainWindow.webContents.send('download-speed-warning', {
                     type: 'jdk',
-                    speed: speedKbps.toFixed(2),
-                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
+                    speed: currentSpeedKbps.toFixed(1),
+                    message: `当前下载速度较慢 (${currentSpeedKbps.toFixed(1)} KB/s)，建议在设置中更换代理节点`
                 });
             }
-            
+
             lastDownloaded = downloaded;
             lastCheckTime = currentTime;
-        }, 3000);
-        
+        }, 2000);
+
         response.data.on('data', (chunk) => {
             downloaded += chunk.length;
             if (onProgress && totalLength) {
-                onProgress(downloaded / totalLength);
+                onProgress(downloaded / totalLength, currentSpeedKbps);
             }
         });
         response.data.pipe(writer);
@@ -336,16 +353,18 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         return {success: true, message: 'JDK 安装包已导入，点击“开始安装”完成配置'};
     });
 
-    ipcMain.handle('install-from-local', async (event, version) => {
+    ipcMain.handle('install-from-local', async (event, version, customPath) => {
         if (!pendingLocalFile) return {success: false, message: '没有已导入的 JDK 安装包，请先导入'};
         if (!version) return {success: false, message: '未指定 JDK 版本'};
-        
-        // 获取配置中的 baseDir，与在线安装保持一致
+
+        // 获取配置中的 baseDir，优先使用用户指定的目录
         const toolConfig = configManager.getToolConfig('jdk', version);
-        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Java';
-        
+        const defaultBaseDir = toolConfig?.baseDir || 'C:\\Program Files\\Java';
+        const baseDir = customPath || defaultBaseDir;
+
         const zipPath = pendingLocalFile;
         const installPath = path.join(baseDir, `jdk-${version}`);
+        logToFile(`本地安装目录: ${installPath} (${customPath ? '用户指定' : '默认'})`);
         const sendProgress = (progress, stage = '') => {
             setImmediate(() => {
                 mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress, stage});
@@ -388,7 +407,7 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
         }
     });
 
-    ipcMain.handle('install-jdk', async (event, version) => {
+    ipcMain.handle('install-jdk', async (event, version, customPath) => {
         logToFile(`尝试获取 JDK ${version} 的配置`);
         const toolConfig = configManager.getToolConfig('jdk', version);
         if (!toolConfig) {
@@ -404,21 +423,54 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
 
         logToFile(`成功获取 JDK ${version} 配置，URL: ${toolConfig.url}`);
         const {url} = toolConfig;
-        const fileName = url.split('/').pop();
+        const rawUrl = configManager.resolveUrl(toolConfig.url); // 带镜像的 URL
+        const directUrl = toolConfig.url.replace('{mirror}', ''); // 直连 URL
+        const fileName = directUrl.split('/').pop();
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = path.join(toolConfig.baseDir || 'C:\\Program Files\\Java', `jdk-${version}`);
-        const sendProgress = (progress, stage = '') => {
+        const baseDir = customPath || toolConfig.baseDir || 'C:\\Program Files\\Java';
+        const installPath = path.join(baseDir, `jdk-${version}`);
+        logToFile(`安装目录: ${installPath} (${customPath ? '用户指定' : '默认'})`);
+        const sendProgress = (progress, stage = '', speed = 0) => {
             setImmediate(() => {
-                mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress, stage});
+                mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress, stage, speed});
             });
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
-        try {
+
+        // 下载函数：先试代理，失败自动切直连
+        async function downloadWithFallback() {
             if (!fs.existsSync(installerPath)) {
                 sendProgress(0, '下载安装包');
-                await downloadFile(url, installerPath, (p) => sendProgress(p * 0.5, '下载安装包'), abortController.signal, true);
-                sendProgress(0.5, '解压中');
+                // 如果配置了代理（rawUrl !== directUrl），先试代理
+                const useMirror = rawUrl !== directUrl;
+                if (useMirror) {
+                    try {
+                        logToFile(`[JDK下载] 尝试代理下载: ${rawUrl}`);
+                        await downloadFile(rawUrl, installerPath, (p, s) => sendProgress(p * 0.5, '下载安装包(代理)', s || 0), abortController.signal, true);
+                        return; // 代理成功
+                    } catch (err) {
+                        if (err.message === '下载已取消') throw err;
+                        logToFile(`[JDK下载] 代理下载失败: ${err.message}，自动切换直连...`);
+                        // 清理半截文件
+                        try { fs.unlinkSync(installerPath); } catch {}
+                        // 通知前端
+                        mainWindow.webContents.send('download-progress', {type: 'jdk', version, progress: 0, stage: '代理失败，切换直连...', speed: 0});
+                    }
+                }
+                // 直连下载
+                logToFile(`[JDK下载] 直连下载: ${directUrl}`);
+                await downloadFile(directUrl, installerPath, (p, s) => sendProgress(p * 0.5, '下载安装包(直连)', s || 0), abortController.signal, false);
+            }
+        }
+
+        try {
+            await downloadWithFallback();
+            if (!fs.existsSync(installerPath)) {
+                // 文件未下载成功（可能被取消且未抛异常）
+                throw new Error('下载未完成');
+            }
+            sendProgress(0.5, '解压中');
             } else {
                 sendProgress(0.5, '解压中');
             }

@@ -37,9 +37,14 @@
         <span v-else>最新版本，体验前沿功能</span>
       </p>
 
-      <div class="path-display">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 22 0 0 1 2 2z"/></svg>
-        <span>{{ installPath }}</span>
+      <div class="path-config">
+        <label>安装目录</label>
+        <div class="path-row">
+          <input type="text" :value="effectiveInstallPath" readonly class="path-input" @click="browseDirectory"/>
+          <button @click="browseDirectory" class="btn-browse" title="选择目录">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </button>
+        </div>
       </div>
 
       <div v-if="installing" class="progress-card">
@@ -50,7 +55,10 @@
         <div class="progress-track">
           <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
         </div>
-        <span class="progress-pct">{{ Math.round(progressPercent) }}%</span>
+        <div class="progress-stats">
+          <span class="progress-pct">{{ Math.round(progressPercent) }}%</span>
+          <span v-if="downloadSpeed > 0 && downloading" class="progress-speed">{{ formatSpeed(downloadSpeed) }}</span>
+        </div>
         <div class="step-list">
           <div v-for="(step, idx) in installSteps" :key="idx" class="step done">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -91,9 +99,14 @@
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
         安装目录已存在文件，请删除或选择其他版本。
       </div>
-      <div class="path-display">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-        <span>{{ localInstallPath }}</span>
+      <div class="path-config">
+        <label>安装目录</label>
+        <div class="path-row">
+          <input type="text" :value="effectiveLocalInstallPath" readonly class="path-input" @click="browseDirectory"/>
+          <button @click="browseDirectory" class="btn-browse" title="选择目录">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+          </button>
+        </div>
       </div>
 
       <div v-if="installing" class="progress-card">
@@ -104,7 +117,9 @@
         <div class="progress-track">
           <div class="progress-bar" :style="{ width: progressPercent + '%' }"></div>
         </div>
-        <span class="progress-pct">{{ Math.round(progressPercent) }}%</span>
+        <div class="progress-stats">
+          <span class="progress-pct">{{ Math.round(progressPercent) }}%</span>
+        </div>
         <div class="step-list">
           <div v-for="(step, idx) in installSteps" :key="idx" class="step done">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -165,19 +180,25 @@ export default {
       ],
       installing: false, downloading: false,
       status: '未安装', currentStage: '', installSteps: [],
-      showProgress: false, progressPercent: 0,
-      localFilePath: '', localVersion: 21, dirExistsWarning: false
+      showProgress: false, progressPercent: 0, downloadSpeed: 0,
+      localFilePath: '', localVersion: 21, dirExistsWarning: false,
+      customBasePath: ''
     };
   },
   computed: {
-    installPath() { return `C:\\Program Files\\muling\\muling-env-box\\Java\\jdk-${this.selectedVersion}`; },
-    localInstallPath() { return `C:\\Program Files\\muling\\muling-env-box\\Java\\jdk-${this.localVersion}`; }
+    defaultBaseDir() { return 'C:\\Program Files\\muling\\muling-env-box\\Java'; },
+    baseDir() { return this.customBasePath || this.defaultBaseDir; },
+    effectiveInstallPath() { return `${this.baseDir}\\jdk-${this.selectedVersion}`; },
+    effectiveLocalInstallPath() { return `${this.baseDir}\\jdk-${this.localVersion}`; },
+    installPath() { return this.effectiveInstallPath; },
+    localInstallPath() { return this.effectiveLocalInstallPath; }
   },
   mounted() {
     if (window.electronAPI) {
       window.electronAPI.onDownloadProgress((data) => {
         if (data.type === 'jdk' && data.version === this.selectedVersion) {
           this.progressPercent = data.progress * 100;
+          if (data.speed !== undefined) { this.downloadSpeed = Math.round(data.speed); }
           if (data.stage) { this.currentStage = data.stage; const sl = this.getStepLabel(data.stage); if (sl && !this.installSteps.includes(sl)) this.installSteps.push(sl); }
           if (data.progress === 1) { this.status = 'JDK 安装成功'; setTimeout(() => { this.showProgress = false; }, 1500); }
         }
@@ -186,14 +207,19 @@ export default {
   },
   methods: {
     getStepLabel(stage) { const m = {'下载安装包':'下载 JDK 安装包','解压中':'解压安装包','配置环境变量':'配置系统环境变量'}; return m[stage] || stage; },
+    formatSpeed(kbps) { if (kbps >= 1024) return (kbps / 1024).toFixed(1) + ' MB/s'; return kbps + ' KB/s'; },
     switchMode(mode) { this.activeMode = mode; if (mode === 'local') { this.localFilePath = ''; this.localVersion = 21; this.dirExistsWarning = false; } },
+    async browseDirectory() {
+      const dir = await window.electronAPI.selectDirectory('选择 JDK 安装目录');
+      if (dir) { this.customBasePath = dir; }
+    },
     cancelDownload() { if (window.electronAPI && window.electronAPI.cancelDownload) { window.electronAPI.cancelDownload(); this.status = '已取消下载'; this.downloading = false; this.showProgress = false; } },
     installJDK() {
       if (this.installing) return;
       this.installing = true; this.showProgress = true; this.progressPercent = 0; this.currentStage = ''; this.installSteps = []; this.status = '准备安装...';
       eventBus.emit('install:start');
       this.downloading = true;
-      window.electronAPI.installJDK(this.selectedVersion).then((result) => {
+      window.electronAPI.installJDK(this.selectedVersion, this.customBasePath || null).then((result) => {
         if (result.success) { this.status = `JDK 安装成功 — ${result.message}`; this.$emit('installed'); setTimeout(() => { this.showProgress = false; }, 2000); }
         else { this.status = `安装失败：${result.message}`; this.showProgress = false; }
       }).catch((err) => {
@@ -226,7 +252,7 @@ export default {
       this.installing = true; this.showProgress = true; this.progressPercent = 0; this.currentStage = ''; this.installSteps = []; this.status = '正在安装...';
       eventBus.emit('install:start');
       try {
-        const result = await window.electronAPI.installFromLocal(this.localVersion);
+        const result = await window.electronAPI.installFromLocal(this.localVersion, this.customBasePath || null);
         if (result.success) { this.status = `JDK 安装成功 — ${result.message}`; this.$emit('installed'); setTimeout(()=>{this.showProgress=false;},2000); this.localFilePath=''; this.dirExistsWarning=false; }
         else { this.status = `安装失败：${result.message}`; this.showProgress = false; }
       } catch (err) { this.status = `安装失败：${err.message}`; this.showProgress = false; }
@@ -280,6 +306,27 @@ export default {
 }
 .path-display.success { background: var(--success-bg); color: var(--success-text); }
 
+/* Path config (editable) */
+.path-config { display: flex; flex-direction: column; gap: 6px; }
+.path-config label { font-size: 0.82rem; color: var(--text-secondary); font-weight: 500; }
+.path-row { display: flex; gap: 6px; align-items: center; }
+.path-input {
+  flex: 1; padding: 8px 11px; border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); background: var(--bg-input);
+  color: var(--text-primary); font-family: var(--font-mono); font-size: 0.78rem;
+  cursor: pointer; transition: border-color var(--transition-fast);
+}
+.path-input:hover { border-color: var(--border-medium); }
+.path-input:focus { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-light); }
+.btn-browse {
+  display: flex; align-items: center; justify-content: center;
+  width: 38px; height: 36px; border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm); background: var(--bg-secondary);
+  cursor: pointer; color: var(--text-secondary);
+  transition: all var(--transition-fast); flex-shrink: 0;
+}
+.btn-browse:hover { background: var(--bg-hover); color: var(--primary); border-color: var(--primary); }
+
 /* Config row */
 .config-row { display: flex; align-items: center; gap: var(--space-2); }
 .config-row label { font-size: 0.85rem; color: var(--text-secondary); font-weight: 500; white-space: nowrap; }
@@ -315,7 +362,9 @@ export default {
   transition: width 0.3s ease;
 }
 @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-.progress-pct { font-size: 0.8rem; font-weight: 600; color: var(--text-secondary); display: block; margin-bottom: 10px; }
+.progress-stats { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.progress-pct { font-size: 0.85rem; font-weight: 700; color: var(--primary); font-family: var(--font-mono); }
+.progress-speed { font-size: 0.78rem; font-weight: 500; color: var(--text-secondary); font-family: var(--font-mono); }
 
 .step-list { display: flex; flex-direction: column; gap: 4px; }
 .step { display: flex; align-items: center; gap: 8px; padding: 5px 8px; border-radius: var(--radius-sm); font-size: 0.82rem; }
