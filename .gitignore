@@ -12,6 +12,7 @@ node_modules
 .DS_Store
 dist
 dist_electron
+out/
 coverage
 *.local
 
@@ -38,3 +39,27 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Python
+__pycache__/
+*.pyc
+
+# 本地沙箱测试遗留
+.dsh-sandbox-test.txt
+
+# 资源打包工作区
+_work/
+.work/
+zip-before/
+zip-after/
+
+# 签名证书（含私钥，绝不入库）
+build/certs/
+*.pfx
+*.cer
+
+# 美术源图（体积大、可重新生成；成品图会放到 public/ 与 electron/）
+assets/art/*.png
+
+# 美术源图（透明底原图，体积大；成品在 public/art 与 electron/assets，可用 scripts/build-art-revise.ps1 重新生成）
+assets/revise/

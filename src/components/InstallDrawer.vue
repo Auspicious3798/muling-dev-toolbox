@@ -35,13 +35,6 @@
       <div class="toast-body">
         <p class="toast-title">下载速度较慢</p>
         <p class="toast-message">{{ speedWarningMessage }}</p>
-        <p class="toast-tip">建议前往「设置」页面更换更快的代理节点</p>
-        <div class="quarkpan-toast-box">
-          <input type="text" readonly :value="quarkpanUrl" class="quarkpan-toast-input" @focus="$event.target.select()"/>
-          <button @click="copyQuarkpanLink" class="quarkpan-toast-copy-btn">
-            {{ copied ? '已复制' : '复制' }}
-          </button>
-        </div>
       </div>
       <button class="toast-close-btn" @click="showSpeedWarning = false" aria-label="关闭">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -60,39 +53,40 @@ import PythonInstaller from './installers/PythonInstaller.vue';
 import MySQLInstaller from './installers/MysqlInstaller.vue';
 import RedisInstaller from './installers/RedisInstaller.vue';
 import MavenInstaller from './installers/MavenInstaller.vue';
+import GradleInstaller from './installers/GradleInstaller.vue';
+import UvInstaller from './installers/UvInstaller.vue';
+import NodejsInstaller from './installers/NodejsInstaller.vue';
 import NginxInstaller from './installers/NginxInstaller.vue';
 import eventBus from '@/eventBus';
+import Lemon from '@/utils/lemon';
 
 export default {
   name: 'InstallDrawer',
-  components: { JDKInstaller, PythonInstaller, MySQLInstaller, RedisInstaller, MavenInstaller, NginxInstaller },
+  components: { JDKInstaller, PythonInstaller, MySQLInstaller, RedisInstaller, MavenInstaller, NginxInstaller, GradleInstaller, UvInstaller, NodejsInstaller },
   props: { visible: Boolean, tool: String },
   emits: ['update:visible', 'installed'],
   data() {
     return {
-      showSpeedWarning: false, speedWarningMessage: '', copied: false,
-      quarkpanUrl: 'https://pan.quark.cn/s/93eb50a2e3e3',
+      showSpeedWarning: false, speedWarningMessage: '',
     };
   },
   mounted() {
+    this._unsubs = [];
     if (window.electronAPI) {
-      window.electronAPI.onDownloadSpeedWarning((data) => { this.speedWarningMessage = data.message; this.showSpeedWarning = true; });
+      this._unsubs.push(window.electronAPI.onDownloadSpeedWarning((data) => { this.speedWarningMessage = data.message; this.showSpeedWarning = true; }));
     }
+  },
+  unmounted() {
+    (this._unsubs || []).forEach((u) => { try { u && u(); } catch (e) {} });
   },
   computed: {
     toolLabel() { const m = {jdk:'JDK',python:'Python',mysql:'MySQL',redis:'Redis',maven:'Maven',nginx:'Nginx'}; return m[this.tool]||this.tool.toUpperCase(); },
-    installerComponent() { const c = {jdk:'JDKInstaller',python:'PythonInstaller',mysql:'MySQLInstaller',redis:'RedisInstaller',maven:'MavenInstaller',nginx:'NginxInstaller'}; return c[this.tool]; },
+    installerComponent() { const c = {jdk:'JDKInstaller',python:'PythonInstaller',mysql:'MySQLInstaller',redis:'RedisInstaller',maven:'MavenInstaller',nginx:'NginxInstaller',gradle:'GradleInstaller',uv:'UvInstaller',nodejs:'NodejsInstaller'}; return c[this.tool]; },
   },
   methods: {
     close() { this.$emit('update:visible', false); },
     onInstalled() { this.$emit('installed'); },
     goToSettings() { this.showSpeedWarning = false; this.$emit('update:visible', false); eventBus.emit('navigate:settings'); },
-    copyQuarkpanLink() {
-      navigator.clipboard.writeText(this.quarkpanUrl).then(() => { this.copied=true; setTimeout(()=>{this.copied=false;},2000); })
-      .catch(() => { const ta=document.createElement('textarea'); ta.value=this.quarkpanUrl; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); this.copied=true; setTimeout(()=>{this.copied=false;},2000); } catch(e){ alert('复制失败'); }
-        document.body.removeChild(ta); });
-    },
   },
 };
 </script>
@@ -102,14 +96,16 @@ export default {
 .drawer-overlay {
   position: fixed; top: 0; left: 0; right: 0; bottom: 0;
   background: var(--overlay-bg);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+  backdrop-filter: blur(30px) saturate(140%); -webkit-backdrop-filter: blur(30px) saturate(140%);
   z-index: 1000; display: flex; justify-content: flex-end;
 }
 
 .drawer-container {
   width: 580px; height: 100%;
-  background: var(--bg-primary);
-  box-shadow: -8px 0 40px rgba(0,0,0,0.15);
+  background: var(--glass-tint-strong);
+  border-left: 1px solid var(--glass-stroke);
+  backdrop-filter: blur(36px) saturate(180%); -webkit-backdrop-filter: blur(36px) saturate(180%);
+  box-shadow: var(--glass-shadow-float);
   display: flex; flex-direction: column;
 }
 
@@ -181,24 +177,6 @@ export default {
 
 .toast-title { font-size: 0.95rem; font-weight: 700; color: var(--text-primary); margin: 0 0 2px; }
 .toast-message { font-size: 0.8rem; color: var(--text-secondary); margin: 0 0 4px; }
-.toast-tip { font-size: 0.78rem; color: var(--text-muted); margin: 0 0 var(--space-3); }
-
-.quarkpan-toast-box { display: flex; gap: 6px; }
-
-.quarkpan-toast-input {
-  flex: 1; background: var(--bg-secondary); border: 1px solid var(--border-light);
-  border-radius: var(--radius-sm); padding: 7px 10px; font-size: 0.73rem;
-  color: var(--text-primary); font-family: var(--font-mono);
-  outline: none; transition: all var(--transition-fast);
-}
-.quarkpan-toast-input:focus { border-color: var(--primary); }
-
-.quarkpan-toast-copy-btn {
-  background: var(--primary); color: white; border: none;
-  padding: 7px 14px; border-radius: var(--radius-sm); font-size: 0.78rem;
-  cursor: pointer; font-weight: 600; transition: all var(--transition-fast); flex-shrink: 0;
-}
-.quarkpan-toast-copy-btn:hover { background: var(--primary-hover); }
 
 .toast-close-btn {
   position: absolute; top: 12px; right: 12px;

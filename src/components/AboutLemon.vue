@@ -1,74 +1,78 @@
 <template>
   <div class="about-lemon">
-    <div class="content-card">
-      <div class="hero">
-        <div class="lemon-icon">
-          <img :src="lemonIcon" alt="沐柠" style="width: 100%; height: 100%;"/>
-        </div>
-        <h1>关于沐柠</h1>
-        <div class="subtitle">Lemon · 数字世界的原创虚拟形象</div>
+    <section class="poster">
+      <div class="poster-art">
+        <img src="/art/scene-about-card.png" alt="小柠"/>
       </div>
 
-      <div class="description">
-        <p>
-          沐柠（Lemon），诞生于数字世界，拥有专属社交账号，存在于虚拟，陪伴于日常。她是朋友，是陪伴，是依赖，更是一个完整的品牌。
+      <div class="poster-body">
+        <div class="brand-line">
+          <span class="brand-dot"></span>
+          全栈沐柠
+        </div>
+
+        <h1>小柠</h1>
+        <p class="subtitle">全栈沐柠的吉祥物</p>
+
+        <p class="lead">
+          全栈沐柠是一个独立接单做开发落地的品牌，接的是“从想法到跑起来”的活：环境搭建、后端服务、前端界面、部署上线。
+        </p>
+        <p class="lead">
+          小柠就是这个品牌的脸。她不是什么科技符号，就是一个会陪你一起折腾环境、一起收拾烂摊子的搭子。
         </p>
 
-        <div class="future-block">
-          <h3>未来延伸</h3>
-          <div class="badge-group">
-            <span class="badge">沐柠环境盒</span>
-            <span class="badge">沐柠 Agent</span>
-            <span class="badge">沐柠 AI</span>
-            <span class="badge">沐柠框架</span>
-          </div>
-          <p>最终成长为真正的数字人，以虚拟或实体，伴你身旁。</p>
+        <div class="links">
+          <a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a>
+          <a href="https://www.muling-download.site" target="_blank">沐柠下载站</a>
+          <a href="https://github.com/Auspicious3798/muling-dev-toolbox" target="_blank">GitHub 仓库</a>
+          <button type="button" class="support-pill" @click="showDonate = true">支持小柠</button>
         </div>
 
-        <p>她助力程序员，温暖每一个前行者，是一种精神，一种力量，一份长久的陪伴。</p>
+        <div class="poster-foot">
+          <span class="tagline">沐柠相伴，万物可期</span>
+        </div>
+      </div>
+    </section>
 
-        <div class="tagline">
-          <span class="quote">✨</span> 沐柠相伴，万物可期 <span class="quote">✨</span>
+    <p class="disclaimer">
+      沐柠环境盒仅供学习、研究和个人使用，使用前请备份重要数据；因使用本工具导致的数据丢失或系统异常，开发者不承担直接或间接责任。工具内安装的第三方软件版权归各自作者所有，请遵守相应开源协议。
+    </p>
+
+    <div v-if="showDonate" class="donate-mask" @click.self="showDonate = false">
+      <div class="donate-card">
+        <div class="donate-head">
+          <h2>支持沐柠</h2>
+          <button type="button" class="donate-close" @click="showDonate = false">✕</button>
         </div>
 
-        <div class="contact">
-          <p>联系沐柠：<a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a></p>
-          <p>GitHub 仓库：<a href="https://github.com/Auspicious3798/muling-dev-toolbox" target="_blank">https://github.com/Auspicious3798/muling-dev-toolbox</a></p>
+        <p class="donate-text">
+          沐柠环境盒本身跑在你自己的电脑上，但它要下载的那些工具包都放在我的云存储里，账单走的是我自己的账户。我算过，平均一天三毛钱左右——不多，但它确实每天都在花。
+        </p>
+        <p class="donate-text">
+          如果你觉得它帮你省了时间，可以请小柠喝杯柠檬水。这笔钱会用来继续维护、继续加工具。
+        </p>
+
+        <div class="donate-qr">
+          <img v-if="!qrFailed" :src="qrSrc" alt="赞赏码" @error="qrFailed = true"/>
+          <div v-else class="donate-qr-empty">赞赏码准备中</div>
         </div>
 
-        <div class="disclaimer">
-          <p><strong>免责声明</strong><br>
-            沐柠环境盒（以下简称"本工具"）由沐柠团队开发并维护，在开发者环境中已经过充分测试。但由于不同用户的操作系统、网络环境、权限配置等因素存在差异，本工具在实际使用中可能会出现各种兼容性问题或未知 Bug。
-          </p>
-          <p style="margin-top: 12px;">
-            <strong>请您知悉并同意：</strong><br>
-            1. 本工具仅供学习、研究和个人使用，请谨慎操作；<br>
-            2. 使用本工具前，请确保您已备份重要数据；<br>
-            3. 如因使用本工具导致的数据丢失、系统异常或其他损失，沐柠团队不承担直接或间接责任；<br>
-            4. 本工具提供的第三方软件（包括但不限于 JDK、Python、MySQL、Redis 等）均为各自版权方所有，用户应遵守相应开源协议或许可证条款；<br>
-            5. 本工具不包含任何恶意代码，但无法完全保证第三方软件的完整性及安全性；<br>
-            6. 用户应自行确保所下载及安装的软件来源合法、安全可用，并自行承担使用风险。
-          </p>
-          <p style="margin-top: 12px;">
-            <strong>如果您在使用过程中遇到问题或发现 Bug：</strong><br>
-            请及时通过邮箱 <a href="mailto:taxuexunmei3798@126.com">taxuexunmei3798@126.com</a> 联系沐柠，我们将尽快排查并修复。
-          </p>
-          <p style="margin-top: 12px;">
-            使用本工具即表示您已阅读并同意本声明的全部内容。
-          </p>
-        </div>
+        <p class="donate-note">
+          <span class="thanks">我代小柠谢谢您</span> —— 就算没有发电，沐柠也会自己掏钱维护，维护到我挺不下去那天。
+        </p>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import lemonIcon from '../../public/icons/lemon.svg?url';
 export default {
   name: 'AboutLemon',
   data() {
     return {
-      lemonIcon,
+      showDonate: false,
+      qrFailed: false,
+      qrSrc: '/art/donate-qr.png',
     };
   },
 };
@@ -76,162 +80,274 @@ export default {
 
 <style scoped>
 .about-lemon {
-  background: var(--gradient-bg);
-  border-radius: 28px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  height: 100%;
-  overflow-y: auto;
-}
-
-.content-card {
-  max-width: 680px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 20px;
-}
-
-.hero {
-  text-align: center;
-  margin-bottom: 32px;
-}
-
-.lemon-icon {
-  width: 96px;
-  height: 96px;
-  margin: 0 auto 16px;
-}
-
-.lemon-icon img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  filter: drop-shadow(0 8px 16px rgba(0, 0, 0, 0.1));
-  transition: transform 0.3s ease;
-}
-
-.lemon-icon img:hover {
-  transform: scale(1.02);
-}
-
-h1 {
-  font-size: 2.2rem;
-  font-weight: 700;
-  margin: 0 0 8px;
-  background: linear-gradient(135deg, var(--text-primary), var(--text-secondary));
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  letter-spacing: -0.3px;
-}
-
-.subtitle {
-  font-size: 0.9rem;
-  color: var(--text-secondary);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  font-weight: 500;
-}
-
-.description p {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--text-primary);
-  margin-bottom: 20px;
-  text-align: justify;
-}
-
-.future-block {
-  background: var(--primary-light);
-  border-radius: 20px;
-  padding: 20px;
-  margin: 24px 0;
-  text-align: center;
-}
-
-.future-block h3 {
-  font-size: 1.2rem;
-  font-weight: 600;
-  color: var(--primary);
-  margin-bottom: 16px;
-}
-
-.badge-group {
   display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 12px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 14px;
 }
 
-.badge {
+.poster {
+  display: flex;
+  min-height: 420px;
+  border-radius: 24px;
+  overflow: hidden;
   background: var(--bg-card);
-  border-radius: 40px;
-  padding: 6px 16px;
-  font-size: 0.85rem;
-  font-weight: 500;
-  color: var(--primary);
-  box-shadow: var(--shadow-sm);
+  background-image: var(--glass-sheen);
   border: 1px solid var(--border-light);
-  transition: all 0.2s;
+  box-shadow: var(--glass-edge), var(--glass-shadow);
 }
 
-.badge:hover {
-  transform: translateY(-2px);
-  box-shadow: var(--shadow-md);
-  border-color: var(--primary);
-}
-
-.tagline {
-  text-align: center;
-  margin-top: 32px;
-  font-size: 1.3rem;
-  font-weight: 700;
-  background: linear-gradient(135deg, var(--primary), var(--primary-hover));
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
+.poster-art {
+  flex: 0 0 42%;
+  min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: var(--art-bg);
+  padding: 18px;
+}
+
+.poster-art img {
+  width: 100%;
+  height: 100%;
+  max-height: 480px;
+  object-fit: contain;
+  animation: heroFloat 7s ease-in-out infinite;
+}
+
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.poster-body {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 34px 38px;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.quote {
-  font-size: 1.2rem;
-  opacity: 0.7;
+.brand-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 2px;
+  color: var(--text-muted);
 }
 
-.contact {
-  text-align: center;
-  margin-top: 32px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border-light);
-  font-size: 0.9rem;
+.brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
 }
 
-.contact a {
+h1 {
+  margin: 0;
+  font-size: 2.4rem;
+  font-weight: 800;
+  letter-spacing: 2px;
+  line-height: 1.1;
+  color: var(--text-primary);
+}
+
+.subtitle {
+  margin: -6px 0 6px;
+  font-size: 0.88rem;
+  letter-spacing: 1px;
   color: var(--primary);
-  text-decoration: none;
 }
 
-.contact a:hover {
-  text-decoration: underline;
+.lead {
+  margin: 0;
+  font-size: 0.86rem;
+  line-height: 1.9;
+  color: var(--text-secondary);
+}
+
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.links a {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  text-decoration: none;
+  background: color-mix(in srgb, var(--text-primary) 5%, transparent);
+  border: 1px solid var(--border-light);
+  transition: all var(--transition-fast);
+}
+
+.links a:hover {
+  color: var(--primary);
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  transform: translateY(-1px);
+}
+
+.support-pill {
+  padding: 7px 14px;
+  border-radius: 999px;
+  font-family: inherit;
+  font-size: 0.76rem;
+  cursor: pointer;
+  color: #8a6d1f;
+  background: color-mix(in srgb, #f5c518 22%, transparent);
+  border: 1px solid color-mix(in srgb, #f5c518 55%, transparent);
+  transition: all var(--transition-fast);
+}
+
+.support-pill:hover {
+  color: #6b5312;
+  background: color-mix(in srgb, #f5c518 34%, transparent);
+  transform: translateY(-1px);
+}
+
+.donate-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 12, 20, 0.55);
+  backdrop-filter: blur(6px);
+}
+
+.donate-card {
+  width: min(420px, 100%);
+  max-height: 100%;
+  overflow: auto;
+  padding: 24px;
+  border-radius: 20px;
+  background: var(--bg-card-strong, var(--bg-card));
+  border: 1px solid var(--border-light);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+}
+
+.donate-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.donate-head h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--text-primary);
+}
+
+.donate-close {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 50%;
+  cursor: pointer;
+  color: var(--text-muted);
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  font-size: 0.8rem;
+}
+
+.donate-text {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  line-height: 1.85;
+  color: var(--text-secondary);
+}
+
+.donate-qr {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0 12px;
+}
+
+.donate-qr img {
+  width: 240px;
+  height: 240px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: #ffffff;
+  padding: 8px;
+}
+
+.donate-qr-empty {
+  width: 240px;
+  height: 240px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  border: 1px dashed var(--border-light);
+}
+
+.donate-note .thanks {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.donate-note {
+  margin: 0;
+  font-size: 0.76rem;
+  line-height: 1.8;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.poster-foot {
+  margin-top: auto;
+  padding-top: 10px;
+}
+
+.tagline {
+  display: inline-block;
+  padding: 6px 16px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--primary) 28%, transparent);
 }
 
 .disclaimer {
-  margin-top: 32px;
-  padding: 16px;
-  font-size: 0.75rem;
+  margin: 0;
+  padding: 0 6px;
+  font-size: 0.72rem;
+  line-height: 1.7;
   color: var(--text-muted);
-  background: var(--bg-secondary);
-  border-radius: 16px;
-  border-left: 3px solid var(--warning-text);
-  text-align: left;
-  line-height: 1.5;
 }
 
-.disclaimer p {
-  margin: 0;
+@media (max-width: 900px) {
+  .poster {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .poster-art {
+    flex: 0 0 auto;
+    height: 240px;
+    padding: 12px;
+  }
+
+  .poster-body {
+    padding: 22px;
+  }
+
+  h1 {
+    font-size: 1.9rem;
+  }
 }
 </style>

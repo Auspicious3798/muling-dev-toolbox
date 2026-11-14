@@ -2,340 +2,83 @@ const {ipcMain} = require('electron');
 const path = require('path');
 const fs = require('fs');
 const {exec} = require('child_process');
-const axios = require('axios');
-const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
 const configManager = require('../configManager.cjs');
+const {downloadFile} = require('../utils/download.cjs');
+const {installZip, zipProgress} = require('../utils/zip.cjs');
+const {createLogger} = require('../utils/logger.cjs');
+const sandbox = require('../utils/sandbox.cjs');
 
 module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
 
     const logFile = path.join(userDataPath, 'maven_install.log');
-    
-    // 默认安装路径（作为后备）
-    const MAVEN_INSTALL_DIR = 'C:\\Program Files\\Maven';
+    const logToFile = createLogger(logFile);
 
-    // 从配置获取 Maven 下载信息
+    let currentAbortController = null;
+
     function getMavenConfig() {
         return configManager.getToolConfig('maven');
     }
 
-    function logToFile(message) {
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-    }
-
-    let currentAbortController = null;
-    let pendingLocalFile = null;
-
-    async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
-        const writer = fs.createWriteStream(destPath);
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'stream',
-            timeout: 600000,
-            signal
-        });
-        const totalLength = response.headers['content-length'];
-        let downloaded = 0;
-        let speedCheckInterval = null;
-        let lastDownloaded = 0;
-        let lastCheckTime = Date.now();
-        let slowSpeedNotified = false;
-        
-        speedCheckInterval = setInterval(() => {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastCheckTime) / 1000;
-            const bytesDiff = downloaded - lastDownloaded;
-            const speedBps = bytesDiff / timeDiff;
-            const speedKbps = speedBps / 1024;
-            
-            logToFile(`[Maven下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
-            
-            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
-                slowSpeedNotified = true;
-                mainWindow.webContents.send('download-speed-warning', {
-                    type: 'maven',
-                    speed: speedKbps.toFixed(2),
-                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
-                });
-            }
-            
-            lastDownloaded = downloaded;
-            lastCheckTime = currentTime;
-        }, 3000);
-        
-        response.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress && totalLength) {
-                onProgress(downloaded / totalLength);
-            }
-        });
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => {
-                clearInterval(speedCheckInterval);
-                resolve();
-            });
-            writer.on('error', (err) => {
-                clearInterval(speedCheckInterval);
-                reject(err);
-            });
-            signal.addEventListener('abort', () => {
-                clearInterval(speedCheckInterval);
-                writer.destroy();
-                reject(new Error('下载已取消'));
-            });
-        });
-    }
-
-    function installZip(zipPath, installDir) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (fs.existsSync(installDir)) {
-                    fs.rmSync(installDir, {recursive: true, force: true});
-                    logToFile(`已删除旧目录: ${installDir}`);
-                }
-                fs.mkdirSync(installDir, {recursive: true});
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(installDir, true);
-                const extracted = fs.readdirSync(installDir);
-                const mavenSubDir = extracted.find(name => name.startsWith('apache-maven-'));
-                if (mavenSubDir) {
-                    const subPath = path.join(installDir, mavenSubDir);
-                    const files = fs.readdirSync(subPath);
-                    for (const file of files) {
-                        const src = path.join(subPath, file);
-                        const dest = path.join(installDir, file);
-                        fs.renameSync(src, dest);
-                    }
-                    fs.rmdirSync(subPath);
-                }
-                logToFile(`解压成功: ${zipPath} -> ${installDir}`);
-                resolve();
-            } catch (err) {
-                logToFile(`解压失败: ${err.message}`);
-                reject(err);
-            }
-        });
-    }
-
-    function setSystemEnvVariable(name, value) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
-            logToFile(`执行 setx: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (error, stdout, stderr) => {
-                if (error) {
-                    logToFile(`setx 失败: ${stderr || error.message}`);
-                    reject(new Error(`设置系统变量失败: ${stderr || error.message}`));
-                } else {
-                    logToFile(`setx 成功: ${name}=${value}`);
-                    const psRefresh = `$env:${name} = "${value}"`;
-                    exec(`powershell -NoProfile -Command "${psRefresh.replace(/"/g, '\\"')}"`, (err) => {
-                        if (err) logToFile(`刷新当前进程 ${name} 失败: ${err.message}`);
-                        resolve();
-                    });
-                }
-            });
-        });
-    }
-
-    function removeSystemEnvVariable(name) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" ""`;
-            exec(setxCmd, {windowsHide: true}, (error) => {
-                if (error) reject(error);
-                else resolve();
-            });
-        });
-    }
-
-    async function getSystemPath() {
-        try {
-            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-            const {stdout} = await execPromise(regCmd);
-            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-            if (match && match[1]) return match[1].trim();
-        } catch (err) {
-        }
-        return '';
-    }
-
-    function setPathForMaven() {
-        return new Promise(async (resolve, reject) => {
-            const targetEntry = `%MAVEN_HOME%\\bin`;
-            const currentPath = await getSystemPath();
-            const parts = currentPath.split(';');
-            const newParts = [];
-            for (const p of parts) {
-                if (!/^%MAVEN_HOME%\\bin$/i.test(p)) {
-                    newParts.push(p);
-                }
-            }
-            newParts.unshift(targetEntry);
-            const newPath = newParts.join(';');
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-            logToFile(`执行 setx PATH: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (err) => {
-                if (err) {
-                    reject(new Error(`设置 PATH 失败: ${err.message}`));
-                } else {
-                    logToFile(`PATH 设置成功: ${newPath}`);
-                    resolve();
-                }
-            });
-        });
-    }
-
-    async function refreshCurrentProcessEnv() {
-        try {
-            const systemPath = await getSystemPath();
-            let expandedPath = systemPath;
-            // 展开 %MAVEN_HOME% 等变量
-            if (process.env.MAVEN_HOME) {
-                expandedPath = expandedPath.replace(/%MAVEN_HOME%/g, process.env.MAVEN_HOME);
-            }
-            expandedPath = expandedPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            process.env.Path = expandedPath;
-        } catch (err) {
-            logToFile(`刷新环境变量失败: ${err.message}`);
-        }
-    }
-
-    // 获取当前系统默认的 JDK 路径（用于设置 JAVA_HOME）
-    async function getCurrentJavaHome() {
-        // 优先从 PATH 中的 java.exe 解析
-        try {
-            const {stdout} = await execPromise('where java', {shell: true});
-            const javaPath = stdout.split('\r\n')[0];
-            if (javaPath && fs.existsSync(javaPath)) {
-                let javaHome = path.dirname(path.dirname(javaPath));
-                if (fs.existsSync(path.join(javaHome, 'bin', 'java.exe'))) {
-                    return javaHome;
-                }
-            }
-        } catch (err) {
-        }
-        // 扫描常见 JDK 目录
-        const commonJdkPaths = [
-            'C:\\Program Files\\Java',
-            'C:\\Program Files\\Eclipse Adoptium',
-            'C:\\Program Files\\OpenJDK'
-        ];
-        for (const base of commonJdkPaths) {
-            if (fs.existsSync(base)) {
-                const dirs = fs.readdirSync(base);
-                for (const dir of dirs) {
-                    const javaExe = path.join(base, dir, 'bin', 'java.exe');
-                    if (fs.existsSync(javaExe)) {
-                        return path.join(base, dir);
-                    }
-                }
-            }
+    // Maven 运行必须能找到 JDK：优先用沙箱里当前激活的 JDK
+    function resolveJavaHome() {
+        const activeJdk = sandbox.getActiveDir('jdk');
+        if (activeJdk && fs.existsSync(path.join(activeJdk, 'bin', 'java.exe'))) return activeJdk;
+        if (process.env.JAVA_HOME && fs.existsSync(path.join(process.env.JAVA_HOME, 'bin', 'java.exe'))) {
+            return process.env.JAVA_HOME;
         }
         return null;
     }
 
-    async function checkJDK() {
-        // 直接执行 java -version 检查是否可用
+    // 写入阿里云镜像，制品只从阿里云公共仓库拉取，避免直连中央仓库被墙
+    function ensureAliyunSettings(installPath) {
+        const confDir = path.join(installPath, 'conf');
+        const settingsPath = path.join(confDir, 'settings.xml');
+        const content = [
+            '<?xml version="1.0" encoding="UTF-8"?>',
+            '<settings xmlns="http://maven.apache.org/SETTINGS/1.0.0"',
+            '          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"',
+            '          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.0.0 https://maven.apache.org/xsd/settings-1.0.0.xsd">',
+            '  <mirrors>',
+            '    <mirror>',
+            '      <id>aliyun-public</id>',
+            '      <name>Aliyun Public Repository</name>',
+            '      <url>https://maven.aliyun.com/repository/public</url>',
+            '      <mirrorOf>central</mirrorOf>',
+            '    </mirror>',
+            '  </mirrors>',
+            '</settings>',
+            ''
+        ].join('\n');
         try {
-            const {stdout, stderr} = await execPromise('java -version 2>&1', {shell: true});
-            const output = stdout + stderr;
-            if (output.includes('version') || output.includes('java version')) return true;
+            fs.mkdirSync(confDir, {recursive: true});
+            fs.writeFileSync(settingsPath, content, 'utf8');
+            return settingsPath;
         } catch (err) {
+            logToFile(`写入 Maven 阿里云镜像配置失败: ${err.message}`);
+            return null;
         }
-        // 备用：扫描目录
-        const javaHome = await getCurrentJavaHome();
-        return javaHome !== null;
     }
 
-    async function isMavenInstalled() {
-        // 获取 JAVA_HOME 路径
-        const javaHome = await getCurrentJavaHome();
+    async function probeMaven(dir) {
+        const mvnCmd = path.join(dir, 'bin', 'mvn.cmd');
+        if (!fs.existsSync(mvnCmd)) return null;
         const env = {...process.env};
-        if (javaHome) {
-            env.JAVA_HOME = javaHome;
-        }
-
-        // 优先检查工具箱默认安装路径
-        const defaultMvnCmd = path.join(MAVEN_INSTALL_DIR, 'bin', 'mvn.cmd');
-        if (fs.existsSync(defaultMvnCmd)) {
-            try {
-                const {stdout} = await execPromise(`"${defaultMvnCmd}" --version`, {shell: true, env});
-                if (stdout.includes('Apache Maven')) {
-                    const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
-                    return {installed: true, version: versionMatch ? versionMatch[1] : ''};
-                }
-            } catch (err) {
-                logToFile(`执行默认 Maven 失败: ${err.message}`);
-            }
-        }
-
-        // 检查用户自定义路径 E:\develop\maven
-        const userMavenHome = 'E:\\develop\\maven';
-        const mvnCmdUser = path.join(userMavenHome, 'bin', 'mvn.cmd');
-        if (fs.existsSync(mvnCmdUser)) {
-            try {
-                const {stdout} = await execPromise(`"${mvnCmdUser}" --version`, {shell: true, env});
-                if (stdout.includes('Apache Maven')) {
-                    const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
-                    return {installed: true, version: versionMatch ? versionMatch[1] : ''};
-                }
-            } catch (err) {
-                logToFile(`执行 ${mvnCmdUser} 失败: ${err.message}`);
-            }
-        }
-
-        // 尝试依赖 PATH 的 mvn --version
+        const javaHome = resolveJavaHome();
+        if (javaHome) env.JAVA_HOME = javaHome;
+        ensureAliyunSettings(dir);
         try {
-            const {stdout} = await execPromise('mvn --version', {shell: true, env});
-            if (stdout.includes('Apache Maven')) {
-                const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
-                return {installed: true, version: versionMatch ? versionMatch[1] : ''};
-            }
+            const {stdout} = await execPromise(`"${mvnCmd}" --version`, {shell: true, env});
+            if (!stdout.includes('Apache Maven')) return null;
+            const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
+            return versionMatch ? versionMatch[1] : '';
         } catch (err) {
-            logToFile(`mvn --version 执行失败: ${err.message}`);
+            logToFile(`执行 ${mvnCmd} 失败: ${err.message}`);
+            return null;
         }
-
-        // 检查环境变量 MAVEN_HOME
-        const mavenHome = process.env.MAVEN_HOME;
-        if (mavenHome && fs.existsSync(path.join(mavenHome, 'bin', 'mvn.cmd'))) {
-            try {
-                const {stdout} = await execPromise(`"${path.join(mavenHome, 'bin', 'mvn.cmd')}" --version`, {
-                    shell: true,
-                    env
-                });
-                if (stdout.includes('Apache Maven')) {
-                    const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
-                    return {installed: true, version: versionMatch ? versionMatch[1] : ''};
-                }
-            } catch (err) {
-            }
-        }
-
-        const commonPaths = [
-            'C:\\Program Files\\Maven',
-            'C:\\maven',
-            path.join(process.env.USERPROFILE, 'maven')
-        ];
-        for (const dir of commonPaths) {
-            const mvnCmd = path.join(dir, 'bin', 'mvn.cmd');
-            if (fs.existsSync(mvnCmd)) {
-                try {
-                    const {stdout} = await execPromise(`"${mvnCmd}" --version`, {shell: true, env});
-                    if (stdout.includes('Apache Maven')) {
-                        const versionMatch = stdout.match(/Apache Maven (\d+\.\d+\.\d+)/);
-                        return {installed: true, version: versionMatch ? versionMatch[1] : ''};
-                    }
-                } catch (err) {
-                }
-            }
-        }
-
-        return {installed: false, version: ''};
     }
 
     ipcMain.on('cancel-maven-download', () => {
@@ -345,38 +88,52 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
         }
     });
 
-    ipcMain.handle('import-local-maven', async (event, filePath) => {
-        const ext = path.extname(filePath).toLowerCase();
-        if (ext !== '.zip') return {success: false, message: '只支持 .zip 文件'};
-        const fileName = path.basename(filePath);
-        const destPath = path.join(downloadDir, fileName);
-        fs.copyFileSync(filePath, destPath);
-        pendingLocalFile = destPath;
-        return {success: true, message: 'Maven 安装包已导入，点击“开始安装”完成配置'};
-    });
+    function resolveVersionEntry(mavenConfig, version) {
+        const list = (mavenConfig && mavenConfig.versions) || {};
+        if (version && list[version]) return {version, url: list[version].url};
+        const fallbackVersion = (mavenConfig && mavenConfig.version) || '3.9.16';
+        if (list[fallbackVersion]) return {version: fallbackVersion, url: list[fallbackVersion].url};
+        return {version: fallbackVersion, url: mavenConfig && mavenConfig.url};
+    }
 
-    ipcMain.handle('install-maven', async (event, useLocal = false) => {
-        const jdkOk = await checkJDK();
-        if (!jdkOk) {
-            return {success: false, message: '未检测到 JDK，请先安装 JDK 后再安装 Maven'};
-        }
-        
-        // 从配置获取 Maven 下载信息
+    ipcMain.handle('install-maven', async (event, version) => {
         const mavenConfig = getMavenConfig();
         if (!mavenConfig) {
             return {success: false, message: '无法获取 Maven 配置'};
         }
-        
-        const installerPath = useLocal ? pendingLocalFile : path.join(downloadDir, 'maven.zip');
-        if (!useLocal && !fs.existsSync(installerPath)) {
-            const sendProgress = (progress, stage = '') => {
-                mainWindow.webContents.send('maven-progress', {type: 'maven', progress, stage});
+        const target = resolveVersionEntry(mavenConfig, version);
+        if (!target.url) {
+            return {success: false, message: `没有找到 Maven ${target.version} 的下载地址`};
+        }
+        // 沙箱模式：统一装到 %LOCALAPPDATA%\Muling\env\maven\maven-<version>
+        const installPath = sandbox.installDir('maven', target.version);
+
+        const installerPath = path.join(downloadDir, `maven-${target.version}.zip`);
+        if (!fs.existsSync(installerPath)) {
+            const sendProgress = (progress, stage = '', meta = {}) => {
+                mainWindow.webContents.send('maven-progress', {
+                    type: 'maven',
+                    progress,
+                    stage,
+                    speed: meta.speed || 0,
+                    eta: typeof meta.eta === 'number' ? meta.eta : null,
+                    received: meta.received || 0,
+                    total: meta.total || null,
+                });
             };
             const abortController = new AbortController();
             currentAbortController = abortController;
             try {
                 sendProgress(0, '下载安装包');
-                await downloadFile(mavenConfig.url, installerPath, (p) => sendProgress(p * 0.5, '下载安装包'), abortController.signal, true);
+                await downloadFile({
+                    url: target.url,
+                    destPath: installerPath,
+                    signal: abortController.signal,
+                    onProgress: (info) => sendProgress((info.percent ?? 0) * 0.5, info.retrying ? `网络中断，正在重试（${info.attempt}/3）` : '下载安装包', info),
+                    log: logToFile,
+                    label: 'Maven下载',
+                    timeout: 600000,
+                });
                 sendProgress(0.5, '解压中');
             } catch (err) {
                 if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
@@ -386,76 +143,74 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
                 if (currentAbortController === abortController) currentAbortController = null;
             }
         }
-        if (useLocal && !pendingLocalFile) {
-            return {success: false, message: '没有已导入的 Maven 安装包，请先导入'};
-        }
-        const zipPath = useLocal ? pendingLocalFile : installerPath;
-        // 展开环境变量（如 %USERPROFILE%）
-        let installPath = mavenConfig.installDir || MAVEN_INSTALL_DIR;
-        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
         try {
             const sendProgress = (progress, stage = '') => {
                 mainWindow.webContents.send('maven-progress', {type: 'maven', progress, stage});
             };
-            
+
             sendProgress(0.5, '解压中');
-            await installZip(zipPath, installPath);
-            sendProgress(0.8, '配置环境变量');
-            await setSystemEnvVariable('MAVEN_HOME', installPath);
-            await setPathForMaven();
-            // 刷新当前进程环境变量
-            await refreshCurrentProcessEnv();
-            // 延迟确保系统环境生效
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await installZip(installerPath, installPath, {log: logToFile, flattenPrefix: 'apache-maven-', onProgress: zipProgress(sendProgress, 0.5, 0.78)});
+            sendProgress(0.8, '配置阿里云镜像');
+            ensureAliyunSettings(installPath);
+            sendProgress(0.9, '加入沙箱环境');
+            sandbox.register('maven', target.version, installPath, {activate: true});
             sendProgress(1, '安装完成');
-            if (!useLocal && fs.existsSync(installerPath)) {
+            mainWindow.webContents.send('maven-changed');
+            return {success: true, version: target.version, message: 'Maven ' + target.version + ' 安装成功，可在「沐柠环境终端」中直接使用 mvn'};
+        } catch (err) {
+            logToFile(`安装失败: ${err.message}`);
+            return {success: false, message: `安装失败: ${err.message}`};
+        } finally {
+            if (fs.existsSync(installerPath)) {
                 try {
                     fs.unlinkSync(installerPath);
                 } catch (e) {
                 }
             }
-            if (useLocal && pendingLocalFile) {
-                try {
-                    fs.unlinkSync(pendingLocalFile);
-                } catch (e) {
-                }
-                pendingLocalFile = null;
-            }
-            mainWindow.webContents.send('maven-changed');
-            return {success: true, message: 'Maven 安装成功'};
-        } catch (err) {
-            logToFile(`安装失败: ${err.message}`);
-            // 检查是否是权限错误
-            if (err.code === 'EPERM' || err.code === 'EACCES') {
-                return {
-                    success: false,
-                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
-                };
-            }
-            return {success: false, message: `安装失败: ${err.message}`};
         }
     });
 
     ipcMain.handle('check-maven', async () => {
-        const {installed, version} = await isMavenInstalled();
-        return {installed, version};
+        const items = sandbox.listInstalled('maven');
+        const activeDir = sandbox.getActiveDir('maven');
+        let version = '';
+        if (activeDir) {
+            const probed = await probeMaven(activeDir);
+            if (probed !== null) version = probed;
+        }
+        return {
+            installed: items.length > 0 || Boolean(version),
+            version,
+            versions: items.map(item => item.version),
+            default: sandbox.getActive('maven'),
+            items
+        };
     });
 
-    ipcMain.handle('uninstall-maven', async () => {
+    ipcMain.handle('switch-maven', async (event, version) => {
         try {
-            const mavenConfig = getMavenConfig();
-            const installPath = mavenConfig ? (mavenConfig.installDir || 'C:\\Program Files\\Maven') : 'C:\\Program Files\\Maven';
-            if (fs.existsSync(installPath)) {
-                fs.rmSync(installPath, {recursive: true, force: true});
+            if (!version) return {success: false, message: '没有指定要切换的版本'};
+            const dir = sandbox.installDir('maven', version);
+            if (!fs.existsSync(path.join(dir, 'bin', 'mvn.cmd'))) {
+                return {success: false, message: `Maven ${version} 的安装目录不完整`};
             }
-            await removeSystemEnvVariable('MAVEN_HOME');
-            const currentPath = await getSystemPath();
-            const parts = currentPath.split(';');
-            const newParts = parts.filter(p => !/^%MAVEN_HOME%\\bin$/i.test(p));
-            const newPath = newParts.join(';');
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-            await execPromise(setxCmd);
-            await refreshCurrentProcessEnv();
+            ensureAliyunSettings(dir);
+            sandbox.setActive('maven', version);
+            mainWindow.webContents.send('maven-changed');
+            return {success: true, message: `已切换到 Maven ${version}`};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('uninstall-maven', async (event, version) => {
+        try {
+            const target = version || sandbox.getActive('maven');
+            const dir = target ? sandbox.installDir('maven', target) : sandbox.getActiveDir('maven');
+            if (dir && fs.existsSync(dir)) {
+                fs.rmSync(dir, {recursive: true, force: true});
+            }
+            if (target) sandbox.unregister('maven', target);
             mainWindow.webContents.send('maven-changed');
             return {success: true, message: 'Maven 已卸载'};
         } catch (err) {

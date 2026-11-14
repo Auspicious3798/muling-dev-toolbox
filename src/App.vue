@@ -1,5 +1,5 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'is-maximized': isMaximized }">
     <!-- 全局扫描遮罩 -->
     <transition name="scan-overlay">
       <div v-if="showScanOverlay" class="global-scan-overlay">
@@ -26,13 +26,14 @@
     <div class="right-panel">
       <div class="window-controls">
         <div class="control-btn" @click="minimizeWindow">─</div>
-        <div class="control-btn" @click="maximizeWindow">□</div>
         <div class="control-btn close-btn" @click="closeWindow">✕</div>
       </div>
       <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
       <Settings v-else-if="activeTool === 'settings'"/>
-      <ProductIntro v-else-if="activeTool === 'product'"/>
-      <AboutLemon v-else-if="activeTool === 'about'"/>
+      <div v-else-if="activeTool === 'about' || activeTool === 'product'" class="merged-page">
+        <ProductIntro/>
+        <AboutLemon/>
+      </div>
       <AIAssistant v-else-if="activeTool === 'ai-assistant'"/>
       <NginxManager v-else-if="activeTool === 'nginx'" @install="openDrawer"/>
       <ComingSoon v-else-if="isComingSoon(activeTool)" :tool="activeTool"/>
@@ -43,6 +44,8 @@
         :tool="activeTool"
         @installed="onInstalled"
     />
+    <TerminalPanel v-if="terminalOpen" :focus="terminalFocus" @close="terminalOpen = false"/>
+    <LemonToast/>
   </div>
 </template>
 
@@ -57,6 +60,8 @@ import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import NginxManager from './components/NginxManager.vue';
 import ProductIntro from './components/ProductIntro.vue';
+import TerminalPanel from './components/TerminalPanel.vue';
+import LemonToast from './components/LemonToast.vue';
 import eventBus from './eventBus';
 import '@/styles/theme.css';
 
@@ -73,34 +78,105 @@ export default {
     Settings,
     NginxManager,
     ProductIntro,
+    TerminalPanel,
+    LemonToast,
   },
   data() {
     return {
       activeTool: 'dashboard',
       drawerVisible: false,
+      terminalOpen: false,
+      terminalFocus: null,
       showScanOverlay: false,
       scanningTool: '',
+      isMaximized: false,
+      unsubscribeMaximized: null,
     };
   },
   mounted() {
     this.initTheme();
+    this.syncCloseBehavior();
+    this.syncWindowState();
     eventBus.on('theme-change', this.handleThemeChange);
     eventBus.on('scan-start', this.handleScanStart);
     eventBus.on('scan-end', this.handleScanEnd);
     eventBus.on('navigate:settings', this.handleNavigateToSettings);
+    eventBus.on('terminal:open', this.openTerminalPanel);
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
+    setTimeout(() => this.restoreServices(), 1800);
   },
   beforeUnmount() {
+    if (typeof this.unsubscribeMaximized === 'function') this.unsubscribeMaximized();
     eventBus.off('theme-change', this.handleThemeChange);
     eventBus.off('scan-start', this.handleScanStart);
     eventBus.off('scan-end', this.handleScanEnd);
     eventBus.off('navigate:settings', this.handleNavigateToSettings);
+    eventBus.off('terminal:open', this.openTerminalPanel);
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
+    async restoreServices() {
+      if (!window.electronAPI || !window.electronAPI.getServiceState) return;
+      let settings = {};
+      try {
+        settings = JSON.parse(localStorage.getItem('toolbox_settings') || '{}') || {};
+      } catch (err) {
+        settings = {};
+      }
+      if (settings.autoRestoreServices === false) return;
+      try {
+        const state = await window.electronAPI.getServiceState();
+        const services = (state && state.success && state.services) || {};
+        const starters = {
+          mysql: window.electronAPI.startMySQLService,
+          redis: window.electronAPI.startRedisService,
+          nginx: window.electronAPI.startNginx
+        };
+        const labels = {mysql: 'MySQL', redis: 'Redis', nginx: 'Nginx'};
+        const started = [];
+        for (const tool of Object.keys(starters)) {
+          if (!services[tool] || typeof starters[tool] !== 'function') continue;
+          try {
+            const res = await starters[tool]();
+            if (res && res.success) started.push(labels[tool]);
+          } catch (err) {}
+        }
+        if (started.length && window.Lemon) {
+          window.Lemon.success(`${started.join('、')} 已经按上次的状态帮你启动好啦～`);
+        }
+      } catch (err) {}
+    },
     handleToolSelect(toolId) {
+      this.terminalOpen = false;
       this.activeTool = toolId;
       this.drawerVisible = false;
+    },
+    syncCloseBehavior() {
+      if (!window.electronAPI || !window.electronAPI.setCloseBehavior) return;
+      let behavior = 'tray';
+      try {
+        const stored = localStorage.getItem('toolbox_settings');
+        if (stored) {
+          const settings = JSON.parse(stored);
+          if (settings.closeBehavior === 'exit') behavior = 'exit';
+        }
+      } catch (err) {
+      }
+      window.electronAPI.setCloseBehavior(behavior);
+    },
+    syncWindowState() {
+      if (!window.electronAPI || !window.electronAPI.onWindowMaximized) return;
+      this.unsubscribeMaximized = window.electronAPI.onWindowMaximized((maximized) => {
+        this.isMaximized = Boolean(maximized);
+      });
+    },
+    openTerminalPanel(payload) {
+      if (payload && payload.tool && payload.version) {
+        this.terminalFocus = { tool: payload.tool, version: payload.version };
+      } else {
+        this.terminalFocus = null;
+      }
+      this.terminalOpen = true;
     },
     openDrawer() {
       this.drawerVisible = true;
@@ -128,7 +204,7 @@ export default {
       }, 1000);
     },
     isComingSoon(tool) {
-      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'about', 'product', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'gradle', 'uv', 'nodejs', 'about', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
       return !implemented.includes(tool);
     },
     applyTheme(theme) {
@@ -140,12 +216,12 @@ export default {
       if (isDark) {
         document.documentElement.classList.add('dark');
         document.documentElement.classList.remove('light');
-        document.body.style.backgroundColor = '#0b1120';
+        document.body.style.backgroundColor = '';
         document.body.style.color = '#f1f5f9';
       } else {
         document.documentElement.classList.remove('dark');
         document.documentElement.classList.add('light');
-        document.body.style.backgroundColor = '#f1f5f9';
+        document.body.style.backgroundColor = '';
         document.body.style.color = '#0f172a';
       }
       localStorage.setItem('theme', theme);
@@ -185,9 +261,6 @@ export default {
     minimizeWindow() {
       if (window.electronAPI) window.electronAPI.minimizeWindow();
     },
-    maximizeWindow() {
-      if (window.electronAPI) window.electronAPI.maximizeWindow();
-    },
     closeWindow() {
       if (window.electronAPI) window.electronAPI.closeWindow();
     },
@@ -223,46 +296,67 @@ body {
   font-size: 14px;
   line-height: 1.6;
   overflow: hidden;
-  background-color: var(--bg-primary);
+  background-color: transparent;
   color: var(--text-primary);
   transition: background-color var(--transition-slow), color var(--transition-slow);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Minimal Scrollbar ── */
+/* ── Scrollbars hidden (wheel / trackpad still scrolls) ── */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  scrollbar-width: none;
 }
 *::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-*::-webkit-scrollbar-track {
-  background: var(--scrollbar-track);
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--scrollbar-thumb);
-  border-radius: 3px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--border-dark);
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 /* ── Layout ── */
 .app-layout {
+  position: relative;
   display: flex;
   height: 100vh;
   width: 100vw;
+  overflow: hidden;
+  border-radius: 16px;
+  background-color: var(--bg-primary);
+  background-image: var(--window-sheen);
+  box-shadow: var(--glass-depth);
+  transition: border-radius var(--transition-fast);
+}
+
+.app-layout > * {
+  position: relative;
+  z-index: 1;
+}
+
+.app-layout.is-maximized {
+  border-radius: 0;
 }
 
 .right-panel {
   flex: 1;
   overflow-y: auto;
   padding: var(--space-6);
-  background-color: var(--bg-primary);
+  background-color: transparent;
   position: relative;
+}
+
+/* ── 产品介绍 + 关于沐柠 合并页 ── */
+.merged-page {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.merged-page > * {
+  height: auto;
+  overflow: visible;
+}
+
+.merged-page > * + * {
+  margin-top: var(--space-6);
 }
 
 /* ── Window Controls ── */
@@ -323,10 +417,12 @@ body {
   align-items: center;
   gap: 24px;
   padding: 48px 64px;
-  background: var(--bg-card);
-  border-radius: var(--radius-xl);
-  box-shadow: var(--shadow-xl);
-  border: 1px solid var(--border-light);
+  background: var(--glass-tint-strong);
+  border-radius: var(--glass-radius-lg);
+  box-shadow: var(--glass-shadow-float);
+  border: 1px solid var(--glass-stroke);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
 }
 
 .scan-spinner {

@@ -2,12 +2,15 @@ const {ipcMain} = require('electron');
 const path = require('path');
 const fs = require('fs');
 const {exec} = require('child_process');
-const axios = require('axios');
 const https = require('https');
-const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
 const configManager = require('../configManager.cjs');
+const {createLogger} = require('../utils/logger.cjs');
+const {downloadFile} = require('../utils/download.cjs');
+const {installZip, zipProgress} = require('../utils/zip.cjs');
+const sandbox = require('../utils/sandbox.cjs');
+const portUtils = require('../utils/port.cjs');
 
 const httpsAgent = new https.Agent({rejectUnauthorized: false});
 
@@ -17,124 +20,35 @@ module.exports = function registerNginxHandlers(mainWindow, userDataPath) {
 
     const logFile = path.join(userDataPath, 'nginx_install.log');
     const DEFAULT_INSTALL_DIR = path.join(userDataPath, 'nginx');
+    const logToFile = createLogger(logFile);
 
     function getNginxConfig() {
         const config = configManager.getToolConfig('nginx');
         if (!config) {
             logToFile('警告：无法获取 Nginx 配置，使用默认配置');
-            // 返回默认配置作为后备
+            // 返回默认配置作为后备（沙箱路径，不写死 Program Files）
             return {
                 version: '1.26.3',
-                installDir: 'C:\\Program Files\\muling\\muling-env-box\\Nginx',
-                url: '{mirror}https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v6.0.0/nginx-1.26.3.zip',
+                installDir: sandbox.installDir('nginx', '1.26.3'),
+                url: 'https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v6.0.0/nginx-1.26.3.zip',
                 type: 'zip'
             };
         }
-        logToFile(`成功获取 Nginx 配置，installDir: ${config.installDir}`);
+        logToFile(`成功获取 Nginx 配置，installDir: ${resolveNginxDir(config)}`);
         return config;
     }
 
-    function logToFile(message) {
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
+    // 沙箱模式：Nginx 装在 %LOCALAPPDATA%\Muling\env\nginx\nginx-<version>
+    function resolveNginxDir(nginxConfig) {
+        const active = sandbox.getActiveDir('nginx');
+        if (active && fs.existsSync(path.join(active, 'nginx.exe'))) return active;
+        const installed = sandbox.listInstalled('nginx');
+        if (installed.length > 0) return installed[0].dir;
+        const version = (nginxConfig && nginxConfig.version) || '1.26.3';
+        return sandbox.installDir('nginx', version);
     }
 
     let currentAbortController = null;
-    let pendingLocalFile = null;
-
-    async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
-        const writer = fs.createWriteStream(destPath);
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'stream',
-            timeout: 600000,
-            signal,
-            httpsAgent: httpsAgent
-        });
-        const totalLength = response.headers['content-length'];
-        let downloaded = 0;
-        let speedCheckInterval = null;
-        let lastDownloaded = 0;
-        let lastCheckTime = Date.now();
-        let slowSpeedNotified = false;
-        
-        speedCheckInterval = setInterval(() => {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastCheckTime) / 1000;
-            const bytesDiff = downloaded - lastDownloaded;
-            const speedBps = bytesDiff / timeDiff;
-            const speedKbps = speedBps / 1024;
-            
-            logToFile(`[Nginx下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
-            
-            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
-                slowSpeedNotified = true;
-                mainWindow.webContents.send('download-speed-warning', {
-                    type: 'nginx',
-                    speed: speedKbps.toFixed(2),
-                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
-                });
-            }
-            
-            lastDownloaded = downloaded;
-            lastCheckTime = currentTime;
-        }, 3000);
-        
-        response.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress && totalLength) {
-                onProgress(downloaded / totalLength);
-            }
-        });
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => {
-                clearInterval(speedCheckInterval);
-                resolve();
-            });
-            writer.on('error', (err) => {
-                clearInterval(speedCheckInterval);
-                reject(err);
-            });
-            signal.addEventListener('abort', () => {
-                clearInterval(speedCheckInterval);
-                writer.destroy();
-                reject(new Error('下载已取消'));
-            });
-        });
-    }
-
-    function installZip(zipPath, installDir) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (fs.existsSync(installDir)) {
-                    fs.rmSync(installDir, {recursive: true, force: true});
-                    logToFile(`已删除旧目录: ${installDir}`);
-                }
-                fs.mkdirSync(installDir, {recursive: true});
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(installDir, true);
-                const items = fs.readdirSync(installDir);
-                const nginxSubDir = items.find(item => item.startsWith('nginx-') && fs.statSync(path.join(installDir, item)).isDirectory());
-                if (nginxSubDir) {
-                    const subPath = path.join(installDir, nginxSubDir);
-                    const files = fs.readdirSync(subPath);
-                    for (const file of files) {
-                        const src = path.join(subPath, file);
-                        const dest = path.join(installDir, file);
-                        fs.renameSync(src, dest);
-                    }
-                    fs.rmdirSync(subPath);
-                }
-                logToFile(`解压成功: ${zipPath} -> ${installDir}`);
-                resolve();
-            } catch (err) {
-                logToFile(`解压失败: ${err.message}`);
-                reject(err);
-            }
-        });
-    }
 
     async function loadSites() {
         const sitesFile = path.join(userDataPath, 'nginx_sites.json');
@@ -190,12 +104,33 @@ http {
     }
 
     async function checkPortAvailable(port, sites) {
-        try {
-            const {stdout} = await execPromise(`netstat -ano | findstr :${port}`);
-            if (stdout.trim()) return false;
-        } catch {
+        if (sites && sites.some(s => Number(s.port) === Number(port))) return false;
+        return portUtils.isPortAvailable(port);
+    }
+
+    async function ensureSitesPorts(sites) {
+        const used = new Set();
+        const changes = [];
+        const next = [];
+        for (const site of sites) {
+            const original = Number(site.port);
+            let port = original;
+            let taken = used.has(port) || !(await portUtils.isPortAvailable(port));
+            if (taken) {
+                const found = await portUtils.findAvailablePort(port);
+                if (found === null) throw new Error(`站点 ${site.name} 的端口 ${port} 不可用，且没有找到替代端口`);
+                port = found;
+                changes.push({name: site.name, from: original, to: found});
+            }
+            used.add(port);
+            next.push({...site, port});
         }
-        return !sites.some(s => s.port === port);
+        return {sites: next, changes};
+    }
+
+    function portChangeSummary(changes) {
+        if (!changes.length) return '';
+        return changes.map(c => `端口 ${c.from} 被占用，${c.name} 已改用 ${c.to}`).join('；');
     }
 
     ipcMain.on('cancel-nginx-download', () => {
@@ -205,31 +140,40 @@ http {
         }
     });
 
-    ipcMain.handle('import-local-nginx', async (event, filePath) => {
-        const ext = path.extname(filePath).toLowerCase();
-        if (ext !== '.zip') return {success: false, message: '只支持 .zip 文件'};
-        const fileName = path.basename(filePath);
-        const destPath = path.join(downloadDir, fileName);
-        fs.copyFileSync(filePath, destPath);
-        pendingLocalFile = destPath;
-        return {success: true, message: 'Nginx 安装包已导入，点击“开始安装”完成配置'};
-    });
+    function resolveNginxVersion(nginxConfig, version) {
+        const list = (nginxConfig && nginxConfig.versions) || {};
+        if (version && list[version]) return {version, url: list[version].url};
+        const fallbackVersion = (nginxConfig && nginxConfig.version) || '1.28.3';
+        if (list[fallbackVersion]) return {version: fallbackVersion, url: list[fallbackVersion].url};
+        return {version: fallbackVersion, url: nginxConfig && nginxConfig.url};
+    }
 
-    ipcMain.handle('install-nginx', async (event, useLocal = false) => {
+    ipcMain.handle('install-nginx', async (event, version) => {
         const nginxConfig = getNginxConfig();
         if (!nginxConfig) {
             return {success: false, message: '无法获取 Nginx 配置'};
         }
 
-        let mirror = configManager.getCurrentMirror ? configManager.getCurrentMirror() : 'https://ghfast.top/';
-        let downloadUrl = nginxConfig.url.replace('{mirror}', mirror);
+        const target = resolveNginxVersion(nginxConfig, version);
+        if (!target.url) {
+            return {success: false, message: `没有找到 Nginx ${target.version} 的下载地址`};
+        }
+        const downloadUrl = target.url;
 
-        const installerPath = useLocal ? pendingLocalFile : path.join(downloadDir, 'nginx.zip');
-        if (!useLocal && !fs.existsSync(installerPath)) {
-            const sendProgress = (progress, stage = '') => {
+        const installerPath = path.join(downloadDir, `nginx-${target.version}.zip`);
+        if (!fs.existsSync(installerPath)) {
+            const sendProgress = (progress, stage = '', meta = {}) => {
                 if (mainWindow && mainWindow.webContents) {
                     setImmediate(() => {
-                        mainWindow.webContents.send('nginx-progress', {type: 'nginx', progress, stage});
+                        mainWindow.webContents.send('nginx-progress', {
+                            type: 'nginx',
+                            progress,
+                            stage,
+                            speed: meta.speed || 0,
+                            eta: typeof meta.eta === 'number' ? meta.eta : null,
+                            received: meta.received || 0,
+                            total: meta.total || null,
+                        });
                     });
                 }
             };
@@ -237,7 +181,16 @@ http {
             currentAbortController = abortController;
             try {
                 sendProgress(0, '下载安装包');
-                await downloadFile(downloadUrl, installerPath, (p) => sendProgress(p * 0.5, '下载安装包'), abortController.signal, true);
+                await downloadFile({
+                    url: downloadUrl,
+                    destPath: installerPath,
+                    signal: abortController.signal,
+                    onProgress: (info) => sendProgress((info.percent ?? 0) * 0.5, info.retrying ? `网络中断，正在重试（${info.attempt}/3）` : '下载安装包', info),
+                    log: logToFile,
+                    label: 'Nginx下载',
+                    timeout: 600000,
+                    agent: httpsAgent,
+                });
                 sendProgress(0.5, '解压中');
             } catch (err) {
                 if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
@@ -247,15 +200,7 @@ http {
                 if (currentAbortController === abortController) currentAbortController = null;
             }
         }
-        if (useLocal && !pendingLocalFile) {
-            return {success: false, message: '没有已导入的 Nginx 安装包，请先导入'};
-        }
-        const zipPath = useLocal ? pendingLocalFile : installerPath;
-        let installPath = nginxConfig.installDir || DEFAULT_INSTALL_DIR;
-        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-        if (!path.isAbsolute(installPath)) {
-            installPath = path.join(userDataPath, installPath);
-        }
+        const installPath = sandbox.installDir('nginx', target.version);
         try {
             const sendProgress = (progress, stage = '') => {
                 if (mainWindow && mainWindow.webContents) {
@@ -266,30 +211,48 @@ http {
             };
             
             sendProgress(0.5, '解压中');
-            await installZip(zipPath, installPath);
+            await installZip(installerPath, installPath, {log: logToFile, flattenPrefix: 'nginx-', onProgress: zipProgress(sendProgress, 0.5, 0.78)});
             sendProgress(0.8, '生成配置');
-            const sites = await loadSites();
+            let sites = await loadSites();
+            if (sites.length === 0) {
+                const htmlDir = path.join(installPath, 'html');
+                if (!fs.existsSync(htmlDir)) fs.mkdirSync(htmlDir, {recursive: true});
+                const indexFile = path.join(htmlDir, 'index.html');
+                if (!fs.existsSync(indexFile)) {
+                    fs.writeFileSync(indexFile, '<!doctype html><meta charset="utf-8"><title>沐柠 Nginx</title><h1>Nginx 已就绪</h1>', 'utf8');
+                }
+                sites = [{name: '默认站点', path: htmlDir, port: 80}];
+            }
+            const ensured = await ensureSitesPorts(sites);
+            sites = ensured.sites;
+            await saveSites(sites);
             await generateConfig(sites, installPath);
+            sandbox.register('nginx', target.version, installPath, {activate: true});
             sendProgress(1, '安装完成');
-            if (!useLocal && fs.existsSync(installerPath)) {
+            if (fs.existsSync(installerPath)) {
                 try {
                     fs.unlinkSync(installerPath);
                 } catch (e) {
                 }
-            }
-            if (useLocal && pendingLocalFile) {
-                try {
-                    fs.unlinkSync(pendingLocalFile);
-                } catch (e) {
-                }
-                pendingLocalFile = null;
             }
             if (mainWindow && mainWindow.webContents) {
                 setImmediate(() => {
                     mainWindow.webContents.send('nginx-changed');
                 });
             }
-            return {success: true, message: 'Nginx 安装成功'};
+            const changes = ensured.changes;
+            return {
+                success: true,
+                version: target.version,
+                port: sites.length ? sites[0].port : 80,
+                defaultPort: 80,
+                portChanged: changes.length > 0,
+                ports: sites.map(s => s.port),
+                changes,
+                message: changes.length
+                    ? `Nginx 安装成功，${portChangeSummary(changes)}`
+                    : 'Nginx 安装成功',
+            };
         } catch (err) {
             logToFile(`安装失败: ${err.message}`);
             // 检查是否是权限错误
@@ -303,17 +266,9 @@ http {
         }
     });
 
-    ipcMain.handle('install-nginx-from-local', async (event) => {
-        return await ipcMain._events['install-nginx'](event, true);
-    });
-
     ipcMain.handle('check-nginx', async () => {
         const nginxConfig = getNginxConfig();
-        let installPath = nginxConfig ? (nginxConfig.installDir || DEFAULT_INSTALL_DIR) : DEFAULT_INSTALL_DIR;
-        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-        if (!path.isAbsolute(installPath)) {
-            installPath = path.join(userDataPath, installPath);
-        }
+        const installPath = resolveNginxDir(nginxConfig);
         const nginxExe = path.join(installPath, 'nginx.exe');
         const installed = fs.existsSync(nginxExe);
         let version = '';
@@ -325,28 +280,77 @@ http {
             } catch (e) {
             }
         }
-        return {installed, version};
+        const items = sandbox.listInstalled('nginx');
+        return {
+            installed,
+            version,
+            versions: items.map(item => item.version),
+            default: sandbox.getActive('nginx'),
+            items
+        };
     });
 
-    ipcMain.handle('uninstall-nginx', async () => {
+    ipcMain.handle('switch-nginx', async (event, version) => {
+        try {
+            if (!version) return {success: false, message: '没有指定要切换的版本'};
+            const dir = sandbox.installDir('nginx', version);
+            if (!fs.existsSync(path.join(dir, 'nginx.exe'))) {
+                return {success: false, message: `Nginx ${version} 的安装目录不完整`};
+            }
+            const wasRunning = await isNginxRunning();
+            if (wasRunning) {
+                const currentDir = resolveNginxDir(getNginxConfig());
+                const currentExe = path.join(currentDir, 'nginx.exe');
+                try {
+                    await execPromise(`"${currentExe}" -p "${currentDir}" -s stop`, {windowsHide: true});
+                } catch (e) {
+                    logToFile(`停止旧版本 Nginx 失败: ${e.message}`);
+                }
+            }
+            sandbox.setActive('nginx', version);
+            const sites = await loadSites();
+            await generateConfig(sites, dir);
+            if (wasRunning) {
+                try {
+                    await execPromise(`"${path.join(dir, 'nginx.exe')}" -p "${dir}"`, {windowsHide: true});
+                } catch (e) {
+                    logToFile(`启动新版本 Nginx 失败: ${e.message}`);
+                }
+            }
+            if (mainWindow && mainWindow.webContents) {
+                setImmediate(() => {
+                    mainWindow.webContents.send('nginx-changed');
+                });
+            }
+            return {success: true, message: `已切换到 Nginx ${version}`};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('uninstall-nginx', async (event, version) => {
         try {
             const nginxConfig = getNginxConfig();
-            let installPath = nginxConfig ? (nginxConfig.installDir || DEFAULT_INSTALL_DIR) : DEFAULT_INSTALL_DIR;
-            installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            if (!path.isAbsolute(installPath)) {
-                installPath = path.join(userDataPath, installPath);
-            }
-            const nginxExe = path.join(installPath, 'nginx.exe');
+            const targetVersion = version || sandbox.getActive('nginx');
+            const installPath = targetVersion
+                ? sandbox.installDir('nginx', targetVersion)
+                : resolveNginxDir(nginxConfig);
+            const isActive = !targetVersion || targetVersion === sandbox.getActive('nginx');
             const running = await isNginxRunning();
-            if (running) {
+            if (running && isActive) {
+                const nginxExe = path.join(installPath, 'nginx.exe');
                 // 添加 -p 参数，与启动时的 prefix 保持一致
                 await execPromise(`"${nginxExe}" -p "${installPath}" -s stop`, {windowsHide: true});
             }
             if (fs.existsSync(installPath)) {
                 fs.rmSync(installPath, {recursive: true, force: true});
             }
-            const sitesFile = path.join(userDataPath, 'nginx_sites.json');
-            if (fs.existsSync(sitesFile)) fs.unlinkSync(sitesFile);
+            if (targetVersion) sandbox.unregister('nginx', targetVersion);
+            const remaining = sandbox.listInstalled('nginx');
+            if (remaining.length === 0) {
+                const sitesFile = path.join(userDataPath, 'nginx_sites.json');
+                if (fs.existsSync(sitesFile)) fs.unlinkSync(sitesFile);
+            }
             if (mainWindow && mainWindow.webContents) {
                 setImmediate(() => {
                     mainWindow.webContents.send('nginx-changed');
@@ -371,16 +375,15 @@ http {
     ipcMain.handle('start-nginx', async () => {
         try {
             const nginxConfig = getNginxConfig();
-            let installPath = nginxConfig ? (nginxConfig.installDir || DEFAULT_INSTALL_DIR) : DEFAULT_INSTALL_DIR;
-            installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            if (!path.isAbsolute(installPath)) {
-                installPath = path.join(userDataPath, installPath);
-            }
+            const installPath = resolveNginxDir(nginxConfig);
             const nginxExe = path.join(installPath, 'nginx.exe');
             if (!fs.existsSync(nginxExe)) return {success: false, message: 'Nginx 未安装'};
             const running = await isNginxRunning();
             if (running) return {success: false, message: 'Nginx 已在运行'};
-            const sites = await loadSites();
+            let sites = await loadSites();
+            const ensured = await ensureSitesPorts(sites);
+            sites = ensured.sites;
+            if (ensured.changes.length) await saveSites(sites);
             await generateConfig(sites, installPath);
             
             // 使用 spawn 在 Nginx 目录下启动
@@ -405,7 +408,15 @@ http {
                 }
             }, 2000);
             
-            return {success: true, message: 'Nginx 已启动'};
+            return {
+                success: true,
+                ports: sites.map(s => s.port),
+                portChanged: ensured.changes.length > 0,
+                changes: ensured.changes,
+                message: ensured.changes.length
+                    ? `Nginx 已启动，${portChangeSummary(ensured.changes)}`
+                    : 'Nginx 已启动',
+            };
         } catch (err) {
             return {success: false, message: err.message};
         }
@@ -414,11 +425,7 @@ http {
     ipcMain.handle('stop-nginx', async () => {
         try {
             const nginxConfig = getNginxConfig();
-            let installPath = nginxConfig ? (nginxConfig.installDir || DEFAULT_INSTALL_DIR) : DEFAULT_INSTALL_DIR;
-            installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            if (!path.isAbsolute(installPath)) {
-                installPath = path.join(userDataPath, installPath);
-            }
+            const installPath = resolveNginxDir(nginxConfig);
             const nginxExe = path.join(installPath, 'nginx.exe');
             if (!fs.existsSync(nginxExe)) return {success: false, message: 'Nginx 未安装'};
             const running = await isNginxRunning();
@@ -434,11 +441,7 @@ http {
     ipcMain.handle('reload-nginx', async () => {
         try {
             const nginxConfig = getNginxConfig();
-            let installPath = nginxConfig ? (nginxConfig.installDir || DEFAULT_INSTALL_DIR) : DEFAULT_INSTALL_DIR;
-            installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-            if (!path.isAbsolute(installPath)) {
-                installPath = path.join(userDataPath, installPath);
-            }
+            const installPath = resolveNginxDir(nginxConfig);
             const nginxExe = path.join(installPath, 'nginx.exe');
             const nginxConf = path.join(installPath, 'conf', 'nginx.conf');
             
@@ -469,11 +472,7 @@ http {
         if (!nginxConfig) {
             return {success: false, message: '无法获取 Nginx 配置'};
         }
-        let installPath = nginxConfig.installDir || DEFAULT_INSTALL_DIR;
-        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-        if (!path.isAbsolute(installPath)) {
-            installPath = path.join(userDataPath, installPath);
-        }
+        const installPath = resolveNginxDir(nginxConfig);
         
         const nginxExe = path.join(installPath, 'nginx.exe');
         if (!fs.existsSync(nginxExe)) {
@@ -486,17 +485,22 @@ http {
         }
         
         let sites = await loadSites();
-        
-        // 检查端口
+
         let finalPort = port;
+        let portChanged = false;
+        let requestedPort = port;
         if (!finalPort || finalPort <= 0) {
             let candidate = 8080;
             while (!(await checkPortAvailable(candidate, sites))) candidate++;
             finalPort = candidate;
-        } else {
-            if (!(await checkPortAvailable(finalPort, sites))) {
-                return {success: false, message: `端口 ${finalPort} 已被占用或已被其他站点使用`};
+        } else if (!(await checkPortAvailable(finalPort, sites))) {
+            const found = await portUtils.findAvailablePort(Number(finalPort));
+            if (found === null) {
+                return {success: false, message: `端口 ${finalPort} 已被占用，且没有找到替代端口`};
             }
+            requestedPort = finalPort;
+            finalPort = found;
+            portChanged = true;
         }
         
         // 检查站点名称
@@ -518,7 +522,15 @@ http {
             return {success: false, message: `生成配置文件失败: ${err.message}`};
         }
         
-        return {success: true, port: finalPort};
+        return {
+            success: true,
+            port: finalPort,
+            defaultPort: requestedPort,
+            portChanged,
+            message: portChanged
+                ? `端口 ${requestedPort} 已被占用，站点已改用 ${finalPort}`
+                : undefined,
+        };
     });
 
     ipcMain.handle('delete-nginx-site', async (event, port) => {
@@ -540,11 +552,7 @@ http {
         if (!nginxConfig) {
             return {success: false, message: '无法获取 Nginx 配置'};
         }
-        let installPath = nginxConfig.installDir || DEFAULT_INSTALL_DIR;
-        installPath = installPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-        if (!path.isAbsolute(installPath)) {
-            installPath = path.join(userDataPath, installPath);
-        }
+        const installPath = resolveNginxDir(nginxConfig);
         
         const nginxExe = path.join(installPath, 'nginx.exe');
         if (!fs.existsSync(nginxExe)) {

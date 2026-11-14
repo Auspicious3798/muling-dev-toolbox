@@ -1,12 +1,14 @@
 const {ipcMain} = require('electron');
 const path = require('path');
 const fs = require('fs');
-const {exec} = require('child_process');
-const axios = require('axios');
-const AdmZip = require('adm-zip');
+const {exec, spawn} = require('child_process');
+const {createLogger} = require('../utils/logger.cjs');
+const downloadFile = require('../utils/download.cjs').downloadFile;
+const {installZip, zipProgress} = require('../utils/zip.cjs');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
 const configManager = require('../configManager.cjs');
+const sandbox = require('../utils/sandbox.cjs');
 
 module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
@@ -14,90 +16,55 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
 
     const logFile = path.join(userDataPath, 'python_install.log');
 
-    function logToFile(message) {
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-    }
+    const logToFile = createLogger(logFile);
 
     let currentAbortController = null;
-    let pendingLocalFile = null;
 
-    async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
-        const writer = fs.createWriteStream(destPath);
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'stream',
-            timeout: 600000,
-            signal
-        });
-        const totalLength = response.headers['content-length'];
-        let downloaded = 0;
-        let speedCheckInterval = null;
-        let lastDownloaded = 0;
-        let lastCheckTime = Date.now();
-        let slowSpeedNotified = false;
-        
-        speedCheckInterval = setInterval(() => {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastCheckTime) / 1000;
-            const bytesDiff = downloaded - lastDownloaded;
-            const speedBps = bytesDiff / timeDiff;
-            const speedKbps = speedBps / 1024;
-            
-            logToFile(`[Python下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
-            
-            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
-                slowSpeedNotified = true;
-                mainWindow.webContents.send('download-speed-warning', {
-                    type: 'python',
-                    speed: speedKbps.toFixed(2),
-                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
-                });
-            }
-            
-            lastDownloaded = downloaded;
-            lastCheckTime = currentTime;
-        }, 3000);
-        
-        response.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress && totalLength) onProgress(downloaded / totalLength);
-        });
-        response.data.pipe(writer);
+    /**
+     * 跑 pip 命令并把关键输出行实时推给界面，避免「安装 pip 中」长时间无反馈。
+     */
+    function runPipStreaming(command, stage) {
         return new Promise((resolve, reject) => {
-            writer.on('finish', () => {
-                clearInterval(speedCheckInterval);
-                resolve();
-            });
-            writer.on('error', (err) => {
-                clearInterval(speedCheckInterval);
+            const child = spawn(command, {shell: true, windowsHide: true});
+            let output = '';
+            let buffer = '';
+            const interesting = /^(Collecting|Installing|Successfully|Downloading|Using cached|Requirement already|Building wheel|Created wheel)/i;
+
+            const handleLine = (line) => {
+                const text = line.trim();
+                if (!text) return;
+                if (!interesting.test(text)) return;
+                const short = text.length > 46 ? text.slice(0, 46) + '…' : text;
+                stage(`安装 pip 中 · ${short}`);
+            };
+
+            const onData = (chunk) => {
+                const text = chunk.toString('utf8');
+                output += text;
+                buffer += text;
+                const lines = buffer.split(/\r?\n/);
+                buffer = lines.pop();
+                lines.forEach(handleLine);
+            };
+
+            child.stdout.on('data', onData);
+            child.stderr.on('data', onData);
+            child.on('error', (err) => reject(err));
+            child.on('close', (code) => {
+                if (buffer) handleLine(buffer);
+                if (code === 0) return resolve(output);
+                const err = new Error(output.trim() || `pip 进程退出码 ${code}`);
                 reject(err);
-            });
-            signal.addEventListener('abort', () => {
-                clearInterval(speedCheckInterval);
-                writer.destroy();
-                reject(new Error('下载已取消'));
             });
         });
     }
 
-    function installZip(zipPath, installDir) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (fs.existsSync(installDir)) fs.rmSync(installDir, {recursive: true, force: true});
-                fs.mkdirSync(installDir, {recursive: true});
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(installDir, true);
-                logToFile(`解压成功: ${zipPath} -> ${installDir}`);
-                resolve();
-            } catch (err) {
-                reject(err);
+    async function installPip(pythonExe, installDir, mirror, onStage = null) {
+        const stage = (text) => {
+            if (typeof onStage === 'function') {
+                try { onStage(text); } catch (err) { /* 忽略 */ }
             }
-        });
-    }
-
-    async function installPip(pythonExe, installDir, mirror) {
+        };
         const pythonPipVersionMap = {
             '3.5': '20.3.4',
             '3.6': '21.3.1',
@@ -162,7 +129,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
 
             logToFile(`执行 get-pip.py: ${installCmd}`);
             try {
-                await execPromise(installCmd);
+                await runPipStreaming(installCmd, stage);
             } catch (pipErr) {
                 logToFile(`get-pip.py 安装失败: ${pipErr.message}`);
                 // 检查是否是网络错误
@@ -186,7 +153,7 @@ module.exports = function registerPythonHandlers(mainWindow, userDataPath) {
             const upgradeCmd = targetPipVersion === 'latest'
                 ? `"${pythonExe}" -m pip install --upgrade pip --index-url ${mirror}`
                 : `"${pythonExe}" -m pip install pip==${targetPipVersion} --index-url ${mirror}`;
-            await execPromise(upgradeCmd);
+            await runPipStreaming(upgradeCmd, stage);
         } catch (err) {
             logToFile(`升级 pip 失败: ${err.message}`);
         }
@@ -227,278 +194,20 @@ trusted-host = ${new URL(mirror).hostname}
         logToFile(`pip 镜像源配置完成: ${mirror}`);
     }
 
-    function setSystemEnvVariable(name, value) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
-            logToFile(`执行 setx: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (error, stdout, stderr) => {
-                if (error) reject(new Error(`设置系统变量失败: ${stderr || error.message}`));
-                else {
-                    logToFile(`setx 成功: ${name}=${value}`);
-                    const psRefresh = `$env:${name} = "${value}"`;
-                    exec(`powershell -NoProfile -Command "${psRefresh.replace(/"/g, '\\"')}"`, (err) => {
-                        if (err) logToFile(`刷新当前进程 ${name} 失败: ${err.message}`);
-                        resolve();
-                    });
-                }
-            });
-        });
+    // 沙箱模式下不再改写系统变量：版本切换只更新沙箱状态
+    function findPythonHome(version) {
+        const hit = sandbox.listInstalled('python').find(item => item.version === version);
+        if (hit && fs.existsSync(hit.dir)) return hit.dir;
+        const dir = sandbox.installDir('python', version);
+        return fs.existsSync(dir) ? dir : null;
     }
 
-    function removeSystemEnvVariable(name) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" ""`;
-            exec(setxCmd, {windowsHide: true}, (error) => {
-                if (error) reject(error);
-                else resolve();
-            });
-        });
+    function getAllInstalledVersions() {
+        return sandbox.listInstalled('python').map(item => item.version);
     }
 
-    function setPathForVersion(version) {
-        return new Promise((resolve, reject) => {
-            const versionKey = version.replace(/\./g, '');
-            const targetVar = `PYTHON_HOME${versionKey}`;
-            const targetEntry = `%${targetVar}%`;
-            const scriptsEntry = `%${targetVar}%\\Scripts`;
-            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-            exec(regCmd, {windowsHide: true}, (error, stdout) => {
-                if (error) return reject(new Error('读取 PATH 失败'));
-                const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-                if (!match) return reject(new Error('无法解析 PATH'));
-                let currentPath = match[1].trim();
-                const parts = currentPath.split(';');
-                const newParts = parts.filter(p => !/^%PYTHON_HOME\d+%$/i.test(p) && !/^%PYTHON_HOME\d+%\\Scripts$/i.test(p));
-                newParts.unshift(targetEntry);
-                newParts.unshift(scriptsEntry);
-                const newPath = newParts.join(';');
-                const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-                exec(setxCmd, {windowsHide: true}, (err) => {
-                    if (err) reject(new Error('设置 PATH 失败'));
-                    else resolve();
-                });
-            });
-        });
-    }
-
-    async function getSystemPath() {
-        try {
-            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-            const {stdout} = await execPromise(regCmd);
-            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-            if (match && match[1]) return match[1].trim();
-        } catch (err) {
-        }
-        return '';
-    }
-
-    async function findPythonHomeByDigits(digits) {
-        const varName = `PYTHON_HOME${digits}`;
-        try {
-            const {stdout} = await execPromise(`echo %${varName}%`);
-            const home = stdout.trim();
-            if (home && fs.existsSync(home)) return home;
-        } catch (err) {
-        }
-        const knownDirs = [
-            'C:\\Program Files\\Python',
-            'C:\\Python',
-            'C:\\Users\\' + process.env.USERNAME + '\\Anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\anaconda3',
-            'C:\\ProgramData\\Anaconda3',
-            'C:\\ProgramData\\anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Programs\\Python',
-            'C:\\Program Files\\muling\\muling-env-box\\Python'
-        ];
-        const possibleVersions = [
-            `${digits[0]}.${digits.slice(1)}`,
-            `${digits[0]}.${digits[1]}.${digits.slice(2)}`,
-            `${digits[0]}.${digits.slice(1, 3)}.${digits.slice(3)}`
-        ];
-        for (const base of knownDirs) {
-            for (const ver of possibleVersions) {
-                const candidate = path.join(base, `python-${ver}`);
-                if (fs.existsSync(candidate) && fs.existsSync(path.join(candidate, 'python.exe'))) {
-                    return candidate;
-                }
-            }
-            if (fs.existsSync(base) && fs.existsSync(path.join(base, 'python.exe'))) {
-                return base;
-            }
-        }
-        return null;
-    }
-
-    async function getCurrentDefaultVersion() {
-        try {
-            const systemPath = await getSystemPath();
-            const versionMatch = systemPath.match(/%PYTHON_HOME(\d+)%/);
-            if (versionMatch) {
-                const digits = versionMatch[1];
-                const home = await findPythonHomeByDigits(digits);
-                if (home) {
-                    const pythonExe = path.join(home, 'python.exe');
-                    if (fs.existsSync(pythonExe)) {
-                        const env = {...process.env};
-                        if (home.toLowerCase().includes('anaconda')) {
-                            env.PYTHONHOME = home;
-                            env.PATH = `${home};${home}\\Library\\bin;${home}\\Scripts;${env.PATH || ''}`;
-                        }
-                        const {stdout, stderr} = await execPromise(`"${pythonExe}" --version 2>&1`, {env});
-                        const output = stdout + stderr;
-                        const verMatch = output.match(/Python (\d+\.\d+\.\d+)/);
-                        if (verMatch && verMatch[1]) return verMatch[1];
-                    }
-                }
-            }
-            const commonPaths = [
-                'C:\\Python',
-                'C:\\Python3',
-                'C:\\Program Files\\Python',
-                'C:\\Program Files\\Python3',
-                path.join('C:\\Users', process.env.USERNAME, 'AppData\\Local\\Programs\\Python'),
-                path.join('C:\\Users', process.env.USERNAME, 'Anaconda3'),
-                path.join('C:\\Users', process.env.USERNAME, 'anaconda3'),
-                'C:\\ProgramData\\Anaconda3',
-                'C:\\ProgramData\\anaconda3'
-            ];
-            let extraPath = '';
-            for (const dir of commonPaths) {
-                if (fs.existsSync(dir) && fs.existsSync(path.join(dir, 'python.exe'))) {
-                    extraPath += dir + ';';
-                }
-            }
-            const env = {
-                ...process.env,
-                Path: `${extraPath}${systemPath};${process.env.Path || ''}`
-            };
-            const {stdout, stderr} = await execPromise('python --version 2>&1', {env});
-            const output = stdout + stderr;
-            const fallbackMatch = output.match(/Python (\d+\.\d+\.\d+)/);
-            if (fallbackMatch && fallbackMatch[1]) return fallbackMatch[1];
-            return null;
-        } catch (err) {
-            logToFile(`获取默认版本失败: ${err.message}`);
-            return null;
-        }
-    }
-
-    async function getAllInstalledVersions() {
-        const versions = new Set();
-        try {
-            const psScript = `
-                Get-ChildItem Env: | Where-Object { $_.Name -match '^PYTHON_HOME\\d+$' } | ForEach-Object { $_.Name -replace 'PYTHON_HOME', '' }
-            `;
-            const {stdout} = await execPromise(`powershell -NoProfile -Command "${psScript.replace(/"/g, '\\"')}"`);
-            const lines = stdout.trim().split('\r\n').filter(l => l);
-            for (const digits of lines) {
-                let i = 0, parts = [];
-                if (digits.length >= 1) parts.push(digits[i++]);
-                if (digits.length >= 2) parts.push(digits[i++]);
-                parts.push(digits.slice(i));
-                versions.add(parts.join('.'));
-            }
-        } catch (err) {
-        }
-        const knownDirs = [
-            'C:\\Program Files\\Python',
-            'C:\\Python',
-            'C:\\Users\\' + process.env.USERNAME + '\\Anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\anaconda3',
-            'C:\\ProgramData\\Anaconda3',
-            'C:\\ProgramData\\anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Programs\\Python',
-            'C:\\Program Files\\Python39',
-            'C:\\Program Files\\Python310',
-            'C:\\Program Files\\Python311',
-            'C:\\Program Files\\Python312',
-            'C:\\Program Files\\Python313',
-            'C:\\Program Files\\Python314',
-            'C:\\Program Files\\muling\\muling-env-box\\Python'
-        ];
-        for (const base of knownDirs) {
-            if (fs.existsSync(base)) {
-                const pythonExe = path.join(base, 'python.exe');
-                if (fs.existsSync(pythonExe)) {
-                    try {
-                        const env = {...process.env};
-                        if (base.toLowerCase().includes('anaconda')) {
-                            env.PYTHONHOME = base;
-                            env.PATH = `${base};${base}\\Library\\bin;${base}\\Scripts;${env.PATH || ''}`;
-                        }
-                        const {stdout, stderr} = await execPromise(`"${pythonExe}" --version 2>&1`, {env});
-                        const output = stdout + stderr;
-                        const match = output.match(/Python (\d+\.\d+\.\d+)/);
-                        if (match) versions.add(match[1]);
-                    } catch (e) {
-                    }
-                }
-                const subdirs = fs.readdirSync(base);
-                for (const sub of subdirs) {
-                    const subPath = path.join(base, sub);
-                    if (fs.statSync(subPath).isDirectory() && (sub.startsWith('python-') || sub.startsWith('Python'))) {
-                        const subExe = path.join(subPath, 'python.exe');
-                        if (fs.existsSync(subExe)) {
-                            try {
-                                const env = {...process.env};
-                                if (subPath.toLowerCase().includes('anaconda')) {
-                                    env.PYTHONHOME = subPath;
-                                    env.PATH = `${subPath};${subPath}\\Library\\bin;${subPath}\\Scripts;${env.PATH || ''}`;
-                                }
-                                const {stdout, stderr} = await execPromise(`"${subExe}" --version 2>&1`, {env});
-                                const output = stdout + stderr;
-                                const match = output.match(/Python (\d+\.\d+\.\d+)/);
-                                if (match) versions.add(match[1]);
-                            } catch (e) {
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        const sortVersions = (a, b) => {
-            const aParts = a.split('.').map(Number);
-            const bParts = b.split('.').map(Number);
-            for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
-                const aNum = aParts[i] || 0;
-                const bNum = bParts[i] || 0;
-                if (aNum !== bNum) return bNum - aNum;
-            }
-            return 0;
-        };
-        return Array.from(versions).sort(sortVersions);
-    }
-
-    async function findPythonHome(version) {
-        const versionKey = version.replace(/\./g, '');
-        const varName = `PYTHON_HOME${versionKey}`;
-        try {
-            const {stdout} = await execPromise(`echo %${varName}%`);
-            const home = stdout.trim();
-            if (home && fs.existsSync(home)) return home;
-        } catch (err) {
-        }
-        const knownDirs = [
-            'C:\\Program Files\\Python',
-            'C:\\Python',
-            'C:\\Users\\' + process.env.USERNAME + '\\Anaconda3',
-            'C:\\Users\\' + process.env.USERNAME + '\\anaconda3',
-            'C:\\ProgramData\\Anaconda3',
-            'C:\\ProgramData\\anaconda3',
-            'C:\\Program Files\\muling\\muling-env-box\\Python'
-        ];
-        for (const base of knownDirs) {
-            const candidate = path.join(base, `python-${version}`);
-            if (fs.existsSync(candidate) && fs.existsSync(path.join(candidate, 'python.exe'))) return candidate;
-            if (fs.existsSync(base) && fs.existsSync(path.join(base, 'python.exe'))) {
-                try {
-                    const {stdout, stderr} = await execPromise(`"${path.join(base, 'python.exe')}" --version 2>&1`);
-                    if ((stdout + stderr).match(/Python (\d+\.\d+\.\d+)/)[1] === version) return base;
-                } catch (e) {
-                }
-            }
-        }
-        return null;
+    function getCurrentDefaultVersion() {
+        return sandbox.getActive('python');
     }
 
     ipcMain.on('cancel-python-download', () => {
@@ -508,103 +217,58 @@ trusted-host = ${new URL(mirror).hostname}
         }
     });
 
-    ipcMain.handle('import-local-python', async (event, filePath) => {
-        const ext = path.extname(filePath).toLowerCase();
-        if (ext !== '.zip') return {success: false, message: '只支持 .zip 文件'};
-        const fileName = path.basename(filePath);
-        const destPath = path.join(downloadDir, fileName);
-        fs.copyFileSync(filePath, destPath);
-        pendingLocalFile = destPath;
-        return {success: true, message: 'Python 安装包已导入，点击“开始安装”完成配置'};
-    });
-
-    ipcMain.handle('install-from-local-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
-        if (!pendingLocalFile) return {success: false, message: '没有已导入的 Python 安装包，请先导入'};
-        if (!version) return {success: false, message: '未指定 Python 版本'};
-        
-        // 获取配置中的 baseDir，与在线安装保持一致
-        const toolConfig = configManager.getToolConfig('python', version);
-        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Python';
-        
-        const zipPath = pendingLocalFile;
-        const installPath = path.join(baseDir, `python-${version}`);
-        const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
-        };
-        try {
-            sendProgress(0, '解压中');
-            await installZip(zipPath, installPath);
-            sendProgress(0.5, '安装 pip 中');
-            const pythonRoot = installPath;
-            const pythonExe = path.join(pythonRoot, 'python.exe');
-            if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
-            await installPip(pythonExe, pythonRoot, mirror);
-            sendProgress(0.8, '配置环境变量');
-            const versionKey = version.replace(/\./g, '');
-            await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
-            await setPathForVersion(version);
-            sendProgress(1, '安装完成');
-            mainWindow.webContents.send('python-changed');
-            return {success: true, message: 'Python 安装成功，pip 已配置'};
-        } catch (err) {
-            // 检查是否是权限错误
-            if (err.code === 'EPERM' || err.code === 'EACCES') {
-                return {
-                    success: false,
-                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
-                };
-            }
-            return {success: false, message: `安装失败: ${err.message}`};
-        } finally {
-            if (fs.existsSync(zipPath)) fs.unlinkSync(zipPath);
-            pendingLocalFile = null;
-        }
-    });
-
     ipcMain.handle('install-python', async (event, version, mirror = 'https://pypi.tuna.tsinghua.edu.cn/simple') => {
         // 从配置获取下载信息
         const toolConfig = configManager.getToolConfig('python', version);
         if (!toolConfig) return {success: false, message: `不支持的 Python 版本: ${version}`};
         
         const {url} = toolConfig;
-        const fileName = url.split('/').pop();
+        const fileName = url.split('/').pop().split('?')[0];
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = path.join(toolConfig.baseDir || 'C:\\Program Files\\Python', `python-${version}`);
-        const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('download-progress', {type: 'python', version, progress, stage});
+        const installPath = sandbox.installDir('python', version);
+        const sendProgress = (progress, stage = '', meta = {}) => {
+            mainWindow.webContents.send('download-progress', {
+                type: 'python',
+                version,
+                progress,
+                stage,
+                speed: meta.speed || 0,
+                eta: typeof meta.eta === 'number' ? meta.eta : null,
+                received: meta.received || 0,
+                total: meta.total || null,
+            });
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
         try {
             if (!fs.existsSync(installerPath)) {
                 sendProgress(0, '下载安装包');
-                await downloadFile(url, installerPath, (p) => sendProgress(p * 0.3, '下载安装包'), abortController.signal, true);
+                await downloadFile({
+                    url,
+                    destPath: installerPath,
+                    signal: abortController.signal,
+                    onProgress: (info) => sendProgress((info.percent ?? 0) * 0.3, info.retrying ? `网络中断，正在重试（${info.attempt}/3）` : '下载安装包', info),
+                    log: logToFile,
+                    label: 'Python下载',
+                    timeout: 600000,
+                });
                 sendProgress(0.3, '解压中');
             } else {
                 sendProgress(0.3, '解压中');
             }
-            await installZip(installerPath, installPath);
+            await installZip(installerPath, installPath, {log: logToFile, onProgress: zipProgress(sendProgress, 0.3, 0.48)});
             sendProgress(0.5, '安装 pip 中');
             const pythonRoot = installPath;
             const pythonExe = path.join(pythonRoot, 'python.exe');
             if (!fs.existsSync(pythonExe)) return {success: false, message: '未找到 python.exe'};
-            await installPip(pythonExe, pythonRoot, mirror);
-            sendProgress(0.8, '配置环境变量');
-            const versionKey = version.replace(/\./g, '');
-            await setSystemEnvVariable(`PYTHON_HOME${versionKey}`, pythonRoot);
-            await setPathForVersion(version);
+            await installPip(pythonExe, pythonRoot, mirror, (text) => sendProgress(0.55, text));
+            sendProgress(0.8, '加入沙箱环境');
+            sandbox.register('python', version, pythonRoot, {activate: true});
             sendProgress(1, '安装完成');
             mainWindow.webContents.send('python-changed');
             return {success: true, message: 'Python 安装成功，pip 已配置'};
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
-            // 检查是否是权限错误
-            if (err.code === 'EPERM' || err.code === 'EACCES') {
-                return {
-                    success: false,
-                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
-                };
-            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (currentAbortController === abortController) currentAbortController = null;
@@ -614,11 +278,14 @@ trusted-host = ${new URL(mirror).hostname}
 
     ipcMain.handle('check-python', async () => {
         try {
-            const versions = await getAllInstalledVersions();
-            const defaultVersion = await getCurrentDefaultVersion();
-            return {versions, default: defaultVersion};
+            const items = sandbox.listInstalled('python');
+            return {
+                versions: items.map(item => item.version),
+                default: sandbox.getActive('python'),
+                items
+            };
         } catch (err) {
-            return {versions: [], default: null};
+            return {versions: [], default: null, items: []};
         }
     });
 
@@ -626,7 +293,7 @@ trusted-host = ${new URL(mirror).hostname}
         try {
             const home = await findPythonHome(version);
             if (!home) return {success: false, message: `未找到 Python${version} 安装目录`};
-            await setPathForVersion(version);
+            sandbox.setActive('python', version);
             mainWindow.webContents.send('python-changed');
             return {success: true, message: `已切换到 Python ${version}`};
         } catch (err) {
@@ -638,29 +305,8 @@ trusted-host = ${new URL(mirror).hostname}
         try {
             const home = await findPythonHome(version);
             if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
-            const currentDefault = await getCurrentDefaultVersion();
-            if (currentDefault === version) {
-                const allVersions = await getAllInstalledVersions();
-                const other = allVersions.find(v => v !== version);
-                if (other) await setPathForVersion(other);
-                else {
-                    const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-                    exec(regCmd, (error, stdout) => {
-                        if (!error) {
-                            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-                            if (match) {
-                                let currentPath = match[1].trim();
-                                const parts = currentPath.split(';');
-                                const newParts = parts.filter(p => !/^%PYTHON_HOME\d+%$/i.test(p));
-                                const newPath = newParts.join(';');
-                                exec(`C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`);
-                            }
-                        }
-                    });
-                }
-            }
-            await removeSystemEnvVariable(`PYTHON_HOME${version.replace(/\./g, '')}`);
             fs.rmSync(home, {recursive: true, force: true});
+            sandbox.unregister('python', version);
             mainWindow.webContents.send('python-changed');
             return {success: true, message: `已删除 Python ${version}`};
         } catch (err) {

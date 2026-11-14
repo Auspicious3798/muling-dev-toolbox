@@ -29,6 +29,11 @@
         <span v-if="nginxInstalled" class="status-badge" :class="nginxRunning ? 'running' : 'stopped'">
           {{ nginxRunning ? '运行中' : '已停止' }}
         </span>
+        <span v-if="nginxInstalled && nginxVersions.length > 1" class="version-switch">
+          <select :value="nginxVersion" @change="switchNginxVersion($event.target.value)" :disabled="actionLoading">
+            <option v-for="v in nginxVersions" :key="v" :value="v">v{{ v }}</option>
+          </select>
+        </span>
       </div>
       <div class="nginx-global-actions">
         <button @click="refreshAll" :disabled="loading" class="refresh-btn">
@@ -120,6 +125,7 @@
 
 <script>
 import eventBus from '../eventBus';
+import Lemon from '@/utils/lemon';
 
 export default {
   name: 'NginxManager',
@@ -127,6 +133,7 @@ export default {
     return {
       nginxInstalled: false,
       nginxVersion: '',
+      nginxVersions: [],
       nginxRunning: false,
       sites: [],
       actionLoading: false,
@@ -154,14 +161,14 @@ export default {
     this.checkNginx();
     this.loadSites();
     this.checkNginxStatus();
-    setInterval(() => this.checkNginxStatus(), 3000);
     if (window.electronAPI) {
-      window.electronAPI.onNginxChanged(() => {
+      this._nginxUnsub = window.electronAPI.onNginxChanged(() => {
         this.checkNginx();
         this.loadSites();
         this.checkNginxStatus();
       });
     }
+    this._statusTimer = setInterval(() => this.checkNginxStatus(), 3000);
     // 监听全局扫描事件，实现安装后自动刷新
     eventBus.on('scan-start', async (toolLabel) => {
       if (toolLabel === 'Nginx' && !this.loading) {
@@ -183,8 +190,10 @@ export default {
     });
   },
   beforeUnmount() {
-    // 清理事件监听器，防止内存泄漏
+    // 清理事件监听器与定时器，防止内存泄漏
     eventBus.off('scan-start');
+    try { this._nginxUnsub && this._nginxUnsub(); } catch (e) {}
+    if (this._statusTimer) clearInterval(this._statusTimer);
   },
   methods: {
     openInstallDrawer() {
@@ -213,6 +222,22 @@ export default {
       const res = await window.electronAPI.checkNginx();
       this.nginxInstalled = res.installed;
       this.nginxVersion = res.version;
+      this.nginxVersions = res.versions || [];
+    },
+    async switchNginxVersion(version) {
+      if (!version || version === this.nginxVersion) return;
+      this.actionLoading = true;
+      try {
+        const res = await window.electronAPI.switchNginx(version);
+        if (res.success) Lemon.success(`Nginx 已经换到 ${version} 啦～`);
+        else Lemon.error(res.message || `切换到 ${version} 没成功`);
+      } catch (err) {
+        Lemon.error(`切换失败了：${err.message}`);
+      } finally {
+        await this.checkNginx();
+        await this.checkNginxStatus();
+        this.actionLoading = false;
+      }
     },
     async loadSites() {
       const res = await window.electronAPI.getNginxSites();
@@ -236,8 +261,13 @@ export default {
     async startNginx() {
       this.actionLoading = true;
       const res = await window.electronAPI.startNginx();
-      if (res.success) this.status = `✅ ${res.message}`;
-      else this.status = `❌ 启动失败：${res.message}`;
+      if (res.success) {
+        this.status = `✅ ${res.message}`;
+        if (res.portChanged && res.changes && res.changes.length) {
+          const first = res.changes[0];
+          Lemon.info(`默认端口 ${first.from} 被占用了，我已经帮你换到 ${first.to} 啦～`);
+        }
+      } else this.status = `❌ 启动失败：${res.message}`;
       await this.checkNginxStatus();
       this.actionLoading = false;
     },
@@ -316,7 +346,7 @@ export default {
     },
     async addSite() {
       if (!this.newSite.name || !this.newSite.path) {
-        alert('请填写网站名称和 dist 路径');
+        Lemon.error('站点名和 dist 路径都得填上，我才知道把门开在哪儿呀～');
         return;
       }
       this.addingSite = true;
@@ -342,29 +372,31 @@ export default {
             this.status = `✅ 站点已添加，端口：${res.port}。请启动 Nginx 使配置生效。`;
           }
           console.log('[NginxManager] 站点添加成功');
+          if (res.portChanged && res.defaultPort) Lemon.info(`端口 ${res.defaultPort} 被占用了，站点已改用 ${res.port} 啦～`);
+          else Lemon.success(`站点「${this.newSite.name}」开好啦，端口 ${res.port}～`);
         } else {
           if (res.message.includes('端口')) {
             this.portConflict = true;
             console.log('[NginxManager] 端口冲突');
           } else {
-            alert('添加失败：' + res.message);
+            Lemon.error('加站点没成功：' + res.message);
             console.error('[NginxManager] 添加失败:', res.message);
           }
         }
       } catch (err) {
         console.error('[NginxManager] 添加站点异常:', err);
-        alert('添加站点时发生错误：' + err.message);
+        Lemon.error('加站点时出了点岔子：' + err.message);
       } finally {
         this.addingSite = false;
       }
     },
     async updateSite() {
       if (!this.newSite.name || !this.newSite.path) {
-        alert('请填写网站名称和 dist 路径');
+        Lemon.error('站点名和 dist 路径都得填上哦～');
         return;
       }
       if (!this.originalPort) {
-        alert('错误：无法找到原始端口');
+        Lemon.error('没找到这个站点原来的端口，先刷新一下再试？');
         return;
       }
       
@@ -393,18 +425,19 @@ export default {
             this.status = `✅ 站点已更新。请启动 Nginx 使配置生效。`;
           }
           console.log('[NginxManager] 站点更新成功');
+          Lemon.success('站点配置更新好啦～');
         } else {
           if (res.message.includes('端口')) {
             this.portConflict = true;
             console.log('[NginxManager] 端口冲突');
           } else {
-            alert('更新失败：' + res.message);
+            Lemon.error('更新没成功：' + res.message);
             console.error('[NginxManager] 更新失败:', res.message);
           }
         }
       } catch (err) {
         console.error('[NginxManager] 更新站点异常:', err);
-        alert('更新站点时发生错误：' + err.message);
+        Lemon.error('更新站点时出了点岔子：' + err.message);
       } finally {
         this.addingSite = false;
       }
@@ -422,8 +455,9 @@ export default {
         } else {
           this.status = '✅ 站点已删除。请启动 Nginx 使配置生效。';
         }
+        Lemon.success('站点已经下线啦～');
       } else {
-        alert('删除失败：' + res.message);
+        Lemon.error('删除没成功：' + res.message);
       }
     }
   }
@@ -503,6 +537,21 @@ h3 {
   opacity: 0.5;
   cursor: not-allowed;
 }
+
+.version-switch select {
+  appearance: none;
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border-light);
+  background: var(--bg-solid);
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.version-switch select:hover { border-color: var(--primary); color: var(--text-primary); }
 
 .status-badge {
   padding: 4px 12px;
@@ -721,7 +770,9 @@ h3 {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
+  backdrop-filter: blur(30px) saturate(140%);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -729,9 +780,13 @@ h3 {
 }
 
 .modal {
-  background: var(--bg-modal);
+  background: var(--glass-tint-strong);
   padding: 24px;
-  border-radius: 20px;
+  border-radius: var(--glass-radius-lg);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow-float);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
   width: 450px;
 }
 

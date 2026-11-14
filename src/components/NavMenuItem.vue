@@ -20,19 +20,23 @@
       </span>
       <span class="item-label">{{ item.label }}</span>
       <span v-if="hasChildren" class="item-arrow">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <polyline :points="expanded ? '6 15 12 9 18 15' : '9 6 15 12 9 18'"></polyline>
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="9 6 15 12 9 18"></polyline>
         </svg>
       </span>
     </div>
-    <div v-if="hasChildren && expanded" class="children">
-      <NavMenuItem
-          v-for="child in item.children"
-          :key="child.id"
-          :item="child"
-          :active-id="activeId"
-          @select="handleChildSelect"
-      />
+    <div v-if="hasChildren" class="children-wrap" :class="{ open: expanded }">
+      <div class="children-inner">
+        <div class="children">
+          <NavMenuItem
+              v-for="child in item.children"
+              :key="child.id"
+              :item="child"
+              :active-id="activeId"
+              @select="handleChildSelect"
+          />
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -102,35 +106,53 @@ export default {
   padding: 9px 12px;
   margin: 2px 0;
   cursor: pointer;
-  transition: all var(--transition-fast);
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
   color: var(--text-nav);
   gap: 10px;
   border-radius: var(--radius-md);
   font-size: 0.88rem;
   position: relative;
+  overflow: hidden;
 }
 
 .menu-item:hover {
-  background-color: rgba(255, 255, 255, 0.06);
+  background-color: color-mix(in srgb, var(--text-nav-hover) 8%, transparent);
   color: var(--text-nav-hover);
 }
 
-.menu-item.active {
-  background: linear-gradient(135deg, rgba(13, 148, 136, 0.2), rgba(13, 148, 136, 0.1));
-  color: #5eead4;
-  font-weight: 600;
+.menu-item:active {
+  transform: scale(0.98);
 }
 
-.menu-item.active::before {
+.menu-item.active {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.22), rgba(13, 148, 136, 0.1));
+  color: var(--nav-active-fg);
+  font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.menu-item::before {
   content: '';
   position: absolute;
   left: 0;
   top: 50%;
-  transform: translateY(-50%);
   width: 3px;
   height: 60%;
   background: var(--primary);
   border-radius: 0 3px 3px 0;
+  transform: translateY(-50%) scaleY(0);
+  transform-origin: center;
+  opacity: 0;
+  transition: transform var(--transition-normal), opacity var(--transition-fast);
+}
+
+.menu-item.active::before {
+  transform: translateY(-50%) scaleY(1);
+  opacity: 1;
 }
 
 .menu-item.has-children {
@@ -153,6 +175,12 @@ export default {
   display: block;
   object-fit: contain;
   opacity: 0.85;
+  transition: transform var(--transition-normal), opacity var(--transition-normal);
+}
+
+.menu-item:hover .nav-icon {
+  transform: scale(1.08);
+  opacity: 1;
 }
 
 .menu-item.active .nav-icon {
@@ -161,6 +189,11 @@ export default {
 
 .nav-icon-fallback {
   font-size: 1rem;
+  transition: transform var(--transition-normal);
+}
+
+.menu-item:hover .nav-icon-fallback {
+  transform: scale(1.12);
 }
 
 .item-label {
@@ -168,23 +201,56 @@ export default {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  transition: transform var(--transition-normal);
+}
+
+.menu-item:hover .item-label {
+  transform: translateX(2px);
 }
 
 .item-arrow {
   display: flex;
   align-items: center;
   color: var(--text-nav-muted);
-  transition: color var(--transition-fast);
+  transition: color var(--transition-fast), transform var(--transition-normal);
   flex-shrink: 0;
+}
+
+.item-arrow svg {
+  transform: rotate(0deg);
+  transition: transform var(--transition-normal);
+}
+
+.menu-item.expanded .item-arrow svg {
+  transform: rotate(90deg);
 }
 
 .menu-item:hover .item-arrow {
   color: var(--text-nav);
 }
 
+.children-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows var(--transition-normal),
+    opacity var(--transition-fast);
+}
+
+.children-wrap.open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+}
+
+.children-inner {
+  overflow: hidden;
+  min-height: 0;
+}
+
 .children {
   margin-left: 8px;
   padding-left: 8px;
-  border-left: 1px solid rgba(255, 255, 255, 0.06);
+  border-left: 1px solid color-mix(in srgb, var(--text-nav-hover) 12%, transparent);
 }
 </style>

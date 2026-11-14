@@ -5,9 +5,9 @@
     <link rel="icon" href="/favicon.ico">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>沐柠环境盒</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- 不要在这里引用 fonts.googleapis.com：Electron 打包后首屏在离线/被墙环境下
+         会因为这个 render-blocking 的外链一直不绘制，表现就是整窗白屏。
+         字体走 theme.css 里的系统字体回退链。 -->
   </head>
   <body>
     <div id="app"></div>

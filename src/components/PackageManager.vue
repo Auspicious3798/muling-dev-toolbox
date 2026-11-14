@@ -157,7 +157,9 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
+  background: var(--overlay-bg);
+  backdrop-filter: blur(30px) saturate(140%);
+  -webkit-backdrop-filter: blur(30px) saturate(140%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,14 +167,17 @@ export default {
 }
 
 .package-manager {
-  background: var(--bg-card);
-  border-radius: 24px;
+  background: var(--glass-tint-strong);
+  border-radius: var(--glass-radius-lg);
+  border: 1px solid var(--glass-stroke);
+  backdrop-filter: blur(36px) saturate(180%);
+  -webkit-backdrop-filter: blur(36px) saturate(180%);
   width: 600px;
   max-width: 90%;
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--glass-shadow-float);
 }
 
 .pm-header {

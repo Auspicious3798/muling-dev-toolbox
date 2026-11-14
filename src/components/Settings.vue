@@ -15,55 +15,54 @@
         </select>
       </div>
       <div class="setting-item">
-        <label>启动时自动检查更新</label>
-        <input type="checkbox" v-model="autoCheckUpdate"/>
-      </div>
-      <div class="setting-item">
         <label>关闭按钮行为</label>
         <select v-model="closeBehavior">
           <option value="exit">退出应用</option>
           <option value="tray">最小化到系统托盘</option>
         </select>
       </div>
+      <div class="setting-item">
+        <label>开机自动启动</label>
+        <label class="switch">
+          <input type="checkbox" v-model="autoLaunch"/>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label>启动时自动恢复上次运行的服务</label>
+        <label class="switch">
+          <input type="checkbox" v-model="autoRestoreServices"/>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="setting-item">
+        <label>版本</label>
+        <div class="cache-info">
+          <span v-if="updateInfo && updateInfo.hasUpdate" class="update-hint">
+            发现新版本 {{ updateInfo.latest }}
+          </span>
+          <span v-else-if="updateInfo && updateInfo.latest" class="update-hint muted">
+            已是最新（{{ updateInfo.current }}）
+          </span>
+          <span v-else-if="updateCheckTip" class="update-hint muted">{{ updateCheckTip }}</span>
+          <button
+            v-if="updateInfo && updateInfo.hasUpdate && updateInfo.url"
+            class="download-update-btn"
+            @click="openUpdatePage"
+          >去下载</button>
+          <button @click="checkUpdate" :disabled="checkingUpdate">{{ checkingUpdate ? '检查中…' : '检查更新' }}</button>
+        </div>
+      </div>
     </div>
 
     <div class="settings-section">
-      <h2>下载与网络</h2>
+      <h2>存储</h2>
       <div class="setting-item">
-        <label>使用代理加速</label>
-        <div class="proxy-switch">
-          <label class="switch">
-            <input type="checkbox" v-model="useProxy" @change="onProxyToggle"/>
-            <span class="slider"></span>
-          </label>
-          <span class="switch-label">{{ useProxy ? '已开启（加速下载）' : '已关闭（直连 GitHub）' }}</span>
+        <label>沙箱占用</label>
+        <div class="cache-info">
+          <span>{{ formatSize(sandboxUsage.total) }}</span>
+          <button @click="openUsage" :disabled="usageLoading">{{ usageLoading ? '统计中…' : '查看明细' }}</button>
         </div>
-      </div>
-      <div class="setting-item" v-if="useProxy">
-        <label>代理节点</label>
-        <div class="mirror-selector">
-          <select v-model="mirror" @change="saveMirror" :disabled="testingSpeed">
-            <option v-for="m in proxyMirrors" :key="m.url" :value="m.url">
-              {{ m.name }} ({{ speedResults[m.url] ? (speedResults[m.url].success ? speedResults[m.url].duration + 'ms' : '超时') : '未测试' }})
-            </option>
-          </select>
-          <button @click="testSpeed" :disabled="testingSpeed" class="test-speed-btn">
-            {{ testingSpeed ? '测试中...' : '测速' }}
-          </button>
-        </div>
-      </div>
-      <div class="quarkpan-banner" v-if="useProxy">
-        <div class="quarkpan-banner-content">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span class="banner-text">沐柠环境盒 - 夸克网盘备用下载</span>
-          <button @click="copyQuarkpanLink" class="banner-copy-btn">
-            {{ copied ? '已复制' : '复制链接' }}
-          </button>
-        </div>
-      </div>
-      <div class="setting-item">
-        <label>代理设置</label>
-        <input type="text" v-model="proxy" placeholder="http://127.0.0.1:7890"/>
       </div>
       <div class="setting-item">
         <label>下载缓存</label>
@@ -77,6 +76,101 @@
         <div class="cache-info">
           <span>{{ formatSize(logsSize) }}</span>
           <button @click="clearLogs" :disabled="clearingLogs">清理日志</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>系统变量</h2>
+      <div class="setting-item">
+        <label>沙箱目录</label>
+        <span class="version-value">{{ sandboxRoot || '未初始化' }}</span>
+      </div>
+      <div class="setting-item" v-for="item in injectionItems" :key="item.tool">
+        <label>{{ item.label }}</label>
+        <div class="cache-info">
+          <span :class="['injection-state', item.enabled ? 'on' : 'off']">
+            {{ item.enabled ? '已注入当前用户环境' : (item.active ? `未注入（默认 ${item.active}）` : '未安装') }}
+          </span>
+          <button v-if="item.enabled" @click="detachOne(item)" :disabled="detaching">撤出</button>
+          <button v-else-if="item.active" @click="injectOne(item)" :disabled="detaching">注入</button>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>全部撤出</label>
+        <div class="cache-info">
+          <span class="hint-text">把注入过的 JAVA_HOME / PYTHON_HOME / MAVEN_HOME 及 PATH 条目一次清干净</span>
+          <button class="danger-btn" @click="detachAll" :disabled="detaching">一键撤出</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <h2>配置备份</h2>
+      <div class="setting-item">
+        <label>导出配置</label>
+        <div class="cache-info">
+          <span class="hint-text">把已装的版本、默认版本、Nginx 站点打包成 .mlenv</span>
+          <button @click="exportConfig" :disabled="backupBusy">导出</button>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>包含程序文件</label>
+        <div class="cache-info">
+          <span class="hint-text">勾选后把沙箱里的程序一起打包（体积可能几百 MB 到几 GB）</span>
+          <label class="switch">
+            <input type="checkbox" v-model="backupIncludeBinaries"/>
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>导入配置</label>
+        <div class="cache-info">
+          <span class="hint-text">在另一台电脑还原这套环境</span>
+          <button @click="pickConfig" :disabled="backupBusy">选择配置包</button>
+        </div>
+      </div>
+      <div class="setting-item">
+        <label>覆盖已存在的同名版本</label>
+        <label class="switch">
+          <input type="checkbox" v-model="backupOverwrite"/>
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="backup-missing" v-if="backupMissing.length">
+        <div class="missing-head">
+          <span>这些版本本机还没有，去左侧对应工具里安装一下就好啦～</span>
+          <button @click="backupMissing = []">知道了</button>
+        </div>
+        <div class="missing-list">
+          <span class="missing-chip" v-for="item in backupMissing" :key="item.tool + item.version">
+            {{ toolLabel(item.tool) }} {{ item.version }}
+          </span>
+        </div>
+      </div>
+      <div class="backup-preview" v-if="backupPreview">
+        <div class="preview-head">
+          <span>配置包包含 {{ backupPreview.tools.length }} 个版本</span>
+          <span class="preview-time">{{ formatDate(backupPreview.createdAt) }}</span>
+        </div>
+        <div class="preview-list">
+          <div class="preview-item" v-for="item in backupPreview.tools" :key="item.tool + item.version">
+            <span class="preview-name">{{ toolLabel(item.tool) }} {{ item.version }}</span>
+            <span :class="['preview-state', item.present ? 'ok' : 'warn']">
+              {{ item.present ? '本机已有' : '需下载' }}
+            </span>
+            <span v-if="item.active" class="preview-default">默认</span>
+          </div>
+        </div>
+        <div class="preview-foot">
+          <span class="hint-text" v-if="backupPreview.hasBinaries && backupPreview.size">
+            含程序文件，约 {{ formatSize(backupPreview.size) }}
+          </span>
+          <div class="preview-actions">
+            <button @click="backupPreview = null" :disabled="backupBusy">取消</button>
+            <button class="primary-btn" @click="applyConfig" :disabled="backupBusy">开始导入</button>
+          </div>
         </div>
       </div>
     </div>
@@ -110,58 +204,264 @@
     <div class="settings-footer">
       <button @click="resetSettings" class="reset-btn">恢复默认设置</button>
     </div>
+
+    <div v-if="showUsageModal" class="usage-overlay" @click.self="showUsageModal = false">
+      <div class="usage-card">
+        <h3>沙箱占用明细</h3>
+        <p class="usage-total">合计 {{ formatSize(sandboxUsage.total) }}</p>
+        <div class="usage-list" v-if="sandboxUsage.items.length">
+          <div class="usage-row" v-for="item in sandboxUsage.items" :key="item.tool + item.dir">
+            <span class="usage-tool">{{ toolLabel(item.tool) }} {{ item.version }}</span>
+            <span class="usage-size">{{ formatSize(item.bytes) }}</span>
+          </div>
+        </div>
+        <p class="usage-empty" v-else>沙箱里还没有安装任何工具。</p>
+        <div class="usage-actions">
+          <button @click="showUsageModal = false">关闭</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script>
 import eventBus from '../eventBus';
+import Lemon from '@/utils/lemon';
 
 export default {
   name: 'Settings',
   data() {
     return {
       theme: 'system',
-      autoCheckUpdate: true,
-      closeBehavior: 'exit',
-      useProxy: true,
-      mirror: 'https://ghfast.top/',
-      mirrors: [],
-      speedResults: {},
-      testingSpeed: false,
-      proxy: '',
+      autoLaunch: false,
+      autoRestoreServices: true,
+      checkingUpdate: false,
+      updateInfo: null,
+      updateCheckTip: '',
+      closeBehavior: 'tray',
       cacheSize: 0,
       logsSize: 0,
       clearingCache: false,
       clearingLogs: false,
-      copied: false,
-      quarkpanUrl: 'https://pan.quark.cn/s/93eb50a2e3e3',
-      versionInfo: { version: '', electron: '', node: '', chrome: '' }
+      sandboxRoot: '',
+      injectionItems: [],
+      detaching: false,
+      backupBusy: false,
+      backupIncludeBinaries: false,
+      backupPreview: null,
+      backupPreviewPath: '',
+      backupMissing: [],
+      backupOverwrite: false,
+      versionInfo: { version: '', electron: '', node: '', chrome: '' },
+      sandboxUsage: {total: 0, items: []},
+      showUsageModal: false,
+      usageLoading: false
     };
   },
-  mounted() { this.loadSettings(); this.loadMirrors(); this.loadCacheInfo(); this.loadVersionInfo(); },
-  computed: {
-    proxyMirrors() { return this.mirrors.filter(m => m.url !== ''); }
-  },
+  mounted() { this.loadSettings(); this.loadCacheInfo(); this.loadVersionInfo(); this.loadInjection(); this.loadAutoLaunch(); this.loadSandboxUsage(); },
   methods: {
+    async loadSandboxUsage() {
+      if (!window.electronAPI || !window.electronAPI.getSandboxUsage) return;
+      try {
+        const res = await window.electronAPI.getSandboxUsage();
+        if (res && res.success) {
+          this.sandboxUsage = {total: res.total || 0, items: res.items || []};
+        }
+      } catch (err) {}
+    },
+    async openUsage() {
+      this.usageLoading = true;
+      await this.loadSandboxUsage();
+      this.usageLoading = false;
+      this.showUsageModal = true;
+    },
+    async loadAutoLaunch() {
+      if (!window.electronAPI || !window.electronAPI.getAutoLaunch) return;
+      try {
+        const res = await window.electronAPI.getAutoLaunch();
+        if (res && res.success) this.autoLaunch = Boolean(res.enabled);
+      } catch (err) {
+        this.autoLaunch = false;
+      }
+    },
+    async openUpdatePage() {
+      const url = (this.updateInfo && this.updateInfo.url) || '';
+      if (!url) return;
+      try { await window.electronAPI.openExternal(url); } catch (err) { Lemon.error('打开下载页失败'); }
+    },
+
+    async checkUpdate() {
+      if (this.checkingUpdate || !window.electronAPI || !window.electronAPI.checkAppUpdate) return;
+      this.checkingUpdate = true;
+      this.updateCheckTip = '';
+      try {
+        const res = await window.electronAPI.checkAppUpdate();
+        if (!res || !res.success) {
+          this.updateCheckTip = '检查失败：' + ((res && res.message) || '网络不可用');
+          return;
+        }
+        this.updateInfo = res;
+        if (res.hasUpdate) Lemon.info(`发现新版本 ${res.latest}，当前 ${res.current}`);
+        else Lemon.success('已经是最新版本啦～');
+      } catch (err) {
+        this.updateCheckTip = '检查失败：' + err.message;
+      } finally {
+        this.checkingUpdate = false;
+      }
+    },
+    toolLabel(tool) {
+      return { jdk: 'JDK', python: 'Python', mysql: 'MySQL', redis: 'Redis', maven: 'Maven', gradle: 'Gradle', nodejs: 'Node.js', nginx: 'Nginx', uv: 'uv' }[tool] || tool;
+    },
+    formatSize(bytes) {
+      const size = Number(bytes) || 0;
+      if (size >= 1024 * 1024 * 1024) return `${(size / 1024 / 1024 / 1024).toFixed(2)} GB`;
+      if (size >= 1024 * 1024) return `${(size / 1024 / 1024).toFixed(1)} MB`;
+      if (size >= 1024) return `${(size / 1024).toFixed(0)} KB`;
+      return `${size} B`;
+    },
+    formatDate(value) {
+      if (!value) return '';
+      const date = new Date(value);
+      if (Number.isNaN(date.getTime())) return '';
+      const pad = (n) => String(n).padStart(2, '0');
+      return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+    },
+    async exportConfig() {
+      if (this.backupBusy) return;
+      this.backupBusy = true;
+      try {
+        const settings = { theme: this.theme, closeBehavior: this.closeBehavior };
+        const r = await window.electronAPI.exportEnvConfig({
+          includeBinaries: this.backupIncludeBinaries,
+          settings
+        });
+        if (r && r.success) {
+          Lemon.success(`配置包已经装好啦：${r.toolCount} 个版本 · ${this.formatSize(r.size)}`, { duration: 5000 });
+        } else if (r && !r.canceled) {
+          Lemon.error(r.message || '导出失败');
+        }
+      } catch (err) {
+        Lemon.error(`导出失败：${err.message}`);
+      } finally {
+        this.backupBusy = false;
+      }
+    },
+    async pickConfig() {
+      if (this.backupBusy) return;
+      this.backupBusy = true;
+      try {
+        const r = await window.electronAPI.inspectEnvConfig();
+        if (r && r.success) {
+          this.backupPreview = r.preview;
+          this.backupPreviewPath = r.filePath;
+        } else if (r && !r.canceled) {
+          Lemon.error(r.message || '读取配置包失败');
+        }
+      } catch (err) {
+        Lemon.error(`读取失败：${err.message}`);
+      } finally {
+        this.backupBusy = false;
+      }
+    },
+    async applyConfig() {
+      if (this.backupBusy || !this.backupPreview) return;
+      const preview = this.backupPreview;
+      const missing = preview.tools.filter((item) => !item.present);
+      const includeBinaries = preview.hasBinaries && missing.length > 0;
+      this.backupBusy = true;
+      try {
+        const r = await window.electronAPI.importEnvConfig({
+          filePath: this.backupPreviewPath,
+          restoreBinaries: includeBinaries,
+          onConflict: this.backupOverwrite ? 'overwrite' : 'skip'
+        });
+        if (!r || !r.success) {
+          Lemon.error((r && r.message) || '导入失败');
+          return;
+        }
+        this.backupPreview = null;
+        this.backupMissing = r.missing || [];
+        if (r.missing.length) {
+          Lemon.show({
+            type: 'info',
+            text: `已还原 ${r.restored.length} 个版本；还有 ${r.missing.length} 个需要重新下载：${r.missing.map((item) => `${this.toolLabel(item.tool)} ${item.version}`).join('、')}`,
+            duration: 8000
+          });
+        } else {
+          Lemon.success(`环境还原完成：${r.restored.length} 个版本${r.siteCount ? ` · ${r.siteCount} 个站点` : ''}～`);
+        }
+        await this.loadInjection();
+      } catch (err) {
+        Lemon.error(`导入失败：${err.message}`);
+      } finally {
+        this.backupBusy = false;
+      }
+    },
+    async loadInjection() {
+      try {
+        const info = await window.electronAPI.getSandboxInfo();
+        if (!info || !info.success) return;
+        this.sandboxRoot = info.data.root || '';
+        const tools = info.data.tools || {};
+        this.injectionItems = ['jdk', 'python', 'maven'].map((tool) => ({
+          tool,
+          label: { jdk: 'JDK', python: 'Python', maven: 'Maven' }[tool],
+          enabled: !!(tools[tool] && tools[tool].injected),
+          active: (tools[tool] && tools[tool].active) || ''
+        }));
+      } catch (err) {}
+    },
+    async injectOne(item) {
+      if (this.detaching) return;
+      if (!confirm(`把 ${item.label} ${item.active} 写进当前用户环境变量吗？\n写入 JAVA_HOME / PYTHON_HOME / MAVEN_HOME 与 PATH 引用，随时可以在这里撤出。`)) return;
+      this.detaching = true;
+      try {
+        const r = await window.electronAPI.setSandboxInjection(item.tool, true);
+        if (r.success) { Lemon.success(`${item.label} 已写进系统变量，新开的终端就能直接用啦～`); await this.loadInjection(); }
+        else Lemon.error(r.message || '注入失败');
+      } catch (err) { Lemon.error(`注入失败：${err.message}`); }
+      finally { this.detaching = false; }
+    },
+    async detachOne(item) {
+      if (this.detaching) return;
+      if (!confirm(`确定撤出 ${item.label} 的用户环境变量吗？\n撤出后系统终端里就找不到它了，但「沐柠环境终端」仍然可用。`)) return;
+      this.detaching = true;
+      try {
+        const r = await window.electronAPI.setSandboxInjection(item.tool, false);
+        if (r.success) { Lemon.success(`${item.label} 的系统变量已经撤干净了～`); await this.loadInjection(); }
+        else Lemon.error(r.message || '撤出失败');
+      } catch (err) { Lemon.error(`撤出失败：${err.message}`); }
+      finally { this.detaching = false; }
+    },
+    async detachAll() {
+      if (this.detaching) return;
+      if (!confirm('把注入过的所有系统变量（JAVA_HOME / PYTHON_HOME / MAVEN_HOME 及对应 PATH 条目）全部撤出吗？')) return;
+      this.detaching = true;
+      try {
+        const r = await window.electronAPI.detachAllInjections();
+        if (r.success) {
+          Lemon.success(r.detached && r.detached.length ? `已撤出 ${r.detached.join('、')} 的系统变量～` : '本来就很干净，没有需要撤出的变量～');
+          await this.loadInjection();
+        } else Lemon.error(r.message || '撤出失败');
+      } catch (err) { Lemon.error(`撤出失败：${err.message}`); }
+      finally { this.detaching = false; }
+    },
     loadSettings() {
       const stored = localStorage.getItem('toolbox_settings');
       if (stored) {
         const settings = JSON.parse(stored);
         this.theme = settings.theme || 'system';
-        this.autoCheckUpdate = settings.autoCheckUpdate !== false;
-        this.closeBehavior = settings.closeBehavior || 'exit';
-        this.mirror = settings.mirror || 'https://ghfast.top/';
-        this.proxy = settings.proxy || '';
-        this.useProxy = settings.useProxy !== false;
+        this.autoRestoreServices = settings.autoRestoreServices !== false;
+        this.closeBehavior = settings.closeBehavior === 'exit' ? 'exit' : 'tray';
       }
       this.applyTheme();
     },
     saveSettings() {
-      const settings = { theme: this.theme, autoCheckUpdate: this.autoCheckUpdate, closeBehavior: this.closeBehavior, mirror: this.mirror, proxy: this.proxy, useProxy: this.useProxy };
+      const settings = { theme: this.theme, autoRestoreServices: this.autoRestoreServices, closeBehavior: this.closeBehavior };
       localStorage.setItem('toolbox_settings', JSON.stringify(settings));
       this.applyTheme();
       eventBus.emit('theme-change', this.theme);
-      if (window.electronAPI && window.electronAPI.setProxy) { window.electronAPI.setProxy(this.proxy); }
+      if (window.electronAPI && window.electronAPI.setCloseBehavior) { window.electronAPI.setCloseBehavior(this.closeBehavior); }
     },
     applyTheme() {
       localStorage.setItem('theme', this.theme);
@@ -176,63 +476,11 @@ export default {
     async clearCache() { this.clearingCache = true; try { await window.electronAPI.clearCache(); await this.loadCacheInfo(); } finally { this.clearingCache = false; } },
     async clearLogs() { this.clearingLogs = true; try { await window.electronAPI.clearLogs(); await this.loadCacheInfo(); } finally { this.clearingLogs = false; } },
     async loadVersionInfo() { if (!window.electronAPI || !window.electronAPI.getVersionInfo) return; this.versionInfo = await window.electronAPI.getVersionInfo(); },
-    async loadMirrors() {
-      if (!window.electronAPI || !window.electronAPI.getMirrors) return;
-      try {
-        const result = await window.electronAPI.getMirrors();
-        if (!result || !Array.isArray(result) || result.length === 0) {
-          this.mirrors = [
-            { name: 'GitHub 官方直连', url: '', recommended: false },
-            { name: 'ghfast.top', url: 'https://ghfast.top/', recommended: true },
-            { name: 'gh-proxy.com', url: 'https://gh-proxy.com/', recommended: false },
-            { name: 'ghproxy.com', url: 'http://ghproxy.com/', recommended: false },
-            { name: 'all.mk-proxy.tk', url: 'https://all.mk-proxy.tk/', recommended: false },
-            { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
-            { name: 'github.moeyy.xyz', url: 'https://github.moeyy.xyz/', recommended: false }
-          ];
-        } else {
-          this.mirrors = result;
-          const recommendedMirror = this.mirrors.find(m => m.recommended && m.url !== '');
-          if (recommendedMirror) { this.mirror = recommendedMirror.url; }
-        }
-      } catch (err) {
-        console.error('加载镜像列表失败:', err);
-        this.mirrors = [
-          { name: 'GitHub 官方直连', url: '', recommended: false },
-          { name: 'ghfast.top', url: 'https://ghfast.top/', recommended: true },
-          { name: 'gh-proxy.com', url: 'https://gh-proxy.com/', recommended: false },
-          { name: 'ghproxy.com', url: 'http://ghproxy.com/', recommended: false },
-          { name: 'all.mk-proxy.tk', url: 'https://all.mk-proxy.tk/', recommended: false },
-          { name: 'kgithub.com', url: 'https://kgithub.com/', recommended: false },
-          { name: 'github.moeyy.xyz', url: 'https://github.moeyy.xyz/', recommended: false }
-        ];
-      }
-    },
-    async testSpeed() {
-      if (!window.electronAPI || !window.electronAPI.testMirrorSpeed) return;
-      this.testingSpeed = true; this.speedResults = {};
-      try {
-        const results = await window.electronAPI.testMirrorSpeed();
-        results.forEach(result => { this.speedResults[result.url] = result; });
-        await this.loadMirrors();
-      } catch (err) { console.error('测速失败:', err); }
-      finally { this.testingSpeed = false; }
-    },
-    onProxyToggle() {
-      this.saveSettings();
-      if (this.useProxy) { this.saveMirror(); }
-      else { if (window.electronAPI && window.electronAPI.setMirror) { window.electronAPI.setMirror(''); } }
-    },
-    async saveMirror() {
-      if (!window.electronAPI || !window.electronAPI.setMirror) return;
-      try { await window.electronAPI.setMirror(this.mirror); } catch (err) { console.error('保存镜像源失败:', err); }
-      this.saveSettings();
-    },
     openGitHub() { if (window.electronAPI && window.electronAPI.openGitHub) { window.electronAPI.openGitHub(); } },
     resetSettings() {
-      this.theme = 'system'; this.autoCheckUpdate = true; this.closeBehavior = 'exit'; this.useProxy = true; this.mirror = 'https://ghfast.top/'; this.proxy = '';
-      this.saveSettings(); this.saveMirror();
-      alert('设置已重置为默认值');
+      this.theme = 'system'; this.autoRestoreServices = true; this.closeBehavior = 'tray';
+      this.saveSettings();
+      Lemon.success('设置回到出厂模样啦～');
     },
     formatSize(bytes) {
       if (bytes === 0) return '0 B';
@@ -240,18 +488,18 @@ export default {
       const i = Math.floor(Math.log(bytes) / Math.log(k));
       return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     },
-    copyQuarkpanLink() {
-      navigator.clipboard.writeText(this.quarkpanUrl).then(() => { this.copied = true; setTimeout(() => { this.copied = false; }, 2000); })
-      .catch(() => { const ta = document.createElement('textarea'); ta.value = this.quarkpanUrl; document.body.appendChild(ta); ta.select();
-        try { document.execCommand('copy'); this.copied = true; setTimeout(() => { this.copied = false; }, 2000); } catch (e) { alert('复制失败，请手动复制链接'); }
-        document.body.removeChild(ta); });
-    }
   },
   watch: {
     theme() { this.saveSettings(); },
-    autoCheckUpdate() { this.saveSettings(); },
-    closeBehavior() { this.saveSettings(); },
-    proxy() { this.saveSettings(); }
+    autoRestoreServices() { this.saveSettings(); },
+    autoLaunch(value) {
+      if (window.electronAPI && window.electronAPI.setAutoLaunch) {
+        window.electronAPI.setAutoLaunch(Boolean(value)).then((res) => {
+          if (!res || !res.success) Lemon.error('设置开机自启失败：' + ((res && res.message) || '未知错误'));
+        });
+      }
+    },
+    closeBehavior() { this.saveSettings(); }
   }
 };
 </script>
@@ -308,11 +556,16 @@ export default {
   padding: 7px 12px;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-light);
-  background: var(--bg-input);
+  background: var(--bg-solid);
   color: var(--text-primary);
   font-size: 0.88rem;
   font-family: var(--font-sans);
   transition: border-color var(--transition-fast);
+}
+
+.setting-item select option {
+  background-color: var(--bg-solid);
+  color: var(--text-primary);
 }
 
 .setting-item select:focus,
@@ -332,7 +585,6 @@ export default {
   color: var(--text-secondary);
 }
 
-.proxy-switch { display: flex; align-items: center; gap: var(--space-3); }
 
 .switch { position: relative; display: inline-block; width: 46px; height: 24px; }
 
@@ -361,37 +613,23 @@ input:checked + .slider::before { transform: translateX(22px); }
 
 .switch-label { color: var(--text-secondary); font-size: 0.85rem; }
 
-.mirror-selector { display: flex; gap: var(--space-2); align-items: center; }
-.mirror-selector select { flex: 1; }
 
-.test-speed-btn {
-  background: var(--primary); color: white; border: none;
-  padding: 7px 14px; border-radius: var(--radius-md); cursor: pointer;
-  font-size: 0.85rem; font-weight: 500; white-space: nowrap;
+.download-update-btn {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-right: 8px;
   transition: all var(--transition-fast);
 }
-.test-speed-btn:hover:not(:disabled) { background: var(--primary-hover); }
-.test-speed-btn:disabled { opacity: 0.6; cursor: not-allowed; }
 
-.quarkpan-banner { margin-top: var(--space-3); }
-
-.quarkpan-banner-content {
-  display: flex; align-items: center; gap: var(--space-3);
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white; padding: 12px 18px; border-radius: var(--radius-lg);
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3);
-}
-
-.banner-text { flex: 1; font-weight: 500; font-size: 0.9rem; }
-
-.banner-copy-btn {
-  background: white; color: #6366f1; border: none;
-  padding: 6px 14px; border-radius: var(--radius-md);
-  font-size: 0.82rem; font-weight: 600; cursor: pointer;
-  white-space: nowrap; transition: all var(--transition-fast);
-}
-.banner-copy-btn:hover { transform: scale(1.03); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
-
+.download-update-btn:hover { background: var(--primary-hover); }
+.update-hint { font-size: 0.76rem; color: var(--primary); margin-right: 8px; }
+.update-hint.muted { color: var(--text-muted); }
 .cache-info { display: flex; gap: var(--space-3); align-items: center; color: var(--text-secondary); font-size: 0.88rem; }
 
 .cache-info button {
@@ -402,6 +640,73 @@ input:checked + .slider::before { transform: translateX(22px); }
 }
 .cache-info button:hover:not(:disabled) { filter: brightness(0.93); }
 .cache-info button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.injection-state { font-size: 0.82rem; font-weight: 600; }
+.injection-state.on { color: var(--primary); }
+.injection-state.off { color: var(--text-muted); }
+.hint-text { font-size: 0.78rem; color: var(--text-muted); max-width: 420px; }
+.cache-info button.danger-btn {
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  color: #f87171;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, #ef4444 32%, transparent);
+}
+.cache-info button.danger-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, #ef4444 22%, transparent);
+  filter: none;
+}
+
+.backup-missing {
+  margin-top: var(--space-3);
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--primary) 8%, var(--bg-card));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 22%, transparent);
+}
+.missing-head {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  font-size: 0.8rem; color: var(--text-secondary);
+}
+.missing-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.missing-chip {
+  font-size: 0.72rem; font-weight: 600; color: var(--text-secondary);
+  background: var(--bg-input); padding: 3px 10px; border-radius: var(--radius-full);
+}
+
+.backup-preview {
+  margin-top: var(--space-3);
+  padding: 14px 16px;
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+}
+.preview-head {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.82rem; font-weight: 600; color: var(--text-primary);
+  margin-bottom: 10px;
+}
+.preview-time { font-size: 0.75rem; color: var(--text-muted); font-weight: 500; }
+.preview-list { display: flex; flex-direction: column; gap: 6px; max-height: 220px; overflow-y: auto; }
+.preview-item { display: flex; align-items: center; gap: 10px; font-size: 0.8rem; }
+.preview-name { flex: 1; color: var(--text-secondary); }
+.preview-state { font-size: 0.72rem; font-weight: 600; }
+.preview-state.ok { color: var(--primary); }
+.preview-state.warn { color: var(--text-muted); }
+.preview-default {
+  font-size: 0.68rem; font-weight: 700; color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+  padding: 2px 8px; border-radius: var(--radius-full);
+}
+.preview-foot {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-top: 12px; padding-top: 10px;
+  border-top: 1px solid var(--border-color);
+}
+.preview-actions { display: flex; gap: 8px; }
+.preview-actions .primary-btn {
+  background: var(--primary); color: #052e2b; font-weight: 700;
+  padding: 8px 18px; border-radius: var(--radius-full); border: none; cursor: pointer;
+}
+.preview-actions .primary-btn:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
 
 .github-btn {
   display: inline-flex; align-items: center; gap: var(--space-2);
@@ -421,4 +726,49 @@ input:checked + .slider::before { transform: translateX(22px); }
 .reset-btn:hover { filter: brightness(0.95); }
 
 .settings-footer { text-align: center; margin-top: var(--space-5); }
+.usage-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 400;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(6px);
+}
+.usage-card {
+  width: min(520px, 90vw);
+  max-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+  border-radius: 18px;
+  background: var(--bg-modal);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--glass-shadow-float);
+}
+.usage-card h3 { margin: 0 0 6px; font-size: 1rem; }
+.usage-total { margin: 0 0 12px; font-size: 0.82rem; color: var(--text-secondary); }
+.usage-list { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.usage-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 0.8rem;
+}
+.usage-tool { color: var(--text-primary); }
+.usage-size { color: var(--text-muted); font-family: var(--font-mono); }
+.usage-empty { color: var(--text-muted); font-size: 0.82rem; }
+.usage-actions { display: flex; justify-content: flex-end; margin-top: 14px; }
+.usage-actions button {
+  padding: 7px 18px;
+  border-radius: 999px;
+  border: 1px solid var(--border-light);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  cursor: pointer;
+}
 </style>

@@ -28,7 +28,7 @@ export default {
   props: { tool: { type: String, required: true } },
   computed: {
     toolLabel() {
-      const map = { gradle: 'Gradle', nacos: 'Nacos', sentinel: 'Sentinel', rabbitmq: 'RabbitMQ', miniconda: 'Miniconda', jupyter: 'Jupyter Lab', ollama: 'Ollama', go: 'Go', mingw: 'MinGW', git: 'Git', nginx: 'Nginx', minio: 'MinIO', elasticsearch: 'Elasticsearch', kibana: 'Kibana', 'redis-insight': 'Redis Insight' };
+      const map = { gradle: 'Gradle', nacos: 'Nacos', sentinel: 'Sentinel', rabbitmq: 'RabbitMQ', miniconda: 'Miniconda', jupyter: 'Jupyter Lab', go: 'Go', mingw: 'MinGW', nginx: 'Nginx', minio: 'MinIO', elasticsearch: 'Elasticsearch', kibana: 'Kibana' };
       return map[this.tool] || this.tool.toUpperCase();
     }
   }

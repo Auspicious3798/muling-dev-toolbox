@@ -1,7 +1,13 @@
 <template>
   <div class="ai-assistant">
     <div class="coming-soon-card">
-      <div class="icon">🤖</div>
+      <div class="lemon-portrait">
+        <img src="/art/xiaoning-portrait-disc.png" alt="小柠"/>
+        <span class="lemon-badge">小柠</span>
+      </div>
+      <div class="speech">
+        <p>嗨，我是小柠～ 现在还在偷偷学本领，等我学会了就来帮你装模型！</p>
+      </div>
       <h2>AI 智能助手</h2>
       <p class="subtitle">正在紧锣密鼓地开发中，敬请期待！</p>
       <div class="roadmap">
@@ -52,6 +58,66 @@ export default {
 .icon {
   font-size: 4rem;
   margin-bottom: 16px;
+}
+
+.lemon-portrait {
+  position: relative;
+  width: 118px;
+  height: 118px;
+  margin: 0 auto 16px;
+}
+
+.lemon-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 2px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow), 0 0 26px rgba(245, 158, 11, 0.24);
+}
+
+.lemon-badge {
+  position: absolute;
+  right: -4px;
+  bottom: 6px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #0b1120;
+  background: linear-gradient(135deg, #fde68a, #fbbf24);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.36);
+}
+
+.speech {
+  position: relative;
+  max-width: 420px;
+  margin: 0 auto 22px;
+  padding: 12px 16px;
+  border-radius: 16px;
+  background-color: var(--glass-tint-strong);
+  border: 1px solid var(--glass-stroke);
+  box-shadow: var(--glass-shadow);
+}
+
+.speech::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  transform: translateX(-50%) rotate(45deg);
+  background-color: var(--glass-tint-strong);
+  border-left: 1px solid var(--glass-stroke);
+  border-top: 1px solid var(--glass-stroke);
+}
+
+.speech p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.6;
+  color: var(--text-secondary);
 }
 
 h2 {

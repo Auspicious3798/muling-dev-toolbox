@@ -2,217 +2,82 @@ const {ipcMain} = require('electron');
 const {spawn, exec} = require('child_process');
 const path = require('path');
 const fs = require('fs');
-const axios = require('axios');
-const AdmZip = require('adm-zip');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
 const configManager = require('../configManager.cjs');
+const {createLogger} = require('../utils/logger.cjs');
+const {downloadFile} = require('../utils/download.cjs');
+const {installZip, zipProgress} = require('../utils/zip.cjs');
+const sandbox = require('../utils/sandbox.cjs');
+const portUtils = require('../utils/port.cjs');
 
 module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
     if (!fs.existsSync(downloadDir)) fs.mkdirSync(downloadDir, {recursive: true});
 
     const logFile = path.join(userDataPath, 'redis_install.log');
+    const logToFile = createLogger(logFile);
 
-    // 辅助函数：获取 Redis 版本配置
     function getRedisVersionConfig(version) {
         const cfg = configManager.getToolConfig('redis', version);
         if (!cfg) return null;
-        
+
         // 根据版本设置默认端口（从6379开始递增）
         const versionNum = parseFloat(version);
         const defaultPort = 6379 + Math.floor((versionNum - 3.2) / 0.2) * 1;
-        
+
         return {
             ...cfg,
             defaultPort
         };
     }
 
-    function logToFile(message) {
-        const timestamp = new Date().toISOString();
-        fs.appendFileSync(logFile, `[${timestamp}] ${message}\n`);
-    }
-
     let currentAbortController = null;
-    let pendingLocalFile = null;
     const processes = new Map();
 
-    async function downloadFile(url, destPath, onProgress, signal, onSlowSpeed = null) {
-        const writer = fs.createWriteStream(destPath);
-        const response = await axios({
-            method: 'GET',
-            url: url,
-            responseType: 'stream',
-            timeout: 600000,
-            signal
-        });
-        const totalLength = response.headers['content-length'];
-        let downloaded = 0;
-        let speedCheckInterval = null;
-        let lastDownloaded = 0;
-        let lastCheckTime = Date.now();
-        let slowSpeedNotified = false;
-        
-        speedCheckInterval = setInterval(() => {
-            const currentTime = Date.now();
-            const timeDiff = (currentTime - lastCheckTime) / 1000;
-            const bytesDiff = downloaded - lastDownloaded;
-            const speedBps = bytesDiff / timeDiff;
-            const speedKbps = speedBps / 1024;
-            
-            logToFile(`[Redis下载] 速度: ${speedKbps.toFixed(2)} KB/s, 已下载: ${(downloaded / 1024 / 1024).toFixed(2)} MB`);
-            
-            if (onSlowSpeed && speedKbps < 50 && downloaded > 1024 * 1024 && !slowSpeedNotified) {
-                slowSpeedNotified = true;
-                mainWindow.webContents.send('download-speed-warning', {
-                    type: 'redis',
-                    speed: speedKbps.toFixed(2),
-                    message: `当前下载速度较慢 (${speedKbps.toFixed(1)} KB/s),建议在设置中更换代理节点` 
-                });
-            }
-            
-            lastDownloaded = downloaded;
-            lastCheckTime = currentTime;
-        }, 3000);
-        
-        response.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (onProgress && totalLength) {
-                onProgress(downloaded / totalLength);
-            }
-        });
-        response.data.pipe(writer);
-        return new Promise((resolve, reject) => {
-            writer.on('finish', () => {
-                clearInterval(speedCheckInterval);
-                resolve();
-            });
-            writer.on('error', (err) => {
-                clearInterval(speedCheckInterval);
-                reject(err);
-            });
-            signal.addEventListener('abort', () => {
-                clearInterval(speedCheckInterval);
-                writer.destroy();
-                reject(new Error('下载已取消'));
-            });
-        });
-    }
-
-    function installZip(zipPath, installDir) {
-        return new Promise((resolve, reject) => {
-            try {
-                if (fs.existsSync(installDir)) {
-                    fs.rmSync(installDir, {recursive: true, force: true});
-                    logToFile(`已删除旧目录: ${installDir}`);
-                }
-                fs.mkdirSync(installDir, {recursive: true});
-                const zip = new AdmZip(zipPath);
-                zip.extractAllTo(installDir, true);
-                logToFile(`解压成功: ${zipPath} -> ${installDir}`);
-                resolve();
-            } catch (err) {
-                logToFile(`解压失败: ${err.message}`);
-                reject(err);
-            }
-        });
-    }
-
-    function setSystemEnvVariable(name, value) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" "${value}"`;
-            logToFile(`执行 setx: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (error, stdout, stderr) => {
-                if (error) {
-                    logToFile(`setx 失败: ${stderr || error.message}`);
-                    reject(new Error(`设置系统变量失败: ${stderr || error.message}`));
-                } else {
-                    logToFile(`setx 成功: ${name}=${value}`);
-                    const psRefresh = `$env:${name} = "${value}"`;
-                    exec(`powershell -NoProfile -Command "${psRefresh.replace(/"/g, '\\"')}"`, (err) => {
-                        if (err) logToFile(`刷新当前进程 ${name} 失败: ${err.message}`);
-                        resolve();
-                    });
-                }
-            });
-        });
-    }
-
-    function removeSystemEnvVariable(name) {
-        return new Promise((resolve, reject) => {
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M "${name}" ""`;
-            exec(setxCmd, {windowsHide: true}, (error) => {
-                if (error) reject(error);
-                else resolve();
-            });
-        });
-    }
-
-    async function getSystemPath() {
-        try {
-            const regCmd = `C:\\Windows\\System32\\reg.exe query "HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment" /v Path`;
-            const {stdout} = await execPromise(regCmd);
-            const match = stdout.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.*)/i);
-            if (match && match[1]) return match[1].trim();
-        } catch (err) {
-        }
-        return '';
-    }
-
-    function setPathForRedis(suffix) {
-        return new Promise(async (resolve, reject) => {
-            const targetVar = `REDIS_HOME${suffix}`;
-            const targetEntry = `%${targetVar}%`;
-
-            const currentPath = await getSystemPath();
-            const parts = currentPath.split(';');
-            const newParts = [];
-            for (const p of parts) {
-                if (!/^%REDIS_HOME\d+%$/i.test(p)) {
-                    newParts.push(p);
-                }
-            }
-            newParts.unshift(targetEntry);
-            const newPath = newParts.join(';');
-
-            const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-            logToFile(`执行 setx PATH: ${setxCmd}`);
-            exec(setxCmd, {windowsHide: true}, (err) => {
-                if (err) {
-                    reject(new Error(`设置 PATH 失败: ${err.message}`));
-                } else {
-                    logToFile(`PATH 设置成功: ${newPath}`);
-                    resolve();
-                }
-            });
-        });
-    }
-
-    async function refreshCurrentProcessEnv() {
-        try {
-            const systemPath = await getSystemPath();
-            process.env.Path = systemPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
-        } catch (err) {
-            logToFile(`刷新环境变量失败: ${err.message}`);
-        }
-    }
-
     async function isPortInUse(port) {
-        return new Promise((resolve) => {
-            const netstatCmd = `netstat -ano | findstr :${port}`;
-            exec(netstatCmd, {windowsHide: true}, (error, stdout) => {
-                resolve(!error && stdout.trim().length > 0);
-            });
-        });
+        return portUtils.isPortInUse(port);
     }
 
     async function findAvailablePort(defaultPort) {
-        let port = defaultPort;
-        while (await isPortInUse(port)) {
-            port++;
+        const found = await portUtils.findAvailablePort(defaultPort);
+        return found === null ? defaultPort : found;
+    }
+
+    async function resolvePort(customPort, defaultPort) {
+        const requested = customPort && !isNaN(customPort) ? Number(customPort) : defaultPort;
+        return portUtils.resolvePort(requested, {strict: Boolean(customPort), defaultPort});
+    }
+
+    function readConfPort(installDir) {
+        const confPath = path.join(installDir, 'redis.windows.conf');
+        if (!fs.existsSync(confPath)) return null;
+        const content = fs.readFileSync(confPath, 'utf8');
+        const match = content.match(/^\s*port\s+(\d+)\s*$/im);
+        return match ? parseInt(match[1], 10) : null;
+    }
+
+    function patchConfPort(installDir, port) {
+        const confPath = path.join(installDir, 'redis.windows.conf');
+        if (!fs.existsSync(confPath)) return false;
+        const content = fs.readFileSync(confPath, 'utf8');
+        const next = /^\s*port\s+/im.test(content)
+            ? content.replace(/^\s*port\s+\d+\s*$/im, `port ${port}`)
+            : `port ${port}\n${content}`;
+        fs.writeFileSync(confPath, next, 'utf8');
+        logToFile(`端口变更，已更新 ${confPath} -> ${port}`);
+        return true;
+    }
+
+    async function ensureConfigPort(installDir, fallbackPort) {
+        const current = readConfPort(installDir) || fallbackPort;
+        if (await portUtils.isPortAvailable(current)) {
+            return {port: current, changed: false, original: current};
         }
-        return port;
+        const found = await portUtils.findAvailablePort(current);
+        if (found === null) throw new Error(`从 ${current} 起没有找到可用端口`);
+        patchConfPort(installDir, found);
+        return {port: found, changed: true, original: current};
     }
 
     async function generateRedisConf(installDir, port, password, maxmemory) {
@@ -269,12 +134,10 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 logToFile(`进程退出但未捕获到 stderr，可能配置文件错误或端口冲突`);
             }
             processes.delete(versionKey);
-            // 删除 PID 文件
             const pidPath = path.join(installDir, 'redis.pid');
             if (fs.existsSync(pidPath)) fs.unlinkSync(pidPath);
         });
         processes.set(versionKey, proc);
-        // 写入 PID 文件以备后用
         const pidPath = path.join(installDir, 'redis.pid');
         fs.writeFileSync(pidPath, proc.pid.toString(), 'utf8');
         logToFile(`Redis ${versionKey} 进程已启动，PID: ${proc.pid}`);
@@ -286,15 +149,12 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         if (proc) {
             logToFile(`准备终止 Redis ${versionKey} 进程 PID: ${proc.pid}`);
             try {
-                // 尝试优雅终止
                 process.kill(proc.pid, 'SIGTERM');
-                // 等待进程退出
                 await new Promise((resolve) => {
                     proc.once('exit', resolve);
-                    setTimeout(resolve, 3000); // 最多等待3秒
+                    setTimeout(resolve, 3000);
                 });
                 if (!proc.killed) {
-                    // 强制终止
                     exec(`taskkill /PID ${proc.pid} /F`, {windowsHide: true}, (err) => {
                         if (err) logToFile(`强制终止失败: ${err.message}`);
                         else logToFile(`Redis ${versionKey} 进程已强制终止`);
@@ -304,29 +164,12 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 }
             } catch (err) {
                 logToFile(`终止 Redis ${versionKey} 进程时出错: ${err.message}`);
-                // 回退到 taskkill
                 exec(`taskkill /PID ${proc.pid} /F`, {windowsHide: true}, (err2) => {
                     if (err2) logToFile(`taskkill 失败: ${err2.message}`);
                     else logToFile(`Redis ${versionKey} 进程已终止`);
                 });
             }
             processes.delete(versionKey);
-        } else {
-            const home = await findRedisHome(versionKey);
-            if (home) {
-                const pidPath = path.join(home, 'redis.pid');
-                if (fs.existsSync(pidPath)) {
-                    const pid = parseInt(fs.readFileSync(pidPath, 'utf8').trim(), 10);
-                    if (!isNaN(pid)) {
-                        logToFile(`通过 PID 文件终止 Redis ${versionKey} PID: ${pid}`);
-                        exec(`taskkill /PID ${pid} /F`, {windowsHide: true}, (err) => {
-                            if (err) logToFile(`通过 PID 文件终止失败: ${err.message}`);
-                            else logToFile(`Redis ${versionKey} 进程已终止`);
-                        });
-                        fs.unlinkSync(pidPath);
-                    }
-                }
-            }
         }
     }
 
@@ -348,94 +191,45 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
                 }
             }
         }
-        // 兜底：检查是否有 redis-server 进程监听该版本端口（可选项，此处简化）
         return false;
     }
 
-    async function getAllInstalledVersions() {
-        const versions = new Set();
-        // 从配置中获取所有 Redis 版本
-        const config = configManager.getConfig();
-        if (config && config.tools && config.tools.redis && config.tools.redis.versions) {
-            for (const [ver, cfg] of Object.entries(config.tools.redis.versions)) {
-                const varName = `REDIS_HOME${cfg.suffix}`;
-                try {
-                    const {stdout} = await execPromise(`echo %${varName}%`);
-                    const home = stdout.trim();
-                    if (home && fs.existsSync(home) && fs.existsSync(path.join(home, 'redis-server.exe'))) {
-                        versions.add(ver);
-                    }
-                } catch (err) {
-                }
-            }
-        }
-        const baseDirs = [
-            'C:\\Program Files\\Redis',
-            'C:\\Program Files\\muling\\muling-env-box\\Redis'
-        ];
-        for (const baseDir of baseDirs) {
-            if (fs.existsSync(baseDir)) {
-                const dirs = fs.readdirSync(baseDir);
-                for (const dir of dirs) {
-                    const fullPath = path.join(baseDir, dir);
-                    if (fs.statSync(fullPath).isDirectory() && fs.existsSync(path.join(fullPath, 'redis-server.exe'))) {
-                        const match = dir.match(/redis-(\d+\.\d+)/);
-                        if (match && getRedisVersionConfig(match[1])) {
-                            versions.add(match[1]);
-                        }
-                    }
-                }
-            }
-        }
-        return Array.from(versions).sort((a, b) => {
-            const order = ['3.2', '4.0', '5.0', '6.0', '6.2', '7.0', '7.2', '7.4', '8.0', '8.2', '8.4', '8.6'];
-            return order.indexOf(a) - order.indexOf(b);
-        });
+    function findRedisHome(version) {
+        const hit = sandbox.listInstalled('redis').find(item => item.version === version);
+        if (hit && fs.existsSync(hit.dir)) return hit.dir;
+        const dir = sandbox.installDir('redis', version);
+        return fs.existsSync(dir) ? dir : null;
     }
 
-    async function findRedisHome(version) {
+    async function installInto(version, zipPath, password, maxmemory, customPort, sendProgress) {
         const cfg = getRedisVersionConfig(version);
-        if (!cfg) return null;
-        const varName = `REDIS_HOME${cfg.suffix}`;
-        try {
-            const {stdout} = await execPromise(`echo %${varName}%`);
-            const home = stdout.trim();
-            if (home && fs.existsSync(home)) return home;
-        } catch (err) {
-        }
-        const installDirs = [
-            `C:\\Program Files\\Redis\\redis-${version}`,
-            `C:\\Program Files\\muling\\muling-env-box\\Redis\\redis-${version}`
-        ];
-        for (const installDir of installDirs) {
-            if (fs.existsSync(installDir) && fs.existsSync(path.join(installDir, 'redis-server.exe'))) {
-                return installDir;
-            }
-        }
-        return null;
-    }
+        if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
+        const {defaultPort} = cfg;
 
-    async function getCurrentDefaultVersion() {
-        try {
-            const systemPath = await getSystemPath();
-            const match = systemPath.match(/%REDIS_HOME(\d+)%/);
-            if (match && match[1]) {
-                const suffix = match[1];
-                for (const [ver, cfg] of Object.entries(config.tools.redis.versions)) {
-                    if (cfg.suffix === suffix) return ver;
-                }
-            }
-            const {stdout, stderr} = await execPromise('redis-cli --version 2>&1');
-            const output = stdout + stderr;
-            const verMatch = output.match(/redis-cli (\d+\.\d+\.\d+)/i);
-            if (verMatch) {
-                const majorMinor = verMatch[1].split('.')[0] + '.' + verMatch[1].split('.')[1];
-                if (getRedisVersionConfig(majorMinor)) return majorMinor;
-            }
-            return null;
-        } catch (err) {
-            return null;
-        }
+        const portResult = await resolvePort(customPort, defaultPort);
+        if (portResult.error) return {success: false, message: portResult.error};
+        const targetPort = portResult.port;
+
+        // 沙箱模式：统一装到 %LOCALAPPDATA%\Muling\env\redis\redis-<version>
+        const installPath = sandbox.installDir('redis', version);
+
+        sendProgress(0.3, '解压中');
+        await installZip(zipPath, installPath, {onProgress: zipProgress(sendProgress, 0.3, 0.48)});
+        sendProgress(0.5, '生成配置');
+        await generateRedisConf(installPath, targetPort, password, maxmemory);
+        sendProgress(0.9, '加入沙箱环境');
+        sandbox.register('redis', version, installPath, {activate: true});
+        sendProgress(1, '安装完成');
+        mainWindow.webContents.send('redis-changed');
+        return {
+            success: true,
+            port: targetPort,
+            defaultPort,
+            portChanged: portResult.changed,
+            message: portResult.changed
+                ? `Redis ${version} 安装成功，端口 ${defaultPort} 被占用，已自动改用 ${targetPort}`
+                : `Redis ${version} 安装成功，端口: ${targetPort}`,
+        };
     }
 
     ipcMain.on('cancel-redis-download', () => {
@@ -443,16 +237,6 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             currentAbortController.abort();
             currentAbortController = null;
         }
-    });
-
-    ipcMain.handle('import-local-redis', async (event, filePath) => {
-        const ext = path.extname(filePath).toLowerCase();
-        if (ext !== '.zip') return {success: false, message: '只支持 .zip 文件'};
-        const fileName = path.basename(filePath);
-        const destPath = path.join(downloadDir, fileName);
-        fs.copyFileSync(filePath, destPath);
-        pendingLocalFile = destPath;
-        return {success: true, message: 'Redis 安装包已导入，请选择版本后点击“开始安装”'};
     });
 
     ipcMain.handle('check-port', async (event, port) => {
@@ -463,56 +247,41 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('install-redis', async (event, version, password = '', maxmemory = 0, customPort = null) => {
         const cfg = getRedisVersionConfig(version);
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
-        
-        // 获取配置中的 baseDir
-        const toolConfig = configManager.getToolConfig('redis', version);
-        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Redis';
-        
-        const {url, suffix, defaultPort} = cfg;
-        let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
-        if (await isPortInUse(targetPort)) {
-            if (!customPort) {
-                targetPort = await findAvailablePort(targetPort);
-            } else {
-                return {success: false, message: `端口 ${targetPort} 已被占用，请选择其他端口`};
-            }
-        }
-        const fileName = url.split('/').pop();
+
+        const {url} = cfg;
+        const fileName = url.split('/').pop().split('?')[0];
         const installerPath = path.join(downloadDir, fileName);
-        const installPath = path.join(baseDir, `redis-${version}`);
-        const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('redis-progress', {type: 'redis', version, progress, stage});
+        const sendProgress = (progress, stage = '', meta = {}) => {
+            mainWindow.webContents.send('redis-progress', {
+                type: 'redis',
+                version,
+                progress,
+                stage,
+                speed: meta.speed || 0,
+                eta: typeof meta.eta === 'number' ? meta.eta : null,
+                received: meta.received || 0,
+                total: meta.total || null,
+            });
         };
         const abortController = new AbortController();
         currentAbortController = abortController;
         try {
             if (!fs.existsSync(installerPath)) {
                 sendProgress(0, '下载安装包');
-                await downloadFile(url, installerPath, (p) => sendProgress(p, '下载安装包'), abortController.signal, true);
-                sendProgress(0.3, '解压中');
-            } else {
-                sendProgress(0.3, '解压中');
+                await downloadFile({
+                    url,
+                    destPath: installerPath,
+                    signal: abortController.signal,
+                    onProgress: (info) => sendProgress((info.percent ?? 0) * 0.3, info.retrying ? `网络中断，正在重试（${info.attempt}/3）` : '下载安装包', info),
+                    log: logToFile,
+                    label: `Redis ${version} 下载`,
+                    timeout: 600000,
+                });
             }
-            await installZip(installerPath, installPath);
-            sendProgress(0.5, '生成配置');
-            await generateRedisConf(installPath, targetPort, password, maxmemory);
-            sendProgress(0.9, '配置环境变量');
-            await setSystemEnvVariable(`REDIS_HOME${suffix}`, installPath);
-            await setPathForRedis(suffix);
-            await refreshCurrentProcessEnv();
-            sendProgress(1, '安装完成');
-            mainWindow.webContents.send('redis-changed');
-            return {success: true, message: `Redis ${version} 安装成功，端口: ${targetPort}`};
+            return await installInto(version, installerPath, password, maxmemory, customPort, sendProgress);
         } catch (err) {
             if (err.message === '下载已取消') return {success: false, message: '下载已取消'};
             logToFile(`安装失败: ${err.message}`);
-            // 检查是否是权限错误
-            if (err.code === 'EPERM' || err.code === 'EACCES') {
-                return {
-                    success: false,
-                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
-                };
-            }
             return {success: false, message: `安装失败: ${err.message}`};
         } finally {
             if (currentAbortController === abortController) currentAbortController = null;
@@ -525,69 +294,16 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         }
     });
 
-    ipcMain.handle('install-from-local-redis', async (event, version, password = '', maxmemory = 0, customPort = null) => {
-        if (!pendingLocalFile) return {success: false, message: '没有已导入的 Redis 安装包，请先导入'};
-        const cfg = getRedisVersionConfig(version);
-        if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
-        
-        // 获取配置中的 baseDir，与在线安装保持一致
-        const toolConfig = configManager.getToolConfig('redis', version);
-        const baseDir = toolConfig?.baseDir || 'C:\\Program Files\\Redis';
-        
-        const {suffix, defaultPort} = cfg;
-        let targetPort = customPort && !isNaN(customPort) ? customPort : defaultPort;
-        if (await isPortInUse(targetPort)) {
-            if (!customPort) {
-                targetPort = await findAvailablePort(targetPort);
-            } else {
-                return {success: false, message: `端口 ${targetPort} 已被占用，请选择其他端口`};
-            }
-        }
-        const zipPath = pendingLocalFile;
-        const installPath = path.join(baseDir, `redis-${version}`);
-        const sendProgress = (progress, stage = '') => {
-            mainWindow.webContents.send('redis-progress', {type: 'redis', version, progress, stage});
-        };
-        try {
-            sendProgress(0.3, '解压中');
-            await installZip(zipPath, installPath);
-            sendProgress(0.5, '生成配置');
-            await generateRedisConf(installPath, targetPort, password, maxmemory);
-            sendProgress(0.9, '配置环境变量');
-            await setSystemEnvVariable(`REDIS_HOME${suffix}`, installPath);
-            await setPathForRedis(suffix);
-            await refreshCurrentProcessEnv();
-            sendProgress(1, '安装完成');
-            mainWindow.webContents.send('redis-changed');
-            return {success: true, message: `Redis ${version} 安装成功，端口: ${targetPort}`};
-        } catch (err) {
-            logToFile(`安装失败: ${err.message}`);
-            // 检查是否是权限错误
-            if (err.code === 'EPERM' || err.code === 'EACCES') {
-                return {
-                    success: false,
-                    message: '安装失败：没有权限写入该目录。请右键点击应用，选择“以管理员身份运行”后重试。'
-                };
-            }
-            return {success: false, message: `安装失败: ${err.message}`};
-        } finally {
-            if (fs.existsSync(zipPath)) {
-                try {
-                    fs.unlinkSync(zipPath);
-                } catch (e) {
-                }
-            }
-            pendingLocalFile = null;
-        }
-    });
-
     ipcMain.handle('check-redis', async () => {
         try {
-            const versions = await getAllInstalledVersions();
-            const defaultVersion = await getCurrentDefaultVersion();
-            return {versions, default: defaultVersion};
+            const items = sandbox.listInstalled('redis');
+            return {
+                versions: items.map(item => item.version),
+                default: sandbox.getActive('redis'),
+                items
+            };
         } catch (err) {
-            return {versions: [], default: null};
+            return {versions: [], default: null, items: []};
         }
     });
 
@@ -595,14 +311,13 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         try {
             const cfg = getRedisVersionConfig(version);
             if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
-            const currentDefault = await getCurrentDefaultVersion();
-            if (currentDefault) {
+            const currentDefault = sandbox.getActive('redis');
+            if (currentDefault && currentDefault !== version) {
                 await stopRedisProcess(currentDefault);
             }
-            await setPathForRedis(cfg.suffix);
-            await refreshCurrentProcessEnv();
+            sandbox.setActive('redis', version);
             await startRedisProcess(home, path.join(home, 'redis.windows.conf'), version);
             mainWindow.webContents.send('redis-changed');
             return {success: true, message: `已切换到 Redis ${version}`};
@@ -613,29 +328,11 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('delete-redis', async (event, version) => {
         try {
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             await stopRedisProcess(version);
-            const currentDefault = await getCurrentDefaultVersion();
-            if (currentDefault === version) {
-                const allVersions = await getAllInstalledVersions();
-                const other = allVersions.find(v => v !== version);
-                if (other) {
-                    const otherCfg = getRedisVersionConfig(other);
-                    await setPathForRedis(otherCfg.suffix);
-                } else {
-                    const systemPath = await getSystemPath();
-                    const parts = systemPath.split(';');
-                    const newParts = parts.filter(p => !/^%REDIS_HOME\d+%$/i.test(p));
-                    const newPath = newParts.join(';');
-                    const setxCmd = `C:\\Windows\\System32\\setx.exe /M PATH "${newPath}"`;
-                    await execPromise(setxCmd);
-                }
-            }
-            await removeSystemEnvVariable(`REDIS_HOME${cfg.suffix}`);
             fs.rmSync(home, {recursive: true, force: true});
+            sandbox.unregister('redis', version);
             mainWindow.webContents.send('redis-changed');
             return {success: true, message: `已删除 Redis ${version}`};
         } catch (err) {
@@ -646,19 +343,26 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('start-redis-service', async (event, version) => {
         try {
             logToFile(`收到启动 Redis ${version} 的请求`);
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             const confPath = path.join(home, 'redis.windows.conf');
             if (!fs.existsSync(confPath)) throw new Error('未找到配置文件');
             const running = await isRedisRunning(version, home);
             if (running) return {success: false, message: `Redis ${version} 已经在运行`};
+            const cfg = getRedisVersionConfig(version);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379);
             await startRedisProcess(home, confPath, version);
-            await setPathForRedis(cfg.suffix);
-            await refreshCurrentProcessEnv();
+            sandbox.setActive('redis', version);
             mainWindow.webContents.send('redis-changed');
-            return {success: true, message: `Redis ${version} 已启动并设为默认`};
+            return {
+                success: true,
+                port: portInfo.port,
+                defaultPort: portInfo.original,
+                portChanged: portInfo.changed,
+                message: portInfo.changed
+                    ? `端口 ${portInfo.original} 被占用，已自动改用 ${portInfo.port} 启动 Redis ${version}`
+                    : `Redis ${version} 已启动并设为默认，端口: ${portInfo.port}`,
+            };
         } catch (err) {
             logToFile(`启动 Redis ${version} 时出错: ${err.message}`);
             return {success: false, message: err.message};
@@ -668,9 +372,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('stop-redis-service', async (event, version) => {
         try {
             logToFile(`收到停止 Redis ${version} 的请求`);
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             const running = await isRedisRunning(version, home);
             if (!running) return {success: false, message: `Redis ${version} 未运行`};
@@ -685,19 +387,26 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     ipcMain.handle('restart-redis-service', async (event, version) => {
         try {
             logToFile(`收到重启 Redis ${version} 的请求`);
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             const confPath = path.join(home, 'redis.windows.conf');
             if (!fs.existsSync(confPath)) throw new Error('未找到配置文件');
             await stopRedisProcess(version);
             await new Promise(resolve => setTimeout(resolve, 1000));
+            const cfg = getRedisVersionConfig(version);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379);
             await startRedisProcess(home, confPath, version);
-            await setPathForRedis(cfg.suffix);
-            await refreshCurrentProcessEnv();
+            sandbox.setActive('redis', version);
             mainWindow.webContents.send('redis-changed');
-            return {success: true, message: `Redis ${version} 已重启并设为默认`};
+            return {
+                success: true,
+                port: portInfo.port,
+                defaultPort: portInfo.original,
+                portChanged: portInfo.changed,
+                message: portInfo.changed
+                    ? `端口 ${portInfo.original} 被占用，已自动改用 ${portInfo.port} 重启 Redis ${version}`
+                    : `Redis ${version} 已重启并设为默认，端口: ${portInfo.port}`,
+            };
         } catch (err) {
             logToFile(`重启 Redis ${version} 时出错: ${err.message}`);
             return {success: false, message: err.message};
@@ -706,9 +415,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('get-redis-service-status', async (event, version) => {
         try {
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, status: 'unknown', message: '不支持的版本'};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             const running = await isRedisRunning(version, home);
             return {success: true, status: running ? 'running' : 'stopped'};
         } catch (err) {
@@ -718,9 +425,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('get-redis-config', async (event, version) => {
         try {
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: '不支持的版本'};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: '未找到安装目录'};
             const confPath = path.join(home, 'redis.windows.conf');
             if (!fs.existsSync(confPath)) return {success: false, message: '配置文件不存在'};
@@ -737,9 +442,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
 
     ipcMain.handle('change-redis-password', async (event, version, oldPassword, newPassword) => {
         try {
-            const cfg = getRedisVersionConfig(version);
-            if (!cfg) return {success: false, message: `不支持的版本: ${version}`};
-            const home = await findRedisHome(version);
+            const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             const confPath = path.join(home, 'redis.windows.conf');
             if (!fs.existsSync(confPath)) throw new Error('未找到配置文件');
@@ -757,8 +460,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             await stopRedisProcess(version);
             await new Promise(resolve => setTimeout(resolve, 1000));
             await startRedisProcess(home, confPath, version);
-            await setPathForRedis(cfg.suffix);
-            await refreshCurrentProcessEnv();
+            sandbox.setActive('redis', version);
             mainWindow.webContents.send('redis-changed');
             logToFile(`Redis ${version} 密码修改成功`);
             return {success: true, message: `Redis ${version} 密码已修改，服务已重启并设为默认`};
