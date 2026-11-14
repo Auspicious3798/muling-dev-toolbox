@@ -46,6 +46,7 @@ async function installZip(zipPath, installDir, { log = () => {}, flattenPrefix =
 
     try {
         let sinceYield = 0;
+        let lastYieldAt = Date.now();
         for (const entry of entries) {
             const entryName = entry.entryName;
             if (entry.isDirectory) {
@@ -54,13 +55,17 @@ async function installZip(zipPath, installDir, { log = () => {}, flattenPrefix =
             }
             const target = path.join(installDir, entryName);
             fs.mkdirSync(path.dirname(target), { recursive: true });
+            if (entry.header && entry.header.size > 16 * 1024 * 1024) {
+                await new Promise((resolve) => setImmediate(resolve));
+            }
             fs.writeFileSync(target, entry.getData());
             doneBytes += entry.header && entry.header.size ? entry.header.size : 0;
             report(false);
             sinceYield += 1;
             // 每写一批文件让出事件循环，保证进度能及时渲染到界面
-            if (sinceYield >= 40) {
+            if (Date.now() - lastYieldAt >= 12) {
                 sinceYield = 0;
+                lastYieldAt = Date.now();
                 await new Promise((resolve) => setImmediate(resolve));
             }
         }

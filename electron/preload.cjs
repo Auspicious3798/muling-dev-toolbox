@@ -6,13 +6,20 @@ const {contextBridge, ipcRenderer, shell} = require('electron');
 // 否则透明窗口会退化成整块白屏。
 // 同一套判断还会带 --muling-software：软件渲染下关掉毛玻璃，
 // 避免全屏 backdrop-filter 把窗口拖到「未响应」。
+// --muling-lite => lightweight render path (no blur / shadow / animation).
+// is-software is kept as an alias for the older CSS rules.
 const PRELOAD_FLAGS = [
     ['--muling-opaque', 'is-opaque'],
+    ['--muling-lite', 'is-lite'],
     ['--muling-software', 'is-software'],
 ];
 const pendingClasses = PRELOAD_FLAGS
     .filter(([arg]) => process.argv.includes(arg))
     .map(([, cls]) => cls);
+
+if (pendingClasses.includes('is-lite') && !pendingClasses.includes('is-software')) {
+    pendingClasses.push('is-software');
+}
 
 if (pendingClasses.length) {
     const markRoot = () => {

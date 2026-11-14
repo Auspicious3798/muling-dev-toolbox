@@ -2,7 +2,7 @@ const {app, BrowserWindow, ipcMain, protocol, dialog, Menu, Tray, nativeImage} =
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const {execSync} = require('child_process');
+const {execSync, execFileSync} = require('child_process');
 const configManager = require('./configManager.cjs');
 const sandbox = require('./utils/sandbox.cjs');
 const registerJDKHandlers = require('./handlers/jdk.cjs');
@@ -27,6 +27,8 @@ let closeBehavior = 'tray';
 
 const SPLASH_MIN_MS = 3000;
 const SPLASH_MAX_MS = 12000;
+// 轻量档位下缩短启动页停留时间，弱机器上等待感更明显
+let splashMinMs = SPLASH_MIN_MS;
 const WINDOW_FADE_MS = 280;
 const IS_AUTOSTART = process.argv.includes('--autostart');
 let quitConfirmed = false;
@@ -364,38 +366,100 @@ function ensureTray() {
 // 透明窗口依赖系统合成（Windows 的 DWM + Chromium 的 GPU 合成）。
 // 虚拟机、远程桌面、禁用硬件加速或驱动异常时，Chromium 拿不到透明表面，
 // 会把整个窗口画成一整块白底 —— 看起来就是「装完打开白屏」。
-// 因此只有确认拿到硬件合成时才启用透明窗口，否则退化成不透明白底窗口。
-// 也可用 --opaque-window 启动参数或 MULING_OPAQUE_WINDOW=1 强制降级。
-function gpuCompositingEnabled() {
+// 另外显存过小（虚拟机默认的 VMware SVGA 只有 4MB）时，模糊、阴影、动画
+// 全部落到 CPU 光栅化，一帧几十毫秒到上百毫秒，系统直接把窗口判成「未响应」。
+// 所以启动时探测「GPU 合成能力 + 显存大小」，在两套档位间选：
+//   full —— 透明窗口 + 毛玻璃拟态
+//   lite —— 不透明纯色窗口 + 零模糊零动画零阴影
+// 可用 --opaque-window / --lite-ui / --full-ui，或环境变量
+// MULING_OPAQUE_WINDOW、MULING_LITE_UI 手动覆盖。
+const LITE_VRAM_BYTES = 2 * 1024 * 1024 * 1024;
+
+function gpuCompositingStatus() {
     try {
         const status = app.getGPUFeatureStatus();
-        return Boolean(status && status.gpu_compositing === 'enabled');
+        return (status && status.gpu_compositing) || 'unknown';
     } catch (err) {
-        return false;
+        return 'unknown';
     }
 }
 
-function shouldUseTransparentWindow() {
-    if (process.argv.includes('--opaque-window')) return false;
-    if (process.env.MULING_OPAQUE_WINDOW === '1') return false;
-    return gpuCompositingEnabled();
+// 显存大小：走注册表，两步查。
+// 1) HKLM\HARDWARE\DEVICEMAP\VIDEO 列出当前显示设备，值是驱动键路径；
+// 2) 每个驱动键下的 HardwareInformation.qwMemorySize（REG_QWORD，字节）就是显存。
+// 比 WMI 的 AdapterRAM 可靠（后者 32 位、超 4G 会截断），也不用起 PowerShell。
+// 读不到返回 0（未知），此时只按 GPU 合成能力判断，不额外降级。
+function queryRegValue(args) {
+    try {
+        return execFileSync('reg.exe', args, {
+            encoding: 'utf8',
+            timeout: 3000,
+            windowsHide: true,
+            stdio: ['ignore', 'pipe', 'ignore'],
+        });
+    } catch (err) {
+        return '';
+    }
+}
+
+function readVramBytes() {
+    const devmap = queryRegValue(['query', 'HKLM\\HARDWARE\\DEVICEMAP\\VIDEO']);
+    if (!devmap) return 0;
+
+    // 同一个驱动 GUID 会挂多个 \000N 实例，按 GUID 去重，只要第一份
+    const driverKeys = new Map();
+    const lineRe = /reg_sz\s+(\\(?:registry|machine)[^\r\n]*)$/gim;
+    let m;
+    while ((m = lineRe.exec(devmap))) {
+        const regPath = m[1].trim();
+        const guid = (regPath.match(/\\control\\video\\(\{[^}]+)\}/i) || [])[1];
+        if (!guid || driverKeys.has(guid)) continue;
+        driverKeys.set(guid, 'HKLM' + regPath.replace(/^\\(registry|machine)\\machine/i, ''));
+    }
+
+    let max = 0;
+    for (const key of driverKeys.values()) {
+        const bytesOut = queryRegValue(['query', key, '/v', 'HardwareInformation.qwMemorySize']);
+        const bytesMatch = bytesOut.match(/qwMemorySize\s+REG_QWORD\s+0x([0-9a-fA-F]+)/i);
+        if (bytesMatch) {
+            const v = parseInt(bytesMatch[1], 16);
+            if (Number.isFinite(v) && v > max) max = v;
+            continue;
+        }
+        const dwordOut = queryRegValue(['query', key, '/v', 'HardwareInformation.MemorySize']);
+        const dwordMatch = dwordOut.match(/MemorySize\s+REG_DWORD\s+0x([0-9a-fA-F]+)/i);
+        if (dwordMatch) {
+            const v = parseInt(dwordMatch[1], 16);
+            if (Number.isFinite(v) && v > max) max = v;
+        }
+    }
+    return max;
+}
+
+function computeRenderProfile() {
+    const compositing = gpuCompositingStatus();
+    const vramBytes = readVramBytes();
+    const lowVram = vramBytes > 0 && vramBytes < LITE_VRAM_BYTES;
+
+    let lite = compositing !== 'enabled' || lowVram;
+    if (process.argv.includes('--lite-ui') || process.env.MULING_LITE_UI === '1') lite = true;
+    if (process.argv.includes('--full-ui') || process.env.MULING_LITE_UI === '0') lite = false;
+
+    const forceOpaque = process.argv.includes('--opaque-window') || process.env.MULING_OPAQUE_WINDOW === '1';
+    return {lite, lowVram, vramBytes, compositing, transparent: !lite && !forceOpaque};
 }
 
 function createWindow() {
     Menu.setApplicationMenu(null);
 
-    const useTransparent = shouldUseTransparentWindow();
-    // 软件渲染（虚拟机 / 远程桌面 / 显卡驱动异常）下，全屏 backdrop-filter 模糊
-    // 会让整窗重绘慢到系统判定「未响应」，这里同步降级成纯色玻璃层。
-    const softwareRender = !gpuCompositingEnabled();
-    try {
-        const gpu = app.getGPUFeatureStatus();
-        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=${gpu && gpu.gpu_compositing} software_render=${softwareRender}`);
-    } catch (err) {
-        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=unknown software_render=${softwareRender}`);
-    }
+    const profile = computeRenderProfile();
+    splashMinMs = profile.lite ? 1200 : SPLASH_MIN_MS;
+    logToFile(
+        `[Window] transparent=${profile.transparent} lite=${profile.lite} gpu_compositing=${profile.compositing}` +
+        ` vram_mb=${profile.vramBytes ? Math.round(profile.vramBytes / 1048576) : 'unknown'}`
+    );
 
-    createSplashWindow(useTransparent);
+    createSplashWindow(profile.transparent);
 
     mainWindow = new BrowserWindow({
         width: 1200,
@@ -404,8 +468,8 @@ function createWindow() {
         minHeight: 600,
         frame: false,
         show: false,
-        transparent: useTransparent,
-        backgroundColor: useTransparent ? '#00000000' : '#0b1120',
+        transparent: profile.transparent,
+        backgroundColor: profile.transparent ? '#00000000' : '#0b1120',
         icon: path.join(__dirname, '../build/icon.ico'),
         webPreferences: {
             nodeIntegration: false,
@@ -413,8 +477,8 @@ function createWindow() {
             backgroundThrottling: false,
             preload: path.join(__dirname, 'preload.cjs'),
             additionalArguments: [
-                ...(useTransparent ? [] : ['--muling-opaque']),
-                ...(softwareRender ? ['--muling-software'] : []),
+                ...(profile.transparent ? [] : ['--muling-opaque']),
+                ...(profile.lite ? ['--muling-lite'] : []),
             ],
         }
     });
@@ -433,7 +497,7 @@ function createWindow() {
         }
 
         const since = splashShownAt || Date.now();
-        const remain = Math.max(0, SPLASH_MIN_MS - (Date.now() - since));
+        const remain = Math.max(0, splashMinMs - (Date.now() - since));
         const finish = () => {
             fadeInMainWindow();
             setTimeout(destroySplash, 120);

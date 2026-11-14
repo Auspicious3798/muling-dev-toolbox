@@ -1,0 +1,121 @@
+/* ============================================================================
+ * Lite 渲染档位
+ *
+ * 主进程在启动时探测「GPU 合成能力 + 显存大小」（electron/main.cjs 的
+ * computeRenderProfile），判定为轻量档位时给 <html> 加 .is-lite。
+ *
+ * 这一档位放弃所有依赖 GPU 合成的装饰：毛玻璃、投影、高光渐变、漂浮/呼吸动画。
+ * 原因是它们在软件光栅化下等于每帧对整窗做一次模糊+重绘，虚拟机里直接把窗口
+ * 拖进「未响应」。视觉上退化成纯色扁平界面，功能与布局完全一致。
+ *
+ * 手动覆盖：启动参数 --lite-ui / --full-ui，或环境变量 MULING_LITE_UI=1 / 0。
+ * ========================================================================== */
+
+/* ---------- 变量层：先把玻璃、模糊、投影、动效全部归零 ---------- */
+html.is-lite {
+  --glass-blur: 0px;
+  --glass-blur-soft: 0px;
+  --glass-saturate: 100%;
+  --glass-sheen: none;
+  --glass-depth: none;
+  --window-sheen: none;
+  --glass-shadow: none;
+  --glass-shadow-hover: none;
+  --glass-shadow-float: none;
+  --shadow-xs: none;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  --shadow-xl: none;
+  --transition-fast: 0ms;
+  --transition-normal: 0ms;
+  --transition-slow: 0ms;
+  --transition-lift: 0ms;
+}
+
+html.is-lite {
+  /* 亮色：玻璃层全部换成实色 */
+  --glass-tint: #ffffff;
+  --glass-tint-strong: #ffffff;
+  --glass-tint-soft: #f8fafc;
+  --glass-tint-hover: #f1f5f9;
+  --glass-stroke: rgba(15, 23, 42, 0.1);
+  --glass-highlight: none;
+  --glass-edge: inset 0 0 0 1px rgba(15, 23, 42, 0.08);
+  --app-bg: var(--opaque-backdrop);
+}
+
+html.is-lite.dark {
+  /* 暗色：对应实色 */
+  --glass-tint: #121a2b;
+  --glass-tint-strong: #162034;
+  --glass-tint-soft: #0f1626;
+  --glass-tint-hover: #1b2540;
+  --glass-stroke: rgba(148, 163, 184, 0.16);
+  --glass-edge: inset 0 0 0 1px rgba(148, 163, 184, 0.14);
+  --app-bg: var(--opaque-backdrop);
+}
+
+/* ---------- 全局：干掉模糊、投影、过渡、动画 ---------- */
+html.is-lite *,
+html.is-lite *::before,
+html.is-lite *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  animation: none !important;
+  transition: none !important;
+}
+
+/* 根节点铺实色，避免窗口透出桌面或白块 */
+html.is-lite,
+html.is-lite body,
+html.is-lite #app {
+  background-color: var(--opaque-backdrop);
+}
+
+/* 悬停位移在软件渲染下会引起整卡重绘，改成只变色 */
+html.is-lite .card:hover,
+html.is-lite .env-card:hover,
+html.is-lite .env-tile:hover,
+html.is-lite .stat-card:hover,
+html.is-lite .content-card:hover,
+html.is-lite .sandbox-card:hover,
+html.is-lite .advantage-item:hover,
+html.is-lite .tech-item:hover,
+html.is-lite .progress-card:hover,
+html.is-lite .package-item:hover {
+  transform: none !important;
+}
+
+/* 抽屉遮罩：实色半透明，不再对整屏做高斯模糊 */
+html.is-lite .drawer-overlay {
+  background: rgba(9, 14, 26, 0.62) !important;
+}
+
+html.is-lite .drawer-container {
+  background: var(--glass-tint-strong) !important;
+}
+
+/* 装饰性大图柔光边框、渐变光斑一并压平 */
+html.is-lite [class*="glow"],
+html.is-lite [class*="halo"],
+html.is-lite [class*="sheen"],
+html.is-lite [class*="blob"] {
+  background-image: none !important;
+  opacity: 0.001 !important;
+}
+
+/* 加载指示保留旋转：这是唯一的「正在工作」反馈，冻结会让人以为卡死 */
+html.is-lite [class*="spin"],
+html.is-lite .spinning,
+html.is-lite .spin {
+  animation: spin 900ms linear infinite !important;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
