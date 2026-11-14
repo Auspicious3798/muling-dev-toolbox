@@ -523,3 +523,25 @@ select option {
   border-right-color: rgba(15, 23, 42, 0.08);
   box-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
+
+/* ──────────────────────────────────────────────────────────────
+   软件渲染降级（虚拟机 / 远程桌面 / 显卡驱动异常）
+   Chromium 拿不到 GPU 合成时，backdrop-filter 的模糊要由 CPU 逐像素算：
+   一个全屏 30px 的模糊遮罩就足以让窗口持续重绘、被系统判定「未响应」。
+   这里在 is-software 下统一关掉毛玻璃，遮罩改成实色。
+   标记由 electron/preload.cjs 在首帧前加到 <html> 上。
+   ────────────────────────────────────────────────────────────── */
+html.is-software *,
+html.is-software *::before,
+html.is-software *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+html.is-software .drawer-overlay {
+  background: rgba(9, 14, 26, 0.66);
+}
+
+html.is-software .drawer-container {
+  background: var(--glass-tint-strong);
+}

@@ -4,15 +4,25 @@ const {contextBridge, ipcRenderer, shell} = require('electron');
 // 会在 webPreferences.additionalArguments 里带上 --muling-opaque。
 // 这里在首帧之前给根节点打标记，让 theme.css 铺一层不透明底色，
 // 否则透明窗口会退化成整块白屏。
-if (process.argv.includes('--muling-opaque')) {
-    const markOpaque = () => {
+// 同一套判断还会带 --muling-software：软件渲染下关掉毛玻璃，
+// 避免全屏 backdrop-filter 把窗口拖到「未响应」。
+const PRELOAD_FLAGS = [
+    ['--muling-opaque', 'is-opaque'],
+    ['--muling-software', 'is-software'],
+];
+const pendingClasses = PRELOAD_FLAGS
+    .filter(([arg]) => process.argv.includes(arg))
+    .map(([, cls]) => cls);
+
+if (pendingClasses.length) {
+    const markRoot = () => {
         const root = document.documentElement;
         if (!root) return false;
-        root.classList.add('is-opaque');
+        root.classList.add(...pendingClasses);
         return true;
     };
-    if (!markOpaque()) {
-        document.addEventListener('DOMContentLoaded', markOpaque, {once: true});
+    if (!markRoot()) {
+        document.addEventListener('DOMContentLoaded', markRoot, {once: true});
     }
 }
 

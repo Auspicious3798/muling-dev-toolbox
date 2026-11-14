@@ -366,9 +366,7 @@ function ensureTray() {
 // 会把整个窗口画成一整块白底 —— 看起来就是「装完打开白屏」。
 // 因此只有确认拿到硬件合成时才启用透明窗口，否则退化成不透明白底窗口。
 // 也可用 --opaque-window 启动参数或 MULING_OPAQUE_WINDOW=1 强制降级。
-function shouldUseTransparentWindow() {
-    if (process.argv.includes('--opaque-window')) return false;
-    if (process.env.MULING_OPAQUE_WINDOW === '1') return false;
+function gpuCompositingEnabled() {
     try {
         const status = app.getGPUFeatureStatus();
         return Boolean(status && status.gpu_compositing === 'enabled');
@@ -377,15 +375,24 @@ function shouldUseTransparentWindow() {
     }
 }
 
+function shouldUseTransparentWindow() {
+    if (process.argv.includes('--opaque-window')) return false;
+    if (process.env.MULING_OPAQUE_WINDOW === '1') return false;
+    return gpuCompositingEnabled();
+}
+
 function createWindow() {
     Menu.setApplicationMenu(null);
 
     const useTransparent = shouldUseTransparentWindow();
+    // 软件渲染（虚拟机 / 远程桌面 / 显卡驱动异常）下，全屏 backdrop-filter 模糊
+    // 会让整窗重绘慢到系统判定「未响应」，这里同步降级成纯色玻璃层。
+    const softwareRender = !gpuCompositingEnabled();
     try {
         const gpu = app.getGPUFeatureStatus();
-        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=${gpu && gpu.gpu_compositing}`);
+        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=${gpu && gpu.gpu_compositing} software_render=${softwareRender}`);
     } catch (err) {
-        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=unknown`);
+        logToFile(`[Window] transparent=${useTransparent} gpu_compositing=unknown software_render=${softwareRender}`);
     }
 
     createSplashWindow(useTransparent);
@@ -405,7 +412,10 @@ function createWindow() {
             contextIsolation: true,
             backgroundThrottling: false,
             preload: path.join(__dirname, 'preload.cjs'),
-            additionalArguments: useTransparent ? [] : ['--muling-opaque'],
+            additionalArguments: [
+                ...(useTransparent ? [] : ['--muling-opaque']),
+                ...(softwareRender ? ['--muling-software'] : []),
+            ],
         }
     });
 
