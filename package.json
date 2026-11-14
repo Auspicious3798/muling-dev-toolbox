@@ -65,7 +65,8 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "沐柠环境盒",
-      "artifactName": "MulingEnvBox-Setup-${version}.exe"
+      "artifactName": "MulingEnvBox-Setup-${version}.exe",
+      "include": "installer.nsh"
     },
     "npmRebuild": false
   },
