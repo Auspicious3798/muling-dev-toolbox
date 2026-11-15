@@ -107,10 +107,10 @@
         <span class="version-value">{{ sandboxRoot || '未初始化' }}</span>
       </div>
       <div class="setting-item" v-for="item in injectionItems" :key="item.tool">
-        <label>{{ item.label }}</label>
+        <label>{{ item.label }}<span v-if="item.envVar" class="env-var-name">{{ item.envVar }}</span></label>
         <div class="cache-info">
           <span :class="['injection-state', item.enabled ? 'on' : 'off']">
-            {{ item.enabled ? '已注入当前用户环境' : (item.active ? `未注入（默认 ${item.active}）` : '未安装') }}
+            {{ item.enabled ? '已注入当前用户环境' : (item.active ? `未注入（默认 ${item.active}）` : (item.installed ? '未注入' : '未安装')) }}
           </span>
           <button v-if="item.enabled" @click="detachOne(item)" :disabled="detaching">撤出</button>
           <button v-else-if="item.active" @click="injectOne(item)" :disabled="detaching">注入</button>
@@ -119,8 +119,14 @@
       <div class="setting-item">
         <label>全部撤出</label>
         <div class="cache-info">
-          <span class="hint-text">把注入过的 JAVA_HOME / PYTHON_HOME / MAVEN_HOME 及 PATH 条目一次清干净</span>
+          <span class="hint-text">把注入过的所有 *_HOME 变量与对应 PATH 条目一次清干净</span>
           <button class="danger-btn" @click="detachAll" :disabled="detaching">一键撤出</button>
+        </div>
+      </div>
+      <div v-if="!injectionItems.length" class="setting-item">
+        <label>提示</label>
+        <div class="cache-info">
+          <span class="hint-text">还没有可注入的工具，先去装一个 JDK / Python / Maven 之类的吧</span>
         </div>
       </div>
     </div>
@@ -468,17 +474,24 @@ export default {
         if (!info || !info.success) return;
         this.sandboxRoot = info.data.root || '';
         const tools = info.data.tools || {};
-        this.injectionItems = ['jdk', 'python', 'maven'].map((tool) => ({
-          tool,
-          label: { jdk: 'JDK', python: 'Python', maven: 'Maven' }[tool],
-          enabled: !!(tools[tool] && tools[tool].injected),
-          active: (tools[tool] && tools[tool].active) || ''
-        }));
+        // 不再写死三项：主进程把所有「可注入」的工具都标了 injectable + label + envVar
+        this.injectionItems = Object.entries(tools)
+          .filter(([, meta]) => meta && meta.injectable)
+          .map(([tool, meta]) => ({
+            tool,
+            label: meta.label || tool,
+            envVar: meta.envVar || '',
+            enabled: !!meta.injected,
+            active: meta.active || '',
+            installed: Array.isArray(meta.versions) ? meta.versions.length > 0 : false,
+          }))
+          .sort((a, b) => a.label.localeCompare(b.label));
+
       } catch (err) {}
     },
     async injectOne(item) {
       if (this.detaching) return;
-      if (!confirm(`把 ${item.label} ${item.active} 写进当前用户环境变量吗？\n写入 JAVA_HOME / PYTHON_HOME / MAVEN_HOME 与 PATH 引用，随时可以在这里撤出。`)) return;
+      if (!confirm(`把 ${item.label} ${item.active} 写进当前用户环境变量吗？\n写入 ${item.envVar || item.label} 与 PATH 引用，随时可以在这里撤出。`)) return;
       this.detaching = true;
       try {
         const r = await window.electronAPI.setSandboxInjection(item.tool, true);
@@ -500,7 +513,7 @@ export default {
     },
     async detachAll() {
       if (this.detaching) return;
-      if (!confirm('把注入过的所有系统变量（JAVA_HOME / PYTHON_HOME / MAVEN_HOME 及对应 PATH 条目）全部撤出吗？')) return;
+      if (!confirm('把注入过的所有系统变量（各项 *_HOME 及对应 PATH 条目）全部撤出吗？')) return;
       this.detaching = true;
       try {
         const r = await window.electronAPI.detachAllInjections();
@@ -717,6 +730,13 @@ input:checked + .slider::before { transform: translateX(22px); }
 .injection-state { font-size: 0.82rem; font-weight: 600; }
 .injection-state.on { color: var(--primary); }
 .injection-state.off { color: var(--text-muted); }
+.env-var-name {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
 .hint-text { font-size: 0.78rem; color: var(--text-muted); max-width: 420px; }
 .cache-info button.danger-btn {
   background: color-mix(in srgb, #ef4444 14%, transparent);

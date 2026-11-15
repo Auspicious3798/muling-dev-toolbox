@@ -13,10 +13,12 @@
         <div class="terminal-status">
           <span class="status-dot" :class="{ inactive: !hasEnv }"></span>
           <span class="status-label">当前环境</span>
-          <span v-if="!hasEnv" class="status-empty">{{ statusText }}</span>
-          <span v-for="tag in envTags" :key="tag.label" class="env-tag" :class="tag.tone">
-            <span class="env-tag-dot"></span>{{ tag.label }}
-          </span>
+          <div class="status-scroll" :title="statusTitle">
+            <span v-if="!hasEnv" class="status-empty">{{ statusText }}</span>
+            <span v-for="tag in envTags" :key="tag.label" class="env-tag" :class="tag.tone">
+              <span class="env-tag-dot"></span>{{ tag.label }}
+            </span>
+          </div>
         </div>
         <div class="terminal-meta">
           <span class="meta-item">{{ termSize }}</span>
@@ -65,6 +67,7 @@ const summary = ref([]);
 
 const hasEnv = computed(() => summary.value.length > 0);
 const statusText = computed(() => (summary.value.length ? summary.value.join('  |  ') : '沙箱内还没有激活的工具'));
+const statusTitle = computed(() => (summary.value.length ? summary.value.join('\n') : '沙箱内还没有激活的工具'));
 
 const ENV_TONES = {
   JDK: 'amber',
@@ -401,6 +404,37 @@ onBeforeUnmount(() => {
   flex: 1 1 auto;
   font-size: 12px;
   overflow: hidden;
+}
+
+/* 装的环境多了以后，只让标签这一行横向滚动，左侧的小圆点和「当前环境」字样保持不动 */
+.status-scroll {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+}
+
+.status-scroll::-webkit-scrollbar {
+  height: 4px;
+}
+
+.status-scroll::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.45);
+  border-radius: 2px;
+}
+
+.status-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.status-scroll > * {
+  flex: 0 0 auto;
 }
 
 .status-dot {

@@ -949,6 +949,8 @@ function getInfo() {
             active: getActive(tool),
             injected: isInjectionEnabled(tool),
             injectable: INJECTABLE_TOOLS.includes(tool),
+            label: TOOL_META[tool].label,
+            envVar: TOOL_META[tool].envVar,
             versions: installed,
         };
     }
