@@ -1,5 +1,6 @@
 const {ipcMain} = require('electron');
 const {spawn, exec} = require('child_process');
+const {spawnHidden} = require('../utils/hiddenSpawn.cjs');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -172,29 +173,41 @@ port=${port}
         if (await isMySQLRunning(installDir)) return null;
 
         const errLog = path.join(installDir, 'mysql-error.log');
-        const fd = fs.openSync(errLog, 'a');
         logToFile(`启动 MySQL 进程: "${mysqldPath}" --defaults-file="${confPath}"`);
-        const proc = spawn(mysqldPath, [`--defaults-file=${confPath}`], {
-            detached: true,
-            stdio: ['ignore', fd, fd],
-            cwd: installDir
-        });
-        fs.closeSync(fd);
-        proc.unref();
-        proc.on('exit', (code) => {
-            logToFile(`MySQL 进程退出，代码: ${code}`);
-            processes.delete(installDir);
-            const pidPath = getPidPath(installDir);
-            if (fs.existsSync(pidPath)) {
-                try { fs.unlinkSync(pidPath); } catch (e) {}
-            }
-        });
-        processes.set(installDir, proc);
-        fs.writeFileSync(getPidPath(installDir), String(proc.pid), 'utf8');
+
+        // mysqld.exe 拿不到控制台时会自己 AllocConsole()，所以 spawn({windowsHide:true}) 仍会弹黑窗口。
+        // 这里用 Start-Process -WindowStyle Hidden 启动，窗口处于 SW_HIDE 状态，服务安静跑在后台。
+        let pid = 0;
+        try {
+            pid = await spawnHidden(mysqldPath, [`--defaults-file=${confPath}`], installDir);
+            logToFile(`MySQL 已按隐藏窗口方式启动，PID: ${pid}，日志: ${errLog}`);
+        } catch (err) {
+            logToFile(`隐藏方式启动失败（${err.message}），回退到普通启动`);
+            const fd = fs.openSync(errLog, 'a');
+            const fallback = spawn(mysqldPath, [`--defaults-file=${confPath}`], {
+                windowsHide: true,
+                stdio: ['ignore', fd, fd],
+                cwd: installDir
+            });
+            fs.closeSync(fd);
+            fallback.unref();
+            fallback.on('exit', (code) => {
+                logToFile(`MySQL 进程退出，代码: ${code}`);
+                processes.delete(installDir);
+                const pidPath = getPidPath(installDir);
+                if (fs.existsSync(pidPath)) {
+                    try { fs.unlinkSync(pidPath); } catch (e) {}
+                }
+            });
+            processes.set(installDir, fallback);
+            pid = fallback.pid;
+        }
+
+        fs.writeFileSync(getPidPath(installDir), String(pid), 'utf8');
         const port = readPort(installDir);
         if (port) await waitForMySQL(port, 20000);
-        logToFile(`MySQL 进程已启动，PID: ${proc.pid}`);
-        return proc;
+        logToFile(`MySQL 进程已启动，PID: ${pid}`);
+        return pid;
     }
 
     async function stopMySQLProcess(installDir) {

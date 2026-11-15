@@ -109,7 +109,8 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         const relativeConfPath = path.basename(confPath);
         logToFile(`准备启动 Redis ${versionKey}，命令: "${redisServerPath}" "${relativeConfPath}" 工作目录: ${installDir}`);
         const proc = spawn(redisServerPath, [relativeConfPath], {
-            detached: true,
+            // 同 mysql：不能用 detached，否则 DETACHED_PROCESS 会盖掉 windowsHide，弹出控制台窗口
+            windowsHide: true,
             stdio: ['ignore', 'pipe', 'pipe'],
             cwd: installDir
         });
