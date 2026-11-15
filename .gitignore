@@ -49,6 +49,7 @@ __pycache__/
 
 # 本地沙箱测试遗留
 .dsh-sandbox-test.txt
+_dev/
 
 # 资源打包工作区
 _work/
