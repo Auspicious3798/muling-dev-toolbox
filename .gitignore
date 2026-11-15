@@ -16,6 +16,9 @@ out/
 coverage
 *.local
 
+# 打包期间使用的本地临时目录（TEMP/TMP 重定向，见 scripts/build.cjs）
+.build-tmp/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

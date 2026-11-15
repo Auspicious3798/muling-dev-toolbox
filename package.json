@@ -10,7 +10,7 @@
     "preview": "vite preview",
     "electron:dev": "cross-env NODE_ENV=development concurrently -k -n VITE,ELECTRON \"npm run dev\" \"electron .\"",
     "electron:dev:debug": "cross-env NODE_ENV=development OPEN_DEVTOOLS=true concurrently -k -n VITE,ELECTRON \"npm run dev\" \"electron .\"",
-    "electron:build": "vite build && electron-builder",
+    "electron:build": "node scripts/build.cjs",
     "sign:check": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/verify-signature.ps1",
     "sign:dev-cert": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/make-dev-cert.ps1"
   },
