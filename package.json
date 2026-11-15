@@ -41,7 +41,7 @@
     "productName": "沐柠环境盒",
     "artifactName": "${productName}-Setup-${version}.exe",
     "directories": {
-      "output": "../out"
+      "output": "dist_electron"
     },
     "files": [
       "dist/**/*",
