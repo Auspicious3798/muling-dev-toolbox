@@ -56,6 +56,26 @@
     </div>
 
     <div class="settings-section">
+      <h2>显示与性能</h2>
+      <div class="setting-item">
+        <label>渲染模式</label>
+        <select v-model="renderMode">
+          <option value="auto">自动（按显卡能力探测）</option>
+          <option value="lite">流畅优先（关闭毛玻璃与动画）</option>
+          <option value="full">画质优先（毛玻璃与动效）</option>
+        </select>
+      </div>
+      <div class="setting-item">
+        <label>当前状态</label>
+        <div class="cache-info">
+          <span class="version-value">{{ renderStatusText }}</span>
+          <button v-if="renderRestartHint" @click="relaunchApp">立即重启</button>
+        </div>
+      </div>
+      <p class="render-hint">{{ renderDetailText }}</p>
+    </div>
+
+    <div class="settings-section">
       <h2>存储</h2>
       <div class="setting-item">
         <label>沙箱占用</label>
@@ -239,6 +259,9 @@ export default {
       updateInfo: null,
       updateCheckTip: '',
       closeBehavior: 'tray',
+      renderMode: 'auto',
+      renderProfile: null,
+      renderRestartHint: false,
       cacheSize: 0,
       logsSize: 0,
       clearingCache: false,
@@ -258,8 +281,50 @@ export default {
       usageLoading: false
     };
   },
-  mounted() { this.loadSettings(); this.loadCacheInfo(); this.loadVersionInfo(); this.loadInjection(); this.loadAutoLaunch(); this.loadSandboxUsage(); },
+  mounted() { this.loadSettings(); this.loadCacheInfo(); this.loadVersionInfo(); this.loadInjection(); this.loadAutoLaunch(); this.loadSandboxUsage(); this.loadRenderProfile(); },
+  computed: {
+    renderStatusText() {
+      const p = this.renderProfile;
+      if (!p) return '读取中…';
+      const tier = p.lite ? '流畅档' : '画质档';
+      const gpu = p.compositing === 'enabled' ? 'GPU 合成已启用' : 'GPU 合成不可用';
+      const vram = p.vramMb ? `显存 ${p.vramMb} MB` : '显存未知';
+      const from = p.mode === 'auto' ? '自动探测' : '手动指定';
+      return `${tier} · ${gpu} · ${vram} · ${from}`;
+    },
+    renderDetailText() {
+      const p = this.renderProfile;
+      if (!p) return '';
+      if (p.hint && p.hint.detail) return p.hint.detail;
+      if (p.lite && p.vramMb && p.vramMb < 2048) return '显存低于 2 GB，已自动切到流畅档。';
+      return p.lite ? '' : '当前为画质档：毛玻璃与动效全部开启。';
+    }
+  },
   methods: {
+    async loadRenderProfile() {
+      if (!window.electronAPI || !window.electronAPI.getRenderProfile) return;
+      try {
+        const res = await window.electronAPI.getRenderProfile();
+        if (res && res.success) {
+          this.renderProfile = res;
+          this.renderMode = res.mode || 'auto';
+        }
+      } catch (err) {}
+    },
+    async applyRenderMode(mode) {
+      if (!window.electronAPI || !window.electronAPI.setRenderMode) return;
+      try {
+        const res = await window.electronAPI.setRenderMode(mode);
+        this.renderRestartHint = !!(res && res.restartRequired);
+        if (res && res.restartRequired && window.Lemon && window.Lemon.info) {
+          window.Lemon.info('渲染模式已保存，重启后生效');
+        }
+        await this.loadRenderProfile();
+      } catch (err) {}
+    },
+    relaunchApp() {
+      if (window.electronAPI && window.electronAPI.relaunchApp) window.electronAPI.relaunchApp();
+    },
     async loadSandboxUsage() {
       if (!window.electronAPI || !window.electronAPI.getSandboxUsage) return;
       try {
@@ -499,7 +564,8 @@ export default {
         });
       }
     },
-    closeBehavior() { this.saveSettings(); }
+    closeBehavior() { this.saveSettings(); },
+    renderMode(value) { this.applyRenderMode(value); }
   }
 };
 </script>
@@ -631,6 +697,13 @@ input:checked + .slider::before { transform: translateX(22px); }
 .update-hint { font-size: 0.76rem; color: var(--primary); margin-right: 8px; }
 .update-hint.muted { color: var(--text-muted); }
 .cache-info { display: flex; gap: var(--space-3); align-items: center; color: var(--text-secondary); font-size: 0.88rem; }
+
+.render-hint {
+  margin: 6px 0 0;
+  font-size: 0.78rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+}
 
 .cache-info button {
   background: var(--info-bg); color: var(--info-text); border: none;

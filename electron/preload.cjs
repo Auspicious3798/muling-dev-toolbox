@@ -158,6 +158,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     closeWindow: () => ipcRenderer.send('close-window'),
     setCloseBehavior: (value) => ipcRenderer.send('set-close-behavior', value),
     getCloseBehavior: () => ipcRenderer.invoke('get-close-behavior'),
+    getRenderProfile: () => ipcRenderer.invoke('get-render-profile'),
+    setRenderMode: (mode) => ipcRenderer.invoke('set-render-mode', mode),
+    relaunchApp: () => ipcRenderer.send('relaunch-app'),
     showMainWindow: () => ipcRenderer.send('show-main-window'),
     
     // 配置管理

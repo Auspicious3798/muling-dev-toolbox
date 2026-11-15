@@ -24,6 +24,9 @@ let splashWindow = null;
 let splashShownAt = 0;
 let isQuitting = false;
 let closeBehavior = 'tray';
+// 渲染档位：auto 按硬件探测，lite/full 由用户在设置里强制
+let renderMode = 'auto';
+let lastRenderProfile = null;
 
 const SPLASH_MIN_MS = 3000;
 const SPLASH_MAX_MS = 12000;
@@ -155,6 +158,9 @@ function loadWindowSettings() {
         if (data && (data.closeBehavior === 'exit' || data.closeBehavior === 'tray')) {
             closeBehavior = data.closeBehavior;
         }
+        if (data && (data.renderMode === 'auto' || data.renderMode === 'lite' || data.renderMode === 'full')) {
+            renderMode = data.renderMode;
+        }
     } catch (err) {
         // 首次运行没有配置文件，沿用默认值
     }
@@ -162,7 +168,7 @@ function loadWindowSettings() {
 
 function saveWindowSettings() {
     try {
-        fs.writeFileSync(getWindowSettingsPath(), JSON.stringify({closeBehavior}), 'utf8');
+        fs.writeFileSync(getWindowSettingsPath(), JSON.stringify({closeBehavior, renderMode}), 'utf8');
     } catch (err) {
         console.error('[Tray] 保存窗口设置失败:', err.message);
     }
@@ -412,7 +418,7 @@ function readVramBytes() {
     let m;
     while ((m = lineRe.exec(devmap))) {
         const regPath = m[1].trim();
-        const guid = (regPath.match(/\\control\\video\\(\{[^}]+)\}/i) || [])[1];
+        const guid = (regPath.match(/\\control\\video\\(\{[^}]+\})/i) || [])[1];
         if (!guid || driverKeys.has(guid)) continue;
         driverKeys.set(guid, 'HKLM' + regPath.replace(/^\\(registry|machine)\\machine/i, ''));
     }
@@ -436,27 +442,84 @@ function readVramBytes() {
     return max;
 }
 
+// 解释「为什么没拿到 GPU 合成」：远程会话、虚拟显示器是最常见的两种。
+// 只在真的降级时才查，正常机器上不付这份开销。
+const VIRTUAL_DISPLAY_RE = /virtual display|gameviewer|parsec|spacedesk|todesk|sunlogin|qemu|vmware|virtualbox|microsoft basic|basic display/i;
+
+function detectDisplayHint() {
+    const session = (process.env.SESSIONNAME || '').toUpperCase();
+    if (session.startsWith('RDP')) {
+        return {reason: 'remote_session', detail: '远程桌面会话（RDP）下 Chromium 通常禁用 GPU 合成'};
+    }
+
+    const devmap = queryRegValue(['query', 'HKLM\\HARDWARE\\DEVICEMAP\\VIDEO']);
+    const guids = new Set();
+    const guidRe = /\\control\\video\\(\{[^}]+\})/gi;
+    let m;
+    while ((m = guidRe.exec(devmap))) guids.add(m[1]);
+
+    for (const guid of guids) {
+        const out = queryRegValue(['query', `HKLM\\SYSTEM\\CurrentControlSet\\Control\\Video\\${guid}\\0000`, '/v', 'DriverDesc']);
+        const desc = (out.match(/DriverDesc\s+REG_SZ\s+(.+)$/im) || [])[1];
+        if (desc && VIRTUAL_DISPLAY_RE.test(desc)) {
+            return {reason: 'virtual_display', detail: `桌面输出到了虚拟显示器：${desc.trim()}`};
+        }
+    }
+    return {reason: 'gpu_unavailable', detail: 'Chromium 没能初始化 ANGLE/D3D，已回退到软件渲染'};
+}
+
 function computeRenderProfile() {
     const compositing = gpuCompositingStatus();
     const vramBytes = readVramBytes();
     const lowVram = vramBytes > 0 && vramBytes < LITE_VRAM_BYTES;
 
+    // auto：拿不到 GPU 合成、或显存过小，降 lite
     let lite = compositing !== 'enabled' || lowVram;
-    if (process.argv.includes('--lite-ui') || process.env.MULING_LITE_UI === '1') lite = true;
-    if (process.argv.includes('--full-ui') || process.env.MULING_LITE_UI === '0') lite = false;
+    let source = 'auto';
+
+    if (renderMode === 'lite') {
+        lite = true;
+        source = 'setting';
+    } else if (renderMode === 'full') {
+        lite = false;
+        source = 'setting';
+    }
+
+    if (process.argv.includes('--lite-ui') || process.env.MULING_LITE_UI === '1') {
+        lite = true;
+        source = 'flag';
+    }
+    if (process.argv.includes('--full-ui') || process.env.MULING_LITE_UI === '0') {
+        lite = false;
+        source = 'flag';
+    }
 
     const forceOpaque = process.argv.includes('--opaque-window') || process.env.MULING_OPAQUE_WINDOW === '1';
-    return {lite, lowVram, vramBytes, compositing, transparent: !lite && !forceOpaque};
+    const hint = compositing === 'enabled' ? {reason: 'ok', detail: ''} : detectDisplayHint();
+
+    return {
+        lite,
+        lowVram,
+        vramBytes,
+        compositing,
+        transparent: !lite && !forceOpaque,
+        mode: renderMode,
+        source,
+        hint,
+    };
 }
 
 function createWindow() {
     Menu.setApplicationMenu(null);
 
     const profile = computeRenderProfile();
+    lastRenderProfile = profile;
     splashMinMs = profile.lite ? 1200 : SPLASH_MIN_MS;
     logToFile(
-        `[Window] transparent=${profile.transparent} lite=${profile.lite} gpu_compositing=${profile.compositing}` +
-        ` vram_mb=${profile.vramBytes ? Math.round(profile.vramBytes / 1048576) : 'unknown'}`
+        `[Window] transparent=${profile.transparent} lite=${profile.lite} mode=${profile.mode} source=${profile.source}` +
+        ` gpu_compositing=${profile.compositing}` +
+        ` vram_mb=${profile.vramBytes ? Math.round(profile.vramBytes / 1048576) : 'unknown'}` +
+        ` reason=${profile.hint.reason}${profile.hint.detail ? ' detail=' + profile.hint.detail : ''}`
     );
 
     createSplashWindow(profile.transparent);
@@ -1062,6 +1125,35 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('get-close-behavior', () => ({closeBehavior}));
+
+    // ---- 渲染档位 ----
+    ipcMain.handle('get-render-profile', () => {
+        const p = lastRenderProfile || computeRenderProfile();
+        return {
+            success: true,
+            mode: p.mode,
+            lite: p.lite,
+            transparent: p.transparent,
+            source: p.source,
+            compositing: p.compositing,
+            vramMb: p.vramBytes ? Math.round(p.vramBytes / 1048576) : 0,
+            hint: p.hint,
+        };
+    });
+
+    ipcMain.handle('set-render-mode', (event, mode) => {
+        renderMode = (mode === 'lite' || mode === 'full') ? mode : 'auto';
+        saveWindowSettings();
+        const current = lastRenderProfile || computeRenderProfile();
+        const next = computeRenderProfile();
+        // 透明窗口没法在运行时切换，只能重启生效
+        return {success: true, restartRequired: next.lite !== current.lite};
+    });
+
+    ipcMain.on('relaunch-app', () => {
+        app.relaunch();
+        app.exit(0);
+    });
 
     ipcMain.on('show-main-window', () => showMainWindow());
 
