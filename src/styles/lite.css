@@ -64,7 +64,12 @@ html.is-lite *::after {
   -webkit-backdrop-filter: none !important;
   box-shadow: none !important;
   text-shadow: none !important;
-  animation: none !important;
+  /* 不能直接 animation: none —— 很多卡片是 opacity:0 + 动画 forwards 才显形，
+     干掉动画会让它们永远停在透明状态（仪表盘「已安装环境」整块空白）。
+     改成瞬间跑完一次，既不动画，又能落到动画结束时的最终样式。 */
+  animation-duration: 0.001s !important;
+  animation-delay: 0s !important;
+  animation-iteration-count: 1 !important;
   transition: none !important;
 }
 
@@ -112,6 +117,15 @@ html.is-lite [class*="spin"],
 html.is-lite .spinning,
 html.is-lite .spin {
   animation: spin 900ms linear infinite !important;
+}
+
+/* 兜底：所有靠动画显形的卡片，直接给最终态，避免个别元素漏网 */
+html.is-lite .env-card,
+html.is-lite .stat-card,
+html.is-lite .package-item,
+html.is-lite .feature-card {
+  opacity: 1 !important;
+  transform: none !important;
 }
 
 @keyframes spin {
