@@ -44,6 +44,17 @@
         :tool="activeTool"
         @installed="onInstalled"
     />
+    <transition name="task-pill">
+      <div v-if="installPill" class="install-pill" @click="reopenInstallDrawer">
+        <div class="install-pill-head">
+          <span class="install-pill-title">{{ installPill.label }} 安装中</span>
+          <span class="install-pill-pct">{{ Math.round(installPill.percent) }}%</span>
+        </div>
+        <div class="install-pill-bar"><i :style="{ width: Math.round(installPill.percent) + '%' }"></i></div>
+        <p class="install-pill-stage">{{ installPill.stage }}</p>
+        <span class="install-pill-hint">点击回到安装面板</span>
+      </div>
+    </transition>
     <TerminalPanel v-if="terminalOpen" :focus="terminalFocus" @close="terminalOpen = false"/>
     <LemonToast/>
   </div>
@@ -63,6 +74,7 @@ import ProductIntro from './components/ProductIntro.vue';
 import TerminalPanel from './components/TerminalPanel.vue';
 import LemonToast from './components/LemonToast.vue';
 import eventBus from './eventBus';
+import { taskCenter, startTask, updateTask, finishTask, clearTask } from './utils/taskCenter';
 import '@/styles/theme.css';
 
 export default {
@@ -93,10 +105,21 @@ export default {
       unsubscribeMaximized: null,
     };
   },
+  computed: {
+    installTask() {
+      return taskCenter.active;
+    },
+    installPill() {
+      const active = taskCenter.active;
+      if (!active || active.status !== 'running') return null;
+      return this.drawerVisible ? null : active;
+    },
+  },
   mounted() {
     this.initTheme();
     this.syncCloseBehavior();
     this.syncWindowState();
+    this.bindInstallTaskEvents();
     eventBus.on('theme-change', this.handleThemeChange);
     eventBus.on('scan-start', this.handleScanStart);
     eventBus.on('scan-end', this.handleScanEnd);
@@ -106,6 +129,7 @@ export default {
     setTimeout(() => this.restoreServices(), 1800);
   },
   beforeUnmount() {
+    this.unbindInstallTaskEvents();
     if (typeof this.unsubscribeMaximized === 'function') this.unsubscribeMaximized();
     eventBus.off('theme-change', this.handleThemeChange);
     eventBus.off('scan-start', this.handleScanStart);
@@ -115,6 +139,78 @@ export default {
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
+    bindInstallTaskEvents() {
+      this._progressUnsubs = [];
+      this._taskClearTimer = null;
+      this._busyHinted = false;
+      eventBus.on('install:start', this.handleInstallStart);
+      eventBus.on('install:end', this.handleInstallEnd);
+      const api = window.electronAPI;
+      if (!api) return;
+      // JDK / Python 走通用 download-progress，其余工具各有独立通道
+      const channels = [
+        'onDownloadProgress',
+        'onMySQLProgress',
+        'onRedisProgress',
+        'onMavenProgress',
+        'onGradleProgress',
+        'onNodejsProgress',
+        'onUvProgress',
+        'onNginxProgress',
+      ];
+      channels.forEach((name) => {
+        if (typeof api[name] !== 'function') return;
+        try {
+          const unsub = api[name]((data) => this.handleInstallProgress(data));
+          if (typeof unsub === 'function') this._progressUnsubs.push(unsub);
+        } catch (err) {
+          /* 订阅失败不影响主流程 */
+        }
+      });
+    },
+    unbindInstallTaskEvents() {
+      eventBus.off('install:start', this.handleInstallStart);
+      eventBus.off('install:end', this.handleInstallEnd);
+      (this._progressUnsubs || []).forEach((fn) => { try { fn && fn(); } catch (err) {} });
+      this._progressUnsubs = [];
+      if (this._taskClearTimer) {
+        clearTimeout(this._taskClearTimer);
+        this._taskClearTimer = null;
+      }
+    },
+    handleInstallStart(tool) {
+      if (this._taskClearTimer) {
+        clearTimeout(this._taskClearTimer);
+        this._taskClearTimer = null;
+      }
+      this._busyHinted = false;
+      startTask(tool && typeof tool === 'string' ? tool : this.activeTool);
+    },
+    handleInstallEnd() {
+      const active = taskCenter.active;
+      if (!active || active.status !== 'running') return;
+      finishTask('done');
+      if (this._taskClearTimer) clearTimeout(this._taskClearTimer);
+      this._taskClearTimer = setTimeout(() => {
+        const current = taskCenter.active;
+        if (!current || current.status !== 'running') clearTask();
+      }, 4000);
+    },
+    handleInstallProgress(data) {
+      if (!data || !data.type) return;
+      updateTask(data.type, {
+        percent: typeof data.progress === 'number' ? data.progress * 100 : undefined,
+        stage: data.stage,
+        speed: data.speed,
+        eta: data.eta,
+      });
+    },
+    reopenInstallDrawer() {
+      const active = taskCenter.active;
+      if (!active) return;
+      this.activeTool = active.tool;
+      this.drawerVisible = true;
+    },
     async restoreServices() {
       if (!window.electronAPI || !window.electronAPI.getServiceState) return;
       let settings = {};
@@ -512,6 +608,92 @@ body {
 .scan-overlay-enter-from,
 .scan-overlay-leave-to {
   opacity: 0;
+}
+
+/* ── 后台安装悬浮条 ── */
+.install-pill {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 240px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--glass-shadow-float);
+  cursor: pointer;
+  z-index: 1200;
+  backdrop-filter: blur(18px) saturate(140%);
+  -webkit-backdrop-filter: blur(18px) saturate(140%);
+  transition: transform var(--transition-fast);
+}
+
+.install-pill:hover {
+  transform: translateY(-2px);
+}
+
+.install-pill-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.install-pill-title {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.install-pill-pct {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.install-pill-bar {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--bg-hover);
+  overflow: hidden;
+  margin: 8px 0 6px;
+}
+
+.install-pill-bar i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--primary);
+  transition: width 0.3s ease;
+}
+
+.install-pill-stage {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.install-pill-hint {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  opacity: 0.75;
+}
+
+.task-pill-enter-active,
+.task-pill-leave-active {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.task-pill-enter-from,
+.task-pill-leave-to {
+  opacity: 0;
+  transform: translateY(8px);
 }
 
 /* ── Selection ── */

@@ -1,6 +1,6 @@
 <template>
   <Transition name="drawer">
-    <div v-if="visible" class="drawer-overlay" @click.self="close">
+    <div v-show="visible" class="drawer-overlay" @click.self="handleOverlayClick">
       <div class="drawer-container">
         <!-- Premium Header -->
         <div class="drawer-header">
@@ -10,17 +10,17 @@
             </div>
             <div class="header-text">
               <h3>安装 {{ toolLabel }}</h3>
-              <span class="header-subtitle">选择版本并开始安装</span>
+              <span class="header-subtitle">{{ headerSubtitle }}</span>
             </div>
           </div>
-          <button class="close-btn" @click="close" aria-label="关闭">
+          <button class="close-btn" @click="handleCloseButton" aria-label="关闭">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
         <!-- Body -->
         <div class="drawer-body">
-          <component :is="installerComponent" ref="installerRef" @installed="onInstalled"/>
+          <component v-if="installerComponent" :is="installerComponent" ref="installerRef" @installed="onInstalled"/>
         </div>
       </div>
     </div>
@@ -59,6 +59,7 @@ import NodejsInstaller from './installers/NodejsInstaller.vue';
 import NginxInstaller from './installers/NginxInstaller.vue';
 import eventBus from '@/eventBus';
 import Lemon from '@/utils/lemon';
+import { taskCenter } from '@/utils/taskCenter';
 
 export default {
   name: 'InstallDrawer',
@@ -82,9 +83,39 @@ export default {
   computed: {
     toolLabel() { const m = {jdk:'JDK',python:'Python',mysql:'MySQL',redis:'Redis',maven:'Maven',nginx:'Nginx'}; return m[this.tool]||this.tool.toUpperCase(); },
     installerComponent() { const c = {jdk:'JDKInstaller',python:'PythonInstaller',mysql:'MySQLInstaller',redis:'RedisInstaller',maven:'MavenInstaller',nginx:'NginxInstaller',gradle:'GradleInstaller',uv:'UvInstaller',nodejs:'NodejsInstaller'}; return c[this.tool]; },
+    currentTask() {
+      const active = taskCenter.active;
+      if (!active || active.status !== 'running') return null;
+      return active.tool === this.tool ? active : null;
+    },
+    busy() { return Boolean(this.currentTask); },
+    taskPercent() { return this.currentTask ? Math.round(this.currentTask.percent) : 0; },
+    headerSubtitle() {
+      if (!this.currentTask) return '选择版本并开始安装';
+      const stage = this.currentTask.stage || '安装中';
+      return `${this.taskPercent}% · ${stage}`;
+    },
   },
   methods: {
     close() { this.$emit('update:visible', false); },
+    handleOverlayClick() {
+      // 安装进行中时，误点空白区域不再直接把面板关掉（否则用户会以为任务丢了）
+      if (this.busy) {
+        const now = Date.now();
+        if (!this._busyHintAt || now - this._busyHintAt > 1800) {
+          this._busyHintAt = now;
+          if (Lemon && Lemon.info) Lemon.info('安装还在跑，关掉面板也不会中断，右下角能看到进度～');
+        }
+        return;
+      }
+      this.close();
+    },
+    handleCloseButton() {
+      if (this.busy && Lemon && Lemon.info) {
+        Lemon.info(`${this.toolLabel} 继续在后台安装，右下角可以点回来～`);
+      }
+      this.close();
+    },
     onInstalled() { this.$emit('installed'); },
     goToSettings() { this.showSpeedWarning = false; this.$emit('update:visible', false); eventBus.emit('navigate:settings'); },
   },
