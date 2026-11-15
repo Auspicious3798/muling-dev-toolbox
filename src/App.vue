@@ -28,7 +28,7 @@
         <div class="control-btn" @click="minimizeWindow">─</div>
         <div class="control-btn close-btn" @click="closeWindow">✕</div>
       </div>
-      <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard"/>
+      <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard" @select-tool="handleToolSelect"/>
       <Settings v-else-if="activeTool === 'settings'"/>
       <div v-else-if="activeTool === 'about' || activeTool === 'product'" class="merged-page">
         <ProductIntro/>

@@ -69,7 +69,7 @@
         </button>
       </div>
       <div class="env-grid">
-        <div v-for="(env, idx) in envList" :key="env.id" class="env-card" :class="{ 'not-installed': !env.installed }" :style="{ animationDelay: idx * 45 + 'ms' }" @click="env.installed ? null : installEnv(env.id)">
+        <div v-for="(env, idx) in envList" :key="env.id" class="env-card is-clickable" :style="{ animationDelay: idx * 45 + 'ms' }" @click="openTool(env.id)">
           <div class="env-card-header">
             <img :src="env.icon" class="env-icon" alt=""/>
             <span class="env-name">{{ env.name }}</span>
@@ -103,6 +103,10 @@
             </button>
           </div>
         </div>
+      </div>
+      <div v-if="!refreshing && envList.length === 0" class="env-empty">
+        <div class="env-empty-title">还没有已安装的环境</div>
+        <div class="env-empty-hint">从左侧导航选一个工具开始安装，装好后会自动出现在这里。</div>
       </div>
     </div>
 
@@ -163,11 +167,7 @@
 <script>
 import eventBus from '@/eventBus';
 import Lemon from '@/utils/lemon';
-import JavaIcon from '../../public/icons/java.svg?url';
-import PythonIcon from '../../public/icons/Python.svg?url';
-import MysqlIcon from '../../public/icons/mysql.svg?url';
-import RedisIcon from '../../public/icons/Redis.svg?url';
-import MavenIcon from '../../public/icons/maven.svg?url';
+import { DASHBOARD_TOOLS } from '@/config/tools';
 
 export default {
   name: 'Dashboard',
@@ -264,13 +264,20 @@ export default {
       this.currentDate = `${now.getFullYear()}年${now.getMonth() + 1}月${now.getDate()}日 ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
     },
     async loadEnvData() {
-      const envs = [
-        { id: 'jdk', name: 'JDK', icon: JavaIcon, checkMethod: 'checkJDK', switchMethod: 'switchJDK', deleteMethod: 'deleteJDK', serviceCapable: false },
-        { id: 'python', name: 'Python', icon: PythonIcon, checkMethod: 'checkPython', switchMethod: 'switchPython', deleteMethod: 'deletePython', serviceCapable: false },
-        { id: 'mysql', name: 'MySQL', icon: MysqlIcon, checkMethod: 'checkMySQL', switchMethod: 'switchMySQL', deleteMethod: 'deleteMySQL', serviceCapable: true, getStatusMethod: 'getMySQLServiceStatus', startMethod: 'startMySQLService', stopMethod: 'stopMySQLService' },
-        { id: 'redis', name: 'Redis', icon: RedisIcon, checkMethod: 'checkRedis', switchMethod: 'switchRedis', deleteMethod: 'deleteRedis', serviceCapable: true, getStatusMethod: 'getRedisServiceStatus', startMethod: 'startRedisService', stopMethod: 'stopRedisService' },
-        { id: 'maven', name: 'Maven', icon: MavenIcon, checkMethod: 'checkMaven', deleteMethod: 'uninstallMaven', serviceCapable: false, isSimple: true }
-      ];
+      // 清单来自 src/config/tools.js，不再写死；只展示本机已经装上的工具。
+      const envs = DASHBOARD_TOOLS.map((tool) => ({
+        id: tool.id,
+        name: tool.name,
+        icon: tool.icon,
+        isSimple: Boolean(tool.isSimple),
+        checkMethod: tool.check,
+        switchMethod: tool.switch || null,
+        deleteMethod: tool.remove || null,
+        serviceCapable: Boolean(tool.service),
+        getStatusMethod: tool.service ? tool.service.status : null,
+        startMethod: tool.service ? tool.service.start : null,
+        stopMethod: tool.service ? tool.service.stop : null
+      }));
       const results = [];
       for (const env of envs) {
         try {
@@ -291,7 +298,7 @@ export default {
           }
         } catch (err) { results.push({...env, installed: false, defaultVersion: null}); }
       }
-      this.envList = results;
+      this.envList = results.filter((env) => env.installed);
     },
     async refreshAll() { if (this.refreshing) return; this.refreshing = true; await this.loadEnvData(); this.refreshing = false; },
     async switchVersion(envId) {
@@ -328,6 +335,7 @@ export default {
     },
     installEnv(envId) { this.$emit('install', envId); },
     quickInstall(envId) { this.$emit('install', envId); },
+    openTool(toolId) { this.$emit('select-tool', toolId); },
     openVersionManager() { Lemon.info('版本管理器还在打磨，很快就来啦～'); },
     async loadSandbox() {
       if (!window.electronAPI || !window.electronAPI.getSandboxInfo) return;
@@ -792,6 +800,30 @@ export default {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 14px;
+}
+
+.env-card.is-clickable {
+  cursor: pointer;
+}
+
+.env-empty {
+  margin-top: 4px;
+  padding: 26px 20px;
+  border-radius: 14px;
+  border: 1px dashed var(--border-light);
+  text-align: center;
+}
+
+.env-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.env-empty-hint {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-secondary);
 }
 
 .env-card {
