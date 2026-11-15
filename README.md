@@ -268,7 +268,17 @@ MULING_ASSET_BASE=https://cdn.example.com/muling npm run electron:dev
 - 作者：Auspicious3798（全栈沐柠）
 - 邮箱：taxuexunmei3798@126.com
 - 下载站：<https://www.muling-download.site>
-- 反馈：<https://github.com/Auspicious3798/muling-dev-toolbox/issues>
+- 源码：<https://gitee.com/auspicious3798/muling-dev-toolbox>
+- 反馈：<https://gitee.com/auspicious3798/muling-dev-toolbox/issues>
+
+## 开源协议
+
+沐柠环境盒以 **MIT** 协议开源，详见 [LICENSE](LICENSE)。你可以自由使用、修改、分发，商用也可以，
+保留版权声明即可。界面里的沐柠形象与插画同样随仓库一起开源。
+
+如果你基于它做了二次开发，欢迎开个 issue 告诉我，我把它加到「友链」里。
+
+版本变更记录见 [CHANGELOG.md](CHANGELOG.md)。
 
 > 沐柠环境盒仅供学习、研究和个人使用，使用前请备份重要数据；因使用本工具导致的数据丢失或系统异常，开发者不承担直接或间接责任。
 > 工具内安装的第三方软件版权归各自作者所有，请遵守相应开源协议。
