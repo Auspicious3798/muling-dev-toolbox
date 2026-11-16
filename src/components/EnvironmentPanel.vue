@@ -307,12 +307,12 @@ export default {
       const p = { jdk:JavaIcon,python:PythonIcon,mysql:MysqlIcon,redis:RedisIcon,maven:MavenIcon,gradle:GradleIcon,uv:'/icons/uv.svg',nodejs:'/icons/nodejs.svg',nacos:NacosIcon,sentinel:SentinelIcon,rabbitmq:RabbitmqIcon,miniconda:MinicondaIcon,jupyter:JupyterIcon,ollama:OllamaIcon,go:GolangIcon,mingw:CIcon,nginx:NginxIcon,minio:MinioIcon,elasticsearch:ElasticsearchIcon,kibana:KibanaIcon,dashboard:DashboardIcon,settings:SettingsIcon,about:LemonIcon,'ai-assistant':AIIcon };
       return p[this.tool] || null;
     },
-    checkMethod() { const m={jdk:'checkJDK',python:'checkPython',mysql:'checkMySQL',redis:'checkRedis',maven:'checkMaven',gradle:'checkGradle',uv:'checkUv',nodejs:'checkNodejs'}; return m[this.tool]; },
-    switchMethod() { const m={jdk:'switchJDK',python:'switchPython',mysql:'switchMySQL',redis:'switchRedis',maven:'switchMaven',gradle:'switchGradle',uv:'switchUv',nodejs:'switchNodejs'}; return m[this.tool]; },
+    checkMethod() { const m={jdk:'checkJDK',python:'checkPython',mysql:'checkMySQL',redis:'checkRedis',maven:'checkMaven',gradle:'checkGradle',uv:'checkUv',nodejs:'checkNodejs',miniconda:'checkMiniconda'}; return m[this.tool]; },
+    switchMethod() { const m={jdk:'switchJDK',python:'switchPython',mysql:'switchMySQL',redis:'switchRedis',maven:'switchMaven',gradle:'switchGradle',uv:'switchUv',nodejs:'switchNodejs',miniconda:'switchMiniconda'}; return m[this.tool]; },
     hasServiceLog() { return ['mysql','redis','nginx'].includes(this.tool); },
     canCopyConnection() { return ['mysql','redis'].includes(this.tool); },
     adoptSupported() { return !!window.electronAPI.detectExistingInstalls && ['jdk','python','mysql','redis','maven','gradle','uv','nodejs','nginx'].includes(this.tool); },
-    deleteMethod() { const m={jdk:'deleteJDK',python:'deletePython',mysql:'deleteMySQL',redis:'deleteRedis',maven:'uninstallMaven',gradle:'uninstallGradle',nodejs:'uninstallNodejs',uv:'uninstallUv'}; return m[this.tool]; },
+    deleteMethod() { const m={jdk:'deleteJDK',python:'deletePython',mysql:'deleteMySQL',redis:'deleteRedis',maven:'uninstallMaven',gradle:'uninstallGradle',nodejs:'uninstallNodejs',uv:'uninstallUv',miniconda:'deleteMiniconda'}; return m[this.tool]; },
     startServiceMethod() { return this.tool==='mysql'?'startMySQLService':'startRedisService'; },
     stopServiceMethod() { return this.tool==='mysql'?'stopMySQLService':'stopRedisService'; },
     getServiceStatusMethod() { return this.tool==='mysql'?'getMySQLServiceStatus':'getRedisServiceStatus'; },

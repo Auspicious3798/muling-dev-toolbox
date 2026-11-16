@@ -16,7 +16,6 @@ import GradleIcon from '/icons/gradle.svg?url';
 import NodejsIcon from '/icons/nodejs.svg?url';
 import NginxIcon from '/icons/nginx.svg?url';
 import MinicondaIcon from '/icons/Miniconda.svg?url';
-import JupyterIcon from '/icons/Jupyter.svg?url';
 
 export const TOOLS = [
   // ── 前端开发 ──
@@ -50,8 +49,10 @@ export const TOOLS = [
     id: 'uv', name: 'uv', group: 'backend', icon: '/icons/uv.svg',
     check: 'checkUv', switch: 'switchUv', remove: 'uninstallUv'
   },
-  { id: 'miniconda', name: 'Miniconda', group: 'backend', icon: MinicondaIcon },
-  { id: 'jupyter', name: 'Jupyter Lab', group: 'backend', icon: JupyterIcon },
+  {
+    id: 'miniconda', name: 'Miniconda', group: 'backend', icon: MinicondaIcon,
+    check: 'checkMiniconda', switch: 'switchMiniconda', remove: 'deleteMiniconda'
+  },
 
   // ── 数据库 ──
   {

@@ -32,7 +32,6 @@ import NavMenuItem from './NavMenuItem.vue';
 import AIIcon from '/icons/AI.svg?url';
 import GradleIcon from '/icons/gradle.svg?url';
 import JavaIcon from '/icons/java.svg?url';
-import JupyterIcon from '/icons/Jupyter.svg?url';
 import MavenIcon from '/icons/maven.svg?url';
 import MinicondaIcon from '/icons/Miniconda.svg?url';
 import MysqlIcon from '/icons/mysql.svg?url';
@@ -64,8 +63,7 @@ export default {
             {id: 'gradle', label: 'Gradle', icon: GradleIcon},
             {id: 'python', label: 'Python', icon: PythonIcon},
             {id: 'uv', label: 'uv', icon: '/icons/uv.svg'},
-            {id: 'miniconda', label: 'Miniconda', icon: MinicondaIcon},
-            {id: 'jupyter', label: 'Jupyter Lab', icon: JupyterIcon}
+            {id: 'miniconda', label: 'Miniconda', icon: MinicondaIcon}
         ]},
         { id: 'database-group', label: '数据库', icon: '/icons/cat-database.svg', children: [
             {id: 'mysql', label: 'MySQL', icon: MysqlIcon},

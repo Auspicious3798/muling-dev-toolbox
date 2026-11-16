@@ -300,7 +300,7 @@ export default {
       }, 1000);
     },
     isComingSoon(tool) {
-      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'gradle', 'uv', 'nodejs', 'about', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
+      const implemented = ['jdk', 'python', 'mysql', 'redis', 'maven', 'gradle', 'uv', 'nodejs', 'miniconda', 'about', 'ai-assistant', 'dashboard', 'settings', 'nginx'];
       return !implemented.includes(tool);
     },
     applyTheme(theme) {

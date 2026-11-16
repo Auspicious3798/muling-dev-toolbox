@@ -27,6 +27,7 @@ const TOOL_META = {
     gradle: {prefix: 'gradle-', entries: ['bin'], envVar: 'GRADLE_HOME', label: 'Gradle'},
     uv: {prefix: 'uv-', entries: [''], envVar: 'UV_HOME', label: 'uv'},
     nodejs: {prefix: 'nodejs-', entries: [''], envVar: 'NODE_HOME', label: 'Node.js'},
+    miniconda: {prefix: 'miniconda-', entries: ['', 'Scripts', 'condabin'], envVar: 'CONDA_HOME', label: 'Miniconda'},
 };
 
 // 只有命令行工具允许「注入系统变量」

@@ -56,6 +56,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     cancelPythonDownload: () => ipcRenderer.send('cancel-python-download'),
     onPythonChanged: (callback) => ipcOn('python-changed', callback),
 
+    installMiniconda: (version) => ipcRenderer.invoke('install-miniconda', version),
+    checkMiniconda: () => ipcRenderer.invoke('check-miniconda'),
+    switchMiniconda: (version) => ipcRenderer.invoke('switch-miniconda', version),
+    deleteMiniconda: (version) => ipcRenderer.invoke('delete-miniconda', version),
+    cancelMinicondaDownload: () => ipcRenderer.send('cancel-miniconda-download'),
+    listCondaEnvs: (version) => ipcRenderer.invoke('list-conda-envs', version),
+    onMinicondaChanged: (callback) => ipcOn('miniconda-changed', callback),
+
     installMySQL: (version, password) => ipcRenderer.invoke('install-mysql', version, password),
     checkMySQL: () => ipcRenderer.invoke('check-mysql'),
     switchMySQL: (version) => ipcRenderer.invoke('switch-mysql', version),

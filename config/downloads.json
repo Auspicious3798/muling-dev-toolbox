@@ -350,6 +350,27 @@
           "type": "zip"
         }
       }
+    },
+    "miniconda": {
+      "version": "3.12-24.9.2",
+      "versions": {
+        "3.10-23.11.0": {
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py310_23.11.0-2-Windows-x86_64.exe",
+          "type": "exe"
+        },
+        "3.11-24.9.2": {
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py311_24.9.2-0-Windows-x86_64.exe",
+          "type": "exe"
+        },
+        "3.12-24.9.2": {
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py312_24.9.2-0-Windows-x86_64.exe",
+          "type": "exe"
+        },
+        "3.13-26.9.4": {
+          "url": "https://mirrors.tuna.tsinghua.edu.cn/anaconda/miniconda/Miniconda3-py313_26.9.4-1-Windows-x86_64.exe",
+          "type": "exe"
+        }
+      }
     }
   }
 }
