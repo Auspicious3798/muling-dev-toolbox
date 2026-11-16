@@ -673,6 +673,15 @@ export default {
           await this.loadSandbox();
           if (enable) Lemon.success(`${this.toolLabel} 已经写进系统变量啦，新开的终端就能直接用～`);
           else Lemon.success(`${this.toolLabel} 的系统变量已经撤干净了，系统环境回到原样～`);
+
+          const check = enable && r.selfCheck;
+          if (check && check.own && check.own.verdict !== 'ok') {
+            setTimeout(() => Lemon.error(`注入成功，但自检没跑起来：${check.own.detail}\n${check.exe}\n`
+              + '这份可能装坏了，建议先卸载再重装一次'), 500);
+          } else if (check && check.shadowed) {
+            setTimeout(() => Lemon.info(`注入了，但新终端里 ${this.toolLabel} 仍会优先用到\n${check.effective}\n`
+              + '它排在用户 PATH 前面；在面板上点「以管理员身份清理」把系统 PATH 里的旧条目摘掉才行'), 500);
+          }
         }
         else Lemon.error(r.message || '变量设置没成功');
       } catch (err) { Lemon.error(`变量设置失败了：${err.message}`); }

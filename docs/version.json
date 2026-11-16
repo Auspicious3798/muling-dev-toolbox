@@ -1,6 +1,6 @@
 {
-  "version": "2.1.5",
-  "notes": "卸载页合并为两项：勾选「已安装的环境」即同时清掉注入的 JAVA_HOME 等变量与指向沙箱的 PATH 条目（默认勾选）。清理旧变量时，把「Run 即被系统终止、且注册表登记的 JavaHome 已不存在」的 Oracle javapath 转发壳纳入自动清理，不再只是提示。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.5-release/MulingEnvBox-Setup-2.1.5.exe",
+  "version": "2.1.6",
+  "notes": "注入系统变量后才做一次自检：直接跑一遍被注入的 exe，并看 where 解析到哪；如果这份装坏了会提示重装，如果被系统 PATH 里的旧 java 抢先会提示去「以管理员身份清理」。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.6-release/MulingEnvBox-Setup-2.1.6.exe",
   "publishedAt": "2026-11-16"
 }

@@ -826,6 +826,7 @@ app.whenReady().then(() => {
             return {
                 success: true,
                 enabled: result.enabled,
+                selfCheck: result.selfCheck || null,
                 message: enabled ? '已注入到当前用户环境变量' : '已从环境变量中移除',
             };
         } catch (err) {

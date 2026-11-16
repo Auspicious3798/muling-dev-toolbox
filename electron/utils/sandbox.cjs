@@ -763,7 +763,31 @@ async function setInjection(tool, enabled) {
 
     state.injection[tool] = !!enabled;
     writeState();
-    return {enabled: !!enabled, backup: state.injectionBackup[tool] || null};
+
+    // 注入后自检：真的跑一次被注入的 exe，区分「这份 JDK 本身跑了没输出」还是「被别的 java 抢先」
+    let selfCheck = null;
+    if (enabled) {
+        try {
+            const envProbe = require('./envProbe.cjs');
+            const spec = envProbe.PROBES && envProbe.PROBES[tool];
+            if (spec) {
+                const own = envProbe.probeExecutable(path.join(dir, 'bin', spec.exe), spec.args);
+                const hits = envProbe.whereAll(spec.command);
+                const effective = (hits && hits[0]) || '';
+                selfCheck = {
+                    exe: path.join(dir, 'bin', spec.exe),
+                    own,
+                    effective,
+                    shadowed: Boolean(effective) && !path.resolve(effective).toLowerCase()
+                        .startsWith(path.resolve(dir).toLowerCase()),
+                };
+            }
+        } catch (err) {
+            selfCheck = {error: err.message};
+        }
+    }
+
+    return {enabled: !!enabled, backup: state.injectionBackup[tool] || null, selfCheck};
 }
 
 async function syncInjection(tool) {
