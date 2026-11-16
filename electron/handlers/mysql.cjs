@@ -1,5 +1,5 @@
 const {ipcMain} = require('electron');
-const {spawn, exec} = require('child_process');
+const {spawn, exec, execFile} = require('child_process');
 const {spawnHidden} = require('../utils/hiddenSpawn.cjs');
 const path = require('path');
 const fs = require('fs');
@@ -7,6 +7,7 @@ const os = require('os');
 const net = require('net');
 const {promisify} = require('util');
 const execPromise = promisify(exec);
+const execFilePromise = promisify(execFile);
 const configManager = require('../configManager.cjs');
 const {downloadFile} = require('../utils/download.cjs');
 const {installZip, zipProgress} = require('../utils/zip.cjs');
@@ -64,30 +65,101 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     }
 
     // 找一下「从当前目录启动、但不是我们拉起来的」mysqld（官方安装的 Windows 服务就是这种）
-    async function findForeignMysqld(home) {
-        const wanted = path.resolve(home).toLowerCase();
+    async function listMysqldPaths() {
+        const found = [];
+        const psExe = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+        const script = "Get-CimInstance Win32_Process -Filter \"Name='mysqld.exe'\" | Select-Object ProcessId,ExecutablePath | ConvertTo-Json -Compress";
+        try {
+            const {stdout} = await execFilePromise(psExe, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+                windowsHide: true,
+                timeout: 10000,
+                maxBuffer: 1024 * 1024,
+            });
+            const text = String(stdout || '').trim();
+            if (text) {
+                const parsed = JSON.parse(text);
+                for (const item of Array.isArray(parsed) ? parsed : [parsed]) {
+                    const pid = Number(item.ProcessId);
+                    const exe = String(item.ExecutablePath || '').trim();
+                    if (pid && exe) found.push({pid, exe});
+                }
+            }
+        } catch (err) {
+            logToFile(`[MySQL] 读 mysqld 进程路径失败（CIM）: ${err.message}`);
+        }
+        if (found.length) return found;
+        // 没有 CIM 结果时退回 tasklist，只能拿到 PID，再逐个问路径
         try {
             const {stdout} = await execPromise('tasklist /FI "IMAGENAME eq mysqld.exe" /FO CSV /NH', {
                 windowsHide: true,
                 timeout: 5000,
             });
-            const pids = Array.from(stdout.matchAll(/"mysqld\.exe","(\d+)"/gi)).map((m) => m[1]);
-            for (const pid of pids) {
+            for (const m of String(stdout || '').matchAll(/"mysqld\.exe","(\d+)"/gi)) {
+                const pid = Number(m[1]);
                 try {
                     const {stdout: exeOut} = await execPromise(
                         `powershell -NoProfile -Command "(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Path"`,
                         {windowsHide: true, timeout: 5000}
                     );
                     const exe = String(exeOut || '').trim();
-                    if (exe && path.resolve(exe).toLowerCase().startsWith(wanted)) {
-                        return {pid: Number(pid), exe};
-                    }
+                    if (exe) found.push({pid, exe});
                 } catch (err) {
-                    // 拿不到路径就跳过这个 pid
+                    // 拿不到路径就跳过
                 }
             }
         } catch (err) {
-            // tasklist 跑不了就当没有
+            logToFile(`[MySQL] tasklist 查询失败: ${err.message}`);
+        }
+        return found;
+    }
+
+    function sameInstall(exe, home) {
+        try {
+            const a = path.resolve(exe).toLowerCase();
+            const b = path.resolve(home).toLowerCase().replace(/[\\]+$/, '');
+            return a === b || a.startsWith(b + path.sep);
+        } catch (err) {
+            return false;
+        }
+    }
+
+    async function findForeignMysqld(home) {
+        const list = await listMysqldPaths();
+        for (const item of list) {
+            if (sameInstall(item.exe, home)) return item;
+        }
+        // 进程列表拿不到时，从「Windows 服务」反查：官方安装的 MySQL 一般都是这么常驻的
+        const service = await findMySQLService(home);
+        if (service) {
+            logToFile(`[MySQL] 命中系统服务: ${service.name} -> ${service.exe}`);
+            return {pid: null, exe: service.exe, service: service.name};
+        }
+        if (list.length) {
+            logToFile(`[MySQL] 有其他 mysqld 在跑，但都不在 ${home}: ${list.map((x) => x.exe).join(' | ')}`);
+        }
+        return null;
+    }
+
+    async function findMySQLService(home) {
+        const psExe = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+        const script = "Get-CimInstance Win32_Service -Filter \"State='Running'\" | Where-Object { $_.PathName -like '*mysqld*' } | Select-Object Name,PathName | ConvertTo-Json -Compress";
+        try {
+            const {stdout} = await execFilePromise(psExe, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+                windowsHide: true,
+                timeout: 10000,
+                maxBuffer: 1024 * 1024,
+            });
+            const text = String(stdout || '').trim();
+            if (!text) return null;
+            const parsed = JSON.parse(text);
+            for (const item of Array.isArray(parsed) ? parsed : [parsed]) {
+                const raw = String(item.PathName || '');
+                const m = raw.match(/^\s*"([^"]+\.exe)"/i) || raw.match(/^\s*(\S+\.exe)/i);
+                const exe = m ? m[1] : '';
+                if (exe && sameInstall(exe, home)) return {name: String(item.Name || ''), exe};
+            }
+        } catch (err) {
+            logToFile(`[MySQL] 查询服务失败: ${err.message}`);
         }
         return null;
     }
@@ -539,7 +611,8 @@ port=${port}
             const running = await isMySQLRunning(home);
             if (running) return {success: true, status: 'running'};
             const foreign = await findForeignMysqld(home);
-            if (foreign) return {success: true, status: 'running', external: true, pid: foreign.pid};
+            logToFile(`[MySQL] 状态 ${version}: owned=false, external=${foreign ? foreign.exe + (foreign.service ? ' (服务 ' + foreign.service + ')' : '') : 'none'}`);
+            if (foreign) return {success: true, status: 'running', external: true, pid: foreign.pid || 0, service: foreign.service || ''};
             return {success: true, status: 'stopped'};
         } catch (err) {
             logToFile(`get-mysql-service-status 异常: ${err.message}`);
