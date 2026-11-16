@@ -145,6 +145,19 @@ function probeExecutable(exePath, args) {
     const stderr = (result.stderr || '').trim();
     const exitCode = typeof result.status === 'number' ? result.status : null;
 
+    // NTSTATUS 级退出码（0xC0000000 以上）说明进程不是「正常退出」而是被系统直接干掉的，
+    // 例如 3221226505 = 0xC0000409 STATUS_STACK_BUFFER_OVERRUN / 3221225477 = 0xC0000005 访问冲突。
+    // 这类结果不足以证明「目录是坏的」，只作为诊断信息回传，绝不据此删除任何条目。
+    if (typeof exitCode === 'number' && exitCode >= 0xC0000000) {
+        return {
+            verdict: 'crashed',
+            exitCode,
+            stdout,
+            stderr,
+            detail: `${path.basename(exePath)} 被系统直接终止（退出码 ${exitCode} / 0x${(exitCode >>> 0).toString(16).toUpperCase()}）`,
+        };
+    }
+
     if (result.error && result.error.code === 'ENOENT') {
         return {verdict: 'missing', exitCode, stdout, stderr, detail: '系统里没有这条命令'};
     }
@@ -217,6 +230,7 @@ async function diagnoseTool(tool, paths) {
         probe = {verdict: 'missing', exitCode: null, stdout: '', stderr: '', detail: 'PATH 里找不到这条命令'};
     }
 
+    // crashed 只报告不清理：那可能是杀毒/系统策略/权限问题，删了 PATH 反而帮倒忙
     const broken = probe.verdict === 'silent' || probe.verdict === 'error';
     const state = {
         tool,
@@ -226,6 +240,7 @@ async function diagnoseTool(tool, paths) {
         hits,
         probe,
         broken,
+        crashed: probe.verdict === 'crashed',
         // 需要摘掉的 PATH 条目：就是让命令解析到这个坏目录的那一条
         shadowEntry: broken && effectiveDir ? effectiveDir : '',
         staleEntries: [],

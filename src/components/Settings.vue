@@ -527,13 +527,21 @@ export default {
         // 先探针：真的跑一遍 java/python/mvn…，看是不是「有进程、零输出」这种哑巴状态
         const probe = await (api.probeEnv ? api.probeEnv() : Promise.resolve(null));
         const items = (probe && probe.success && probe.data) || [];
+        const crashed = items.filter((item) => item && item.probe && item.probe.verdict === 'crashed');
         const broken = items.filter((item) => item.broken);
         if (items.length) {
           const quiet = items.filter((item) => !item.broken).length;
-          Lemon.info(`探针跑完：${items.length} 个命令，${quiet} 个正常，${broken.length} 个有问题`);
+          Lemon.info(`探针跑完：${items.length} 个命令，${quiet} 个正常，${broken.length} 个有问题`
+            + (crashed.length ? `，${crashed.length} 个被系统直接终止` : ''));
           broken.slice(0, 3).forEach((item, i) => setTimeout(
             () => Lemon.error(`${item.tool}：${item.probe && item.probe.detail}`),
             400 * (i + 1)
+          ));
+          // 被系统直接终止（0xC000000x）的多半是杀毒/权限/策略拦的，不动 PATH，只把路径告诉用户
+          crashed.slice(0, 3).forEach((item, i) => setTimeout(
+            () => Lemon.info(`${item.tool} 先不动：${item.effective || '未知路径'} —— ${item.probe.detail}，`
+              + '可以手动在这个目录里跑一下看看，或用别的版本'),
+            400 * (broken.length + i + 1)
           ));
         }
 

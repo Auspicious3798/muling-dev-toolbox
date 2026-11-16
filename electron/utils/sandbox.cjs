@@ -1187,7 +1187,17 @@ async function cleanLegacyAll() {
             verdict: item.probe ? item.probe.verdict : 'missing',
             detail: item.probe ? item.probe.detail : '',
             broken: Boolean(item.broken),
+            crashed: Boolean(item.crashed),
         })),
+        // 探针跑出「进程被系统直接终止」的，只报告不清理，把可执行文件路径带回去方便自查
+        crashed: diag
+            .filter((item) => item.crashed)
+            .map((item) => ({
+                tool: item.tool,
+                effective: item.effective,
+                exitCode: item.probe.exitCode,
+                detail: item.probe.detail,
+            })),
     };
 }
 
