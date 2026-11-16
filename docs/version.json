@@ -1,0 +1,6 @@
+{
+  "version": "2.1.0",
+  "notes": "端口可自定义并对占用做校验；接管环境时把 PATH/JAVA_HOME 收归环境盒管理，附一键清理旧变量；终端环境标签支持横向滚动；系统变量列表按可注入工具动态生成；MySQL 启动不再弹控制台窗口。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.0-release/MulingEnvBox-Setup-2.1.0.exe",
+  "publishedAt": "2026-11-16"
+}
