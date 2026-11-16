@@ -40,7 +40,34 @@ function ipcOn(channel, callback) {
     return () => ipcRenderer.removeListener(channel, handler);
 }
 
+// 中间件共用一套接口：installX / checkX / startXService / stopXService / getXServiceStatus / getXConfig / setXPort
+// 生成 api.middleware[tool] = {...}，渲染进程统一走 middleware(tool) 访问
+const MIDDLEWARE_TOOLS = ['nacos', 'sentinel', 'rabbitmq', 'minio', 'elasticsearch', 'kibana'];
+
+function buildMiddlewareApi() {
+    const api = {};
+    for (const tool of MIDDLEWARE_TOOLS) {
+        api[tool] = {
+            install: (version) => ipcRenderer.invoke(`install-${tool}`, version),
+            cancel: () => ipcRenderer.send(`cancel-${tool}-download`),
+            check: () => ipcRenderer.invoke(`check-${tool}`),
+            switchVersion: (version) => ipcRenderer.invoke(`switch-${tool}`, version),
+            uninstall: (version) => ipcRenderer.invoke(`uninstall-${tool}`, version),
+            start: (version) => ipcRenderer.invoke(`start-${tool}-service`, version),
+            stop: (version) => ipcRenderer.invoke(`stop-${tool}-service`, version),
+            status: (version) => ipcRenderer.invoke(`get-${tool}-service-status`, version),
+            config: (version) => ipcRenderer.invoke(`get-${tool}-config`, version),
+            setPort: (version, port) => ipcRenderer.invoke(`set-${tool}-port`, version, port),
+            log: (version) => ipcRenderer.invoke(`get-${tool}-log`, version),
+            onProgress: (callback) => ipcOn(`${tool}-progress`, callback),
+            onChanged: (callback) => ipcOn(`${tool}-changed`, callback),
+        };
+    }
+    return api;
+}
+
 contextBridge.exposeInMainWorld('electronAPI', {
+    middleware: buildMiddlewareApi(),
     installJDK: (version, customPath) => ipcRenderer.invoke('install-jdk', version, customPath),
     checkJDK: () => ipcRenderer.invoke('check-jdk'),
     switchJDK: (version) => ipcRenderer.invoke('switch-jdk', version),

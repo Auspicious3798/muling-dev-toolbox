@@ -1,5 +1,7 @@
 <template>
   <div class="environment-panel">
+    <MiddlewarePanel v-if="isMiddleware" :tool="tool" @install="$emit('install')" @adopt="adoptExisting"/>
+    <template v-else>
     <!-- Header -->
     <div class="panel-header">
       <div class="title-section">
@@ -245,6 +247,7 @@
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -272,12 +275,13 @@ import DashboardIcon from '../../public/icons/Dashboard.svg?url';
 import LemonIcon from '../../public/icons/lemon.svg?url';
 import SettingsIcon from '../../public/icons/setting.svg?url';
 import PackageManager from './PackageManager.vue';
+import MiddlewarePanel from './MiddlewarePanel.vue';
 import eventBus from '../eventBus';
 import Lemon from '@/utils/lemon';
 
 export default {
   name: 'EnvironmentPanel',
-  components: { PackageManager },
+  components: { PackageManager, MiddlewarePanel },
   props: { tool: { type: String, required: true } },
   data() {
     return {
@@ -299,6 +303,7 @@ export default {
     };
   },
   computed: {
+    isMiddleware() { return ['nacos','sentinel','rabbitmq','minio','elasticsearch','kibana'].includes(this.tool); },
     toolLabel() {
       const m = { jdk:'JDK',python:'Python',mysql:'MySQL',redis:'Redis',maven:'Maven',gradle:'Gradle',uv:'uv',nodejs:'Node.js',nacos:'Nacos',sentinel:'Sentinel',rabbitmq:'RabbitMQ',miniconda:'Miniconda',jupyter:'Jupyter Lab',ollama:'Ollama',go:'Go',mingw:'MinGW',nginx:'Nginx',minio:'MinIO',elasticsearch:'Elasticsearch',kibana:'Kibana' };
       return m[this.tool] || this.tool.toUpperCase();

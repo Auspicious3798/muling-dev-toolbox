@@ -20,7 +20,7 @@
 
         <!-- Body -->
         <div class="drawer-body">
-          <component v-if="installerComponent" :is="installerComponent" ref="installerRef" @installed="onInstalled"/>
+          <component v-if="installerComponent" :is="installerComponent" ref="installerRef" :tool="tool" @installed="onInstalled"/>
         </div>
       </div>
     </div>
@@ -57,13 +57,14 @@ import GradleInstaller from './installers/GradleInstaller.vue';
 import UvInstaller from './installers/UvInstaller.vue';
 import NodejsInstaller from './installers/NodejsInstaller.vue';
 import NginxInstaller from './installers/NginxInstaller.vue';
+import MiddlewareInstaller from './installers/MiddlewareInstaller.vue';
 import eventBus from '@/eventBus';
 import Lemon from '@/utils/lemon';
 import { taskCenter } from '@/utils/taskCenter';
 
 export default {
   name: 'InstallDrawer',
-  components: { JDKInstaller, PythonInstaller, MySQLInstaller, RedisInstaller, MavenInstaller, NginxInstaller, GradleInstaller, UvInstaller, NodejsInstaller },
+  components: { JDKInstaller, PythonInstaller, MySQLInstaller, RedisInstaller, MavenInstaller, NginxInstaller, GradleInstaller, UvInstaller, NodejsInstaller, MiddlewareInstaller },
   props: { visible: Boolean, tool: String },
   emits: ['update:visible', 'installed'],
   data() {
@@ -81,8 +82,8 @@ export default {
     (this._unsubs || []).forEach((u) => { try { u && u(); } catch (e) {} });
   },
   computed: {
-    toolLabel() { const m = {jdk:'JDK',python:'Python',mysql:'MySQL',redis:'Redis',maven:'Maven',nginx:'Nginx'}; return m[this.tool]||this.tool.toUpperCase(); },
-    installerComponent() { const c = {jdk:'JDKInstaller',python:'PythonInstaller',mysql:'MySQLInstaller',redis:'RedisInstaller',maven:'MavenInstaller',nginx:'NginxInstaller',gradle:'GradleInstaller',uv:'UvInstaller',nodejs:'NodejsInstaller'}; return c[this.tool]; },
+    toolLabel() { const m = {jdk:'JDK',python:'Python',mysql:'MySQL',redis:'Redis',maven:'Maven',nginx:'Nginx',nacos:'Nacos',sentinel:'Sentinel',rabbitmq:'RabbitMQ',minio:'MinIO',elasticsearch:'Elasticsearch',kibana:'Kibana'}; return m[this.tool]||this.tool.toUpperCase(); },
+    installerComponent() { const c = {jdk:'JDKInstaller',python:'PythonInstaller',mysql:'MySQLInstaller',redis:'RedisInstaller',maven:'MavenInstaller',nginx:'NginxInstaller',gradle:'GradleInstaller',uv:'UvInstaller',nodejs:'NodejsInstaller',nacos:'MiddlewareInstaller',sentinel:'MiddlewareInstaller',rabbitmq:'MiddlewareInstaller',minio:'MiddlewareInstaller',elasticsearch:'MiddlewareInstaller',kibana:'MiddlewareInstaller'}; return c[this.tool]; },
     currentTask() {
       const active = taskCenter.active;
       if (!active || active.status !== 'running') return null;

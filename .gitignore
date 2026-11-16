@@ -80,3 +80,9 @@ docs/*.md
 
 # 本地打包/调试脚本目录
 _build/
+
+# 中间件原始包（下载暂存，处理后再进 zip-before / zip-after）
+_mw/
+
+# 临时校验脚本
+_sfc.cjs
