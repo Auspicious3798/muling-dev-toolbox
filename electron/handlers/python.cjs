@@ -305,9 +305,12 @@ trusted-host = ${new URL(mirror).hostname}
         try {
             const home = await findPythonHome(version);
             if (!home) return {success: false, message: `未找到 Python ${version} 的安装目录`};
-            fs.rmSync(home, {recursive: true, force: true});
+            const removal = sandbox.removeDirIfSandboxed(home);
             sandbox.unregister('python', version);
             mainWindow.webContents.send('python-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: `已解除 Python ${version} 的登记，文件仍保留在 ${removal.dir}`};
+            }
             return {success: true, message: `已删除 Python ${version}`};
         } catch (err) {
             return {success: false, message: err.message};

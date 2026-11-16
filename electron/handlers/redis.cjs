@@ -340,9 +340,12 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             const home = findRedisHome(version);
             if (!home) return {success: false, message: `未找到 Redis ${version} 的安装目录`};
             await stopRedisProcess(version);
-            fs.rmSync(home, {recursive: true, force: true});
+            const removal = sandbox.removeDirIfSandboxed(home);
             sandbox.unregister('redis', version);
             mainWindow.webContents.send('redis-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: `已解除 Redis ${version} 的登记，文件仍保留在 ${removal.dir}`};
+            }
             return {success: true, message: `已删除 Redis ${version}`};
         } catch (err) {
             return {success: false, message: err.message};

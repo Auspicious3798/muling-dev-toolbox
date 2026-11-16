@@ -186,12 +186,13 @@ module.exports = function registerGradleHandlers(mainWindow, userDataPath) {
     ipcMain.handle('uninstall-gradle', async (event, version) => {
         try {
             const target = version || sandbox.getActive('gradle');
-            const dir = target ? sandbox.installDir('gradle', target) : sandbox.getActiveDir('gradle');
-            if (dir && fs.existsSync(dir)) {
-                fs.rmSync(dir, {recursive: true, force: true});
-            }
+            const dir = target ? sandbox.getVersionDir('gradle', target) : sandbox.getActiveDir('gradle');
+            const removal = sandbox.removeDirIfSandboxed(dir);
             if (target) sandbox.unregister('gradle', target);
             mainWindow.webContents.send('gradle-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: '已解除 Gradle 的登记，文件仍保留在 ' + removal.dir};
+            }
             return {success: true, message: 'Gradle 已卸载'};
         } catch (err) {
             return {success: false, message: err.message};

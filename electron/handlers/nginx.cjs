@@ -336,7 +336,7 @@ http {
             const nginxConfig = getNginxConfig();
             const targetVersion = version || sandbox.getActive('nginx');
             const installPath = targetVersion
-                ? sandbox.installDir('nginx', targetVersion)
+                ? sandbox.getVersionDir('nginx', targetVersion)
                 : resolveNginxDir(nginxConfig);
             const isActive = !targetVersion || targetVersion === sandbox.getActive('nginx');
             const running = await isNginxRunning();
@@ -345,9 +345,7 @@ http {
                 // 添加 -p 参数，与启动时的 prefix 保持一致
                 await execPromise(`"${nginxExe}" -p "${installPath}" -s stop`, {windowsHide: true});
             }
-            if (fs.existsSync(installPath)) {
-                fs.rmSync(installPath, {recursive: true, force: true});
-            }
+            const removal = sandbox.removeDirIfSandboxed(installPath);
             if (targetVersion) sandbox.unregister('nginx', targetVersion);
             const remaining = sandbox.listInstalled('nginx');
             if (remaining.length === 0) {

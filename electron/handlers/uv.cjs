@@ -141,12 +141,13 @@ module.exports = function registerUvHandlers(mainWindow, userDataPath) {
     ipcMain.handle('uninstall-uv', async (event, version) => {
         try {
             const target = version || sandbox.getActive('uv');
-            const dir = target ? sandbox.installDir('uv', target) : sandbox.getActiveDir('uv');
-            if (dir && fs.existsSync(dir)) {
-                fs.rmSync(dir, {recursive: true, force: true});
-            }
+            const dir = target ? sandbox.getVersionDir('uv', target) : sandbox.getActiveDir('uv');
+            const removal = sandbox.removeDirIfSandboxed(dir);
             if (target) sandbox.unregister('uv', target);
             mainWindow.webContents.send('uv-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: '已解除 uv 的登记，文件仍保留在 ' + removal.dir};
+            }
             return {success: true, message: 'uv 已卸载'};
         } catch (err) {
             return {success: false, message: err.message};

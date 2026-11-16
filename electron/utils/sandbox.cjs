@@ -244,6 +244,26 @@ function isKnownDir(target) {
 }
 
 /**
+ * 删除某个版本的安装目录——但只删沙箱内自己装的。
+ * 接管的目录在 Program Files 之类的地方，属于「只登记不搬文件」，
+ * 卸载时应当只解绑，绝不能去删人家的官方安装。
+ */
+function removeDirIfSandboxed(dir) {
+    const target = path.resolve(String(dir || ''));
+    const root = path.resolve(getRoot());
+    const inside = target.toLowerCase().startsWith(root.toLowerCase() + path.sep);
+    if (!inside) return {removed: false, sandboxed: false, dir: target};
+    if (!fs.existsSync(target)) return {removed: false, sandboxed: true, dir: target};
+    try {
+        fs.rmSync(target, {recursive: true, force: true, maxRetries: 3, retryDelay: 120});
+    } catch (err) {
+        // 删不掉就抛出去，让调用方把原因告诉用户，而不是假装卸载成功
+        throw new Error(`删除 ${target} 失败：${err.message}`);
+    }
+    return {removed: true, sandboxed: true, dir: target};
+}
+
+/**
  * 接管一个已经存在的安装目录（不复制、不移动文件）
  */
 async function adopt(tool, dir, version) {
@@ -1517,6 +1537,7 @@ module.exports = {
     ensureRoot,
     installDir,
     getVersionDir,
+    removeDirIfSandboxed,
     isKnownDir,
     scanInstalled,
     listInstalled,

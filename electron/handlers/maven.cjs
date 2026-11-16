@@ -206,12 +206,13 @@ module.exports = function registerMavenHandlers(mainWindow, userDataPath) {
     ipcMain.handle('uninstall-maven', async (event, version) => {
         try {
             const target = version || sandbox.getActive('maven');
-            const dir = target ? sandbox.installDir('maven', target) : sandbox.getActiveDir('maven');
-            if (dir && fs.existsSync(dir)) {
-                fs.rmSync(dir, {recursive: true, force: true});
-            }
+            const dir = target ? sandbox.getVersionDir('maven', target) : sandbox.getActiveDir('maven');
+            const removal = sandbox.removeDirIfSandboxed(dir);
             if (target) sandbox.unregister('maven', target);
             mainWindow.webContents.send('maven-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: '已解除 Maven 的登记，文件仍保留在 ' + removal.dir};
+            }
             return {success: true, message: 'Maven 已卸载'};
         } catch (err) {
             return {success: false, message: err.message};

@@ -1,5 +1,17 @@
 # 更新日志
 
+## v2.1.10 · 2026-11-16
+
+### 修复
+
+- **卸载接管的工具会去删官方安装目录**：点卸载时按登记目录直接 `fs.rmSync`，而接管只登记、文件
+  仍在 `C:\Program Files\...`，于是卸载 JDK 24 时直接报 `EPERM, Permission denied: \\?\C:\Program Files\Java\jdk-24`。
+  这只是没权限把它挡住了，带管理员运行就会真的毁掉官方安装。现在统一走
+  `sandbox.removeDirIfSandboxed()`：只有落在沙箱根 `%LOCALAPPDATA%\Muling\env` 里的才删，
+  外面的只解除登记并提示「文件仍保留在 <目录>」；沙箱内删除失败也会把原因原样报出来，不再假装成功。
+- 9 个工具（JDK / Node.js / Maven / Gradle / uv / Python / MySQL / Redis / Nginx）的卸载路径
+  都改成先 `getVersionDir()` 取真实目录，再接上面那层保护。
+
 ## v2.1.9 · 2026-11-16
 
 ### 修复

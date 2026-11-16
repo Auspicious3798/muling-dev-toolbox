@@ -393,9 +393,12 @@ port=${port}
             const home = findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             await stopMySQLProcess(home);
-            fs.rmSync(home, {recursive: true, force: true});
+            const removal = sandbox.removeDirIfSandboxed(home);
             sandbox.unregister('mysql', version);
             mainWindow.webContents.send('mysql-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: `已解除 MySQL ${version} 的登记，文件仍保留在 ${removal.dir}`};
+            }
             return {success: true, message: `已删除 MySQL ${version}`};
         } catch (err) {
             return {success: false, message: err.message};

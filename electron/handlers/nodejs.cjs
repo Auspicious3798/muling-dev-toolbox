@@ -159,12 +159,13 @@ module.exports = function registerNodejsHandlers(mainWindow, userDataPath) {
     ipcMain.handle('uninstall-nodejs', async (event, version) => {
         try {
             const target = version || sandbox.getActive('nodejs');
-            const dir = target ? sandbox.installDir('nodejs', target) : sandbox.getActiveDir('nodejs');
-            if (dir && fs.existsSync(dir)) {
-                fs.rmSync(dir, {recursive: true, force: true});
-            }
+            const dir = target ? sandbox.getVersionDir('nodejs', target) : sandbox.getActiveDir('nodejs');
+            const removal = sandbox.removeDirIfSandboxed(dir);
             if (target) sandbox.unregister('nodejs', target);
             mainWindow.webContents.send('nodejs-changed');
+            if (!removal.sandboxed) {
+                return {success: true, message: '已解除 Node.js 的登记，文件仍保留在 ' + removal.dir};
+            }
             return {success: true, message: 'Node.js 已卸载'};
         } catch (err) {
             return {success: false, message: err.message};

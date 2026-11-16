@@ -149,9 +149,16 @@ module.exports = function registerJDKHandlers(mainWindow, userDataPath) {
             const toolState = sandbox.readState().tools.jdk;
             const recorded = toolState && toolState.versions[version] && toolState.versions[version].dir;
             const dir = recorded || sandbox.installDir('jdk', version);
-            if (fs.existsSync(dir)) fs.rmSync(dir, {recursive: true, force: true});
+            // 接管的 JDK 在 Program Files 里，卸载只解绑登记，绝不删人家的官方安装
+            const removal = sandbox.removeDirIfSandboxed(dir);
             sandbox.unregister('jdk', version);
             mainWindow.webContents.send('jdk-changed');
+            if (!removal.sandboxed) {
+                return {
+                    success: true,
+                    message: `已解除 JDK ${version} 的登记，文件仍保留在 ${removal.dir}`,
+                };
+            }
             return {success: true, message: `已删除 JDK ${version}`};
         } catch (err) {
             return {success: false, message: err.message};
