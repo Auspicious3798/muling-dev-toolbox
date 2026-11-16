@@ -6,7 +6,7 @@
 
 **把 JDK、Python、MySQL、Redis 这些装起来最烦的东西，变成点两下的事。**
 
-<a href="https://www.muling-download.site"><img src="https://img.shields.io/badge/Version-2.0.0-2dd4bf?style=flat-square" alt="Version"></a>
+<a href="https://www.muling-download.site"><img src="https://img.shields.io/badge/Version-2.1.0-2dd4bf?style=flat-square" alt="Version"></a>
 <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Platform">
 <img src="https://img.shields.io/badge/Electron-41-47848F?style=flat-square&logo=electron" alt="Electron">
 <img src="https://img.shields.io/badge/Vue-3.5-42b883?style=flat-square&logo=vuedotjs" alt="Vue">
@@ -119,7 +119,7 @@ JDK 从 8 到 26、Python 从 3.9 到 3.13、MySQL 8.0/8.4/9.3……同一个工
 ## 下载
 
 - 官网：<https://www.muling-download.site>
-- 安装包：`沐柠环境盒-Setup-2.0.0.exe`（NSIS，支持自定义安装目录）
+- 安装包：`MulingEnvBox-Setup-2.1.0.exe`（NSIS，支持自定义安装目录）
 
 系统要求：**Windows 10 / 11（64 位）**，约 300MB 磁盘空间（不含工具）。
 
@@ -154,7 +154,7 @@ npm run electron:build
 
 ```
 dist_electron/
-├── 沐柠环境盒-Setup-2.0.0.exe   ← 给别人装的就是这个
+├── MulingEnvBox-Setup-2.1.0.exe   ← 给别人装的就是这个
 ├── win-unpacked/                ← 免安装版，双击 exe 直接跑
 │   └── 沐柠环境盒.exe
 └── builder-effective-config.yaml
