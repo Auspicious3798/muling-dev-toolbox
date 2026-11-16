@@ -73,5 +73,7 @@ assets/revise/
 /.vscode/
 
 # 内部运维/美术笔记（只在本机留档，不进公开仓库）
-docs/OSS-资源清单.md
-docs/素材清单与提示词.md
+# 白名单模式：docs/ 下的 md 默认全部忽略，只放行确实要给使用者看的两份
+docs/*.md
+!docs/代码签名.md
+!docs/资源基址.md
