@@ -696,10 +696,13 @@ function createWindow() {
 }
 
 const CLEAN_ENV_ONLY = process.argv.includes('--clean-env');
+const ADOPT_ENV_INDEX = process.argv.indexOf('--adopt-env');
+const ADOPT_ENV_ONLY = ADOPT_ENV_INDEX >= 0;
+const ADOPT_ENV_TOOL = ADOPT_ENV_ONLY ? String(process.argv[ADOPT_ENV_INDEX + 1] || '') : '';
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
-    if (!CLEAN_ENV_ONLY) app.quit();
+    if (!CLEAN_ENV_ONLY && !ADOPT_ENV_ONLY) app.quit();
 } else {
     app.on('second-instance', () => {
         showMainWindow();
@@ -712,6 +715,15 @@ app.whenReady().then(() => {
         sandbox.cleanLegacyAll()
             .then((res) => logToFile(`[CleanEnv] 管理员清理完成 removed=${res.removed.length} warnings=${res.warnings.length}`))
             .catch((err) => logToFile(`[CleanEnv] 失败：${err.message}`))
+            .finally(() => setTimeout(() => app.quit(), 500));
+        return;
+    }
+
+    // 提权接管模式：只把系统 PATH 里该工具的旧条目摘掉，然后退出
+    if (ADOPT_ENV_ONLY) {
+        sandbox.removeSystemToolEntries(ADOPT_ENV_TOOL)
+            .then((res) => logToFile(`[AdoptEnv] tool=${ADOPT_ENV_TOOL} ok=${res.ok} removed=${(res.removed || []).length} message=${res.message}`))
+            .catch((err) => logToFile(`[AdoptEnv] 失败：${err.message}`))
             .finally(() => setTimeout(() => app.quit(), 500));
         return;
     }
@@ -886,6 +898,23 @@ app.whenReady().then(() => {
                 execFile(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {windowsHide: true}, (err) => (err ? reject(err) : resolve()));
             });
             return {success: true, message: '已请求管理员权限，确认后会自动把系统级旧条目清掉'};
+        } catch (err) {
+            return {success: false, message: `提权失败：${err.message}`};
+        }
+    });
+
+    ipcMain.handle('adopt-env-elevated', async (_event, tool) => {
+        try {
+            const {execFile} = require('child_process');
+            const ps = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+            const exe = String(process.execPath).replace(/'/g, "''");
+            const safeTool = String(tool || '').replace(/'/g, '');
+            const script = `Start-Process -FilePath '${exe}' -ArgumentList '--adopt-env','${safeTool}' -Verb RunAs`;
+            await new Promise((resolve, reject) => {
+                execFile(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {windowsHide: true}, (err) => (err ? reject(err) : resolve()));
+            });
+            logToFile(`[AdoptEnv] 请求管理员权限清理系统 PATH tool=${safeTool}`);
+            return {success: true, message: '已请求管理员权限，确认后会自动把系统 PATH 里的旧条目清掉，重开终端就生效'};
         } catch (err) {
             return {success: false, message: `提权失败：${err.message}`};
         }

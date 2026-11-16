@@ -171,6 +171,15 @@
       </div>
     </div>
 
+    <div class="adopt-admin" v-if="adoptNeedsAdmin">
+      <div class="adopt-admin-text">
+        系统 PATH 里还有旧的 {{ toolLabel }} 路径，它排在用户 PATH 前面，重开终端后仍会优先用旧的。
+      </div>
+      <button class="adopt-btn" :disabled="fixingAdmin" @click="fixAdoptAdmin">
+        {{ fixingAdmin ? '正在请求授权…' : '以管理员身份清理' }}
+      </button>
+    </div>
+
     <!-- Redis Password Modal -->
     <div v-if="showPasswordModal" class="modal-overlay" @click.self="closePasswordModal">
       <div class="modal-card">
@@ -285,6 +294,7 @@ export default {
       oldMySQLPassword: '', newMySQLPassword: '', mysqlPasswordChanging: false, showMySQLPassword: false, savedMySQLPassword: null,
       sandboxInfo: null, injected: false,
       adoptCandidates: [], adopting: false, adoptHandler: null,
+      adoptNeedsAdmin: '', fixingAdmin: false,
       editingPort: null, portDraft: '', portSaving: false
     };
   },
@@ -357,6 +367,24 @@ export default {
         this.adopting = false;
       }
     },
+    async fixAdoptAdmin() {
+      const api = window.electronAPI || {};
+      if (!api.adoptEnvElevated) { Lemon.error('当前环境不支持提权清理'); return; }
+      this.fixingAdmin = true;
+      try {
+        const r = await api.adoptEnvElevated(this.tool);
+        if (r && r.success) {
+          Lemon.success(r.message || '已请求管理员权限');
+          this.adoptNeedsAdmin = '';
+        } else {
+          Lemon.error((r && r.message) || '提权失败，可右键程序「以管理员身份运行」后重试');
+        }
+      } catch (err) {
+        Lemon.error(`提权失败：${err.message}`);
+      } finally {
+        this.fixingAdmin = false;
+      }
+    },
     async adoptOne(item) {
       if (this.adopting || item.registered) return;
       this.adopting = true;
@@ -369,6 +397,7 @@ export default {
         Lemon.success(`已接管 ${this.toolLabel} ${r.data.version}，文件还在原来的位置，环境变量也交给环境盒管了～`);
         const notes = (r.data && r.data.messages) || [];
         notes.forEach((line, i) => setTimeout(() => Lemon.info(line), 600 * (i + 1)));
+        this.adoptNeedsAdmin = notes.some((line) => String(line).includes('系统 PATH 里还有')) ? this.tool : '';
         this.adoptCandidates = [];
         await this.refresh();
       } catch (err) {
@@ -915,6 +944,15 @@ export default {
 .empty-ghost:hover:not(:disabled) { color: var(--primary); }
 .empty-hint { font-size: 0.76rem; color: var(--text-muted); max-width: 420px; }
 
+.adopt-admin {
+  margin: 0 24px 20px; padding: 14px 18px;
+  display: flex; align-items: center; gap: 16px;
+  border-radius: var(--radius-lg);
+  background: var(--bg-card);
+  box-shadow: var(--glass-edge), var(--glass-shadow);
+  border-left: 3px solid var(--warning, #f0a020);
+}
+.adopt-admin-text { flex: 1; min-width: 0; font-size: 0.8rem; line-height: 1.6; color: var(--text-secondary); }
 .adopt-panel {
   margin: 0 24px 20px; padding: 16px 18px;
   border-radius: var(--radius-lg);

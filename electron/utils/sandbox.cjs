@@ -1028,6 +1028,28 @@ async function takeOverEnv(tool) {
 }
 
 /**
+ * 提权模式专用：把系统 PATH 里属于该工具的旧条目摘掉（只动 HKLM 的 PATH 这一处）
+ */
+async function removeSystemToolEntries(tool) {
+    const meta = getToolMeta(tool);
+    if (!meta) return {ok: false, removed: [], message: `未知工具：${tool}`};
+    const env = require('./env.cjs');
+    try {
+        const systemPath = await env.getSystemPath();
+        const parts = String(systemPath || '').split(';').filter(Boolean);
+        const stale = parts.filter((entry) => isToolDirEntry(tool, entry));
+        if (!stale.length) {
+            return {ok: true, removed: [], message: `系统 PATH 里没有 ${meta.label} 的旧条目`};
+        }
+        const kept = parts.filter((entry) => !stale.includes(entry));
+        await env.setSystemPath(kept.join(';'));
+        return {ok: true, removed: stale, message: `已从系统 PATH 清掉 ${stale.length} 条 ${meta.label} 旧路径`};
+    } catch (err) {
+        return {ok: false, removed: [], message: `清理系统 PATH 失败：${err.message}`};
+    }
+}
+
+/**
  * 一键清理：先做探针，再精确清理。
  *
  * 旧版是按「目录长得像某个工具」一刀切，会把用户还要用的安装也一并摘掉。
@@ -1318,6 +1340,7 @@ module.exports = {
     adopt,
     takeOverEnv,
     cleanLegacyAll,
+    removeSystemToolEntries,
     detectExistingInstalls,
     register,
     setToolPassword,
