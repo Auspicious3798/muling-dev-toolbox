@@ -196,6 +196,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     adoptExistingInstall: (tool, dir, version) => ipcRenderer.invoke('sandbox-adopt', tool, dir, version),
     cleanLegacyEnv: () => ipcRenderer.invoke('clean-legacy-env'),
     cleanLegacyEnvElevated: () => ipcRenderer.invoke('clean-legacy-env-elevated'),
+    probeEnv: () => ipcRenderer.invoke('probe-env'),
     setSandboxActive: (tool, version) => ipcRenderer.invoke('sandbox-set-active', tool, version),
     getSandboxEnvCommand: (tool) => ipcRenderer.invoke('sandbox-get-env-command', tool),
     openEnvTerminal: () => ipcRenderer.invoke('sandbox-open-terminal'),

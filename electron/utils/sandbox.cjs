@@ -999,55 +999,129 @@ async function takeOverEnv(tool) {
 }
 
 /**
- * 一键清理：把 PATH / 变量里指向「别的安装」的旧条目统统摘掉。
- * 用户级直接处理；系统级有权限就顺手清，没权限返回 needsAdmin 由上层提权再跑一次。
+ * 一键清理：先做探针，再精确清理。
+ *
+ * 旧版是按「目录长得像某个工具」一刀切，会把用户还要用的安装也一并摘掉。
+ * 现在改成：
+ *   1) 在隐藏进程里真的跑一次 java/python/mvn…，看它能不能用
+ *   2) 如果这个命令是「哑巴」（有进程、零输出），说明 PATH 里让命令生效的那一条
+ *      指向了被搬空的旧目录 —— 只摘这一条（以及确实空掉的同族条目）
+ *   3) 一个都不坏就什么都不动
+ * 用户级直接改，系统级有权限顺手清，没权限返回 needsAdmin 让上层提权再跑一次。
  */
 const CLEAN_TOOLS = ['jdk', 'python', 'maven', 'gradle', 'nodejs', 'uv', 'mysql', 'redis', 'nginx'];
 
 async function cleanLegacyAll() {
     const env = require('./env.cjs');
+    const envProbe = require('./envProbe.cjs');
+
     const removed = [];
     const warnings = [];
-    let systemStale = [];
+    const diag = await envProbe.diagnoseAll(CLEAN_TOOLS);
 
-    try {
-        const userPath = await env.getUserPath();
-        const parts = String(userPath || '').split(';').filter(Boolean);
-        const kept = [];
-        for (const entry of parts) {
-            const hit = CLEAN_TOOLS.find((t) => isToolDirEntry(t, entry));
-            if (hit) removed.push(`${hit}: ${entry}`);
-            else kept.push(entry);
+    // 需要摘掉的 PATH 条目（统一小写去重，保留原样用于比较）
+    const targets = new Map();
+    const addTarget = (raw, reason) => {
+        if (!raw) return;
+        const key = String(raw).toLowerCase();
+        if (!targets.has(key)) targets.set(key, {raw: String(raw), reason});
+    };
+    for (const item of diag) {
+        if (item.broken && item.shadowEntry) {
+            addTarget(item.shadowEntry, `${item.tool} 命令能启动但没有任何输出（指向的目录已残缺）`);
         }
-        if (kept.length !== parts.length) await env.setUserPath(kept.join(';'));
-    } catch (err) {
-        warnings.push(`清理用户 PATH 失败：${err.message}`);
+        for (const raw of item.staleEntries || []) addTarget(raw, `${item.tool} 的旧目录已经被搬空`);
     }
 
-    try {
-        const systemPath = await env.getSystemPath();
-        const parts = String(systemPath || '').split(';').filter(Boolean);
-        const kept = [];
-        for (const entry of parts) {
-            const hit = CLEAN_TOOLS.find((t) => isToolDirEntry(t, entry));
-            if (hit) systemStale.push(entry);
-            else kept.push(entry);
+    const insideSandbox = (entry) => {
+        const dir = envProbe.expandEntry(entry);
+        if (!dir) return false;
+        return path.resolve(dir).toLowerCase().startsWith(path.resolve(getRoot()).toLowerCase());
+    };
+
+    const staleSystem = [];
+
+    if (targets.size) {
+        try {
+            const userPath = await env.getUserPath();
+            const parts = String(userPath || '').split(';').filter(Boolean);
+            const kept = [];
+            for (const entry of parts) {
+                const hit = targets.get(entry.toLowerCase());
+                if (hit && !insideSandbox(entry)) removed.push(`user: ${entry}（${hit.reason}）`);
+                else kept.push(entry);
+            }
+            if (kept.length !== parts.length) await env.setUserPath(kept.join(';'));
+        } catch (err) {
+            warnings.push(`清理用户 PATH 失败：${err.message}`);
         }
-        if (systemStale.length) {
-            await env.setSystemPath(kept.join(';'));
-            removed.push(...systemStale.map((entry) => `system: ${entry}`));
-            systemStale = [];
+
+        try {
+            const systemPath = await env.getSystemPath();
+            const parts = String(systemPath || '').split(';').filter(Boolean);
+            const kept = [];
+            for (const entry of parts) {
+                const hit = targets.get(entry.toLowerCase());
+                if (hit && !insideSandbox(entry)) staleSystem.push(entry);
+                else kept.push(entry);
+            }
+            if (staleSystem.length) {
+                await env.setSystemPath(kept.join(';'));
+                removed.push(...staleSystem.map((entry) => `system: ${entry}`));
+                staleSystem.length = 0;
+            }
+        } catch (err) {
+            // 没权限清系统 PATH：把待清理的条目留给上层提权
+            if (!staleSystem.length) {
+                try {
+                    const systemPath = await env.getSystemPath();
+                    const parts = String(systemPath || '').split(';').filter(Boolean);
+                    for (const entry of parts) {
+                        if (targets.has(entry.toLowerCase()) && !insideSandbox(entry)) staleSystem.push(entry);
+                    }
+                } catch (err2) {
+                    warnings.push(`读取系统 PATH 失败：${err2.message}`);
+                }
+            }
+        }
+    }
+
+    // 指向这些坏目录的自定义变量（未必叫 *_HOME）也一并报出来，让用户知道该改什么
+    const affectedVars = [];
+    try {
+        const names = await listEnvVarNames('HKCU\\Environment');
+        for (const name of names) {
+            if (name.toUpperCase() === 'PATH') continue;
+            let value = '';
+            try {
+                value = (await env.getUserEnvVariable(name)) || '';
+            } catch (err) {
+                continue;
+            }
+            const dir = envProbe.expandEntry(value);
+            if (!dir || !dir.includes('\\')) continue;
+            const hit = targets.get(dir.toLowerCase()) || targets.get(path.dirname(dir).toLowerCase());
+            if (hit) affectedVars.push(`${name} = ${value}（${hit.reason}）`);
         }
     } catch (err) {
-        if (!systemStale.length) warnings.push(`读取系统 PATH 失败：${err.message}`);
+        warnings.push(`读取用户变量失败：${err.message}`);
     }
 
     return {
         ok: true,
         removed,
-        needsAdmin: systemStale.length > 0,
-        systemStale,
+        affectedVars,
+        needsAdmin: staleSystem.length > 0,
+        systemStale: staleSystem,
         warnings,
+        probe: diag.map((item) => ({
+            tool: item.tool,
+            command: item.command,
+            effective: item.effective,
+            verdict: item.probe ? item.probe.verdict : 'missing',
+            detail: item.probe ? item.probe.detail : '',
+            broken: Boolean(item.broken),
+        })),
     };
 }
 

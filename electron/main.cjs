@@ -855,10 +855,21 @@ app.whenReady().then(() => {
         }
     });
 
+    ipcMain.handle('probe-env', async () => {
+        try {
+            const envProbe = require('./utils/envProbe.cjs');
+            const items = await envProbe.diagnoseAll();
+            logToFile(`[Probe] ${items.map((i) => `${i.tool}:${i.probe && i.probe.verdict}`).join(' ')}`);
+            return {success: true, data: items};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
     ipcMain.handle('clean-legacy-env', async () => {
         try {
             const result = await sandbox.cleanLegacyAll();
-            logToFile(`[CleanEnv] 清理完成 removed=${(result.removed || []).length} needsAdmin=${result.needsAdmin}`);
+            logToFile(`[CleanEnv] 清理完成 removed=${(result.removed || []).length} needsAdmin=${result.needsAdmin} broken=${(result.probe || []).filter((i) => i.broken).length}`);
             return {success: true, data: result};
         } catch (err) {
             return {success: false, message: err.message};

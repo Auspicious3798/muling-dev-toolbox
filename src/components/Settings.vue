@@ -524,15 +524,35 @@ export default {
       if (!api.cleanLegacyEnv) { Lemon.error('当前环境不支持一键清理'); return; }
       this.cleaningLegacy = true;
       try {
+        // 先探针：真的跑一遍 java/python/mvn…，看是不是「有进程、零输出」这种哑巴状态
+        const probe = await (api.probeEnv ? api.probeEnv() : Promise.resolve(null));
+        const items = (probe && probe.success && probe.data) || [];
+        const broken = items.filter((item) => item.broken);
+        if (items.length) {
+          const quiet = items.filter((item) => !item.broken).length;
+          Lemon.info(`探针跑完：${items.length} 个命令，${quiet} 个正常，${broken.length} 个有问题`);
+          broken.slice(0, 3).forEach((item, i) => setTimeout(
+            () => Lemon.error(`${item.tool}：${item.probe && item.probe.detail}`),
+            400 * (i + 1)
+          ));
+        }
+
         const res = await api.cleanLegacyEnv();
         if (!res || !res.success) { Lemon.error((res && res.message) || '清理失败'); return; }
         const data = res.data || {};
         const removed = data.removed || [];
+        const affected = data.affectedVars || [];
         if (removed.length) {
-          Lemon.success(`清掉了 ${removed.length} 条旧环境变量条目，新开的终端就干净了～`);
+          Lemon.success(`精准清掉了 ${removed.length} 条让命令失效的 PATH 条目，重开终端就生效～`);
           removed.slice(0, 5).forEach((line, i) => setTimeout(() => Lemon.info(line), 500 * (i + 1)));
+        } else if (broken.length) {
+          Lemon.info('探针发现有问题，但 PATH 里没有可以直接摘掉的条目，可能是变量指向了坏目录');
         } else {
-          Lemon.info('PATH 里没找到残留的旧工具目录，已经很干净了～');
+          Lemon.info('探针全部正常，PATH 里没有会让命令失效的条目，不用担心～');
+        }
+        if (affected.length) {
+          Lemon.info(`${affected.length} 个变量还指着旧目录，建议改掉：`);
+          affected.slice(0, 4).forEach((line, i) => setTimeout(() => Lemon.info(line), 500 * (i + 1)));
         }
         if (data.needsAdmin) {
           Lemon.info('系统 PATH 里还有几条需要管理员权限，正在请求授权…');
