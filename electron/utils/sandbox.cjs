@@ -210,6 +210,40 @@ function guessVersion(tool, dir) {
 }
 
 /**
+ * 某个工具某版本的实际目录：接管过的用登记目录（可能在 Program Files），
+ * 没登记的才回落到沙箱路径。用于「打开目录」「在终端中使用」这类入口。
+ */
+function getVersionDir(tool, version) {
+    const wanted = String(version || '');
+    const toolState = getToolState(tool);
+    const info = toolState && toolState.versions ? toolState.versions[wanted] : null;
+    if (info && info.dir) return info.dir;
+    const hit = listInstalled(tool).find((item) => String(item.version) === wanted);
+    if (hit && hit.dir) return hit.dir;
+    return installDir(tool, wanted);
+}
+
+/**
+ * 这个路径是不是沙箱认可的目录（沙箱内，或某个已登记版本的目录）
+ */
+function isKnownDir(target) {
+    const resolved = path.resolve(String(target || ''));
+    const root = path.resolve(getRoot());
+    if (resolved === root || resolved.startsWith(root + path.sep)) return true;
+    const state = readState();
+    for (const [tool, toolState] of Object.entries(state.tools || {})) {
+        const versions = (toolState && toolState.versions) || {};
+        for (const version of Object.keys(versions)) {
+            const info = versions[version];
+            if (!info || !info.dir) continue;
+            const dir = path.resolve(info.dir);
+            if (resolved === dir || resolved.startsWith(dir + path.sep)) return true;
+        }
+    }
+    return false;
+}
+
+/**
  * 接管一个已经存在的安装目录（不复制、不移动文件）
  */
 async function adopt(tool, dir, version) {
@@ -1482,6 +1516,8 @@ module.exports = {
     getLauncherPs1Path,
     ensureRoot,
     installDir,
+    getVersionDir,
+    isKnownDir,
     scanInstalled,
     listInstalled,
     looksInstalled,

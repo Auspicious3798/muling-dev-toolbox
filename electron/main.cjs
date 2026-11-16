@@ -998,7 +998,8 @@ app.whenReady().then(() => {
             }
             const root = path.resolve(sandbox.getRoot());
             const target = path.resolve(targetPath);
-            if (target !== root && !target.startsWith(root + path.sep)) {
+            const inRoot = target === root || target.startsWith(root + path.sep);
+            if (!inRoot && !sandbox.isKnownDir(target)) {
                 return {success: false, message: '只能打开沙箱内的目录'};
             }
             if (!fs.existsSync(target)) {
@@ -1019,7 +1020,7 @@ app.whenReady().then(() => {
             if (!tool || !version) {
                 return {success: false, message: '参数无效'};
             }
-            return {success: true, dir: sandbox.installDir(tool, version)};
+            return {success: true, dir: sandbox.getVersionDir(tool, version)};
         } catch (err) {
             return {success: false, message: err.message};
         }
