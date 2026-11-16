@@ -24,8 +24,11 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
 
     function getMySQLVersionConfig(version) {
         const cfg = configManager.getToolConfig('mysql', version);
-        if (!cfg) return null;
         const defaultPort = version === '5.7' ? 3306 : (version === '8.0' ? 3307 : 3308);
+        if (!cfg) {
+            // 接管来的版本（比如本机的 9.3）不在下载清单里，但也得能看端口、改密码
+            return {defaultPort: 3306, adopted: true, url: null};
+        }
         return {...cfg, defaultPort};
     }
 
@@ -33,11 +36,60 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     const processes = new Map();
 
     function readPort(home) {
-        const confPath = path.join(home, 'my.ini');
-        if (!fs.existsSync(confPath)) return null;
-        const content = fs.readFileSync(confPath, 'utf8');
-        const portMatch = content.match(/^\s*port\s*=\s*(\d+)/im);
-        return portMatch ? parseInt(portMatch[1], 10) : null;
+        const candidates = [path.join(home, 'my.ini')];
+        // 官方安装器把 my.ini 放在 C:\ProgramData\MySQL\MySQL Server X.Y\ 下，接管的环境也在那儿
+        try {
+            const programData = process.env.ProgramData || process.env.PROGRAMDATA || 'C:\\ProgramData';
+            const root = path.join(programData, 'MySQL');
+            if (fs.existsSync(root)) {
+                for (const entry of fs.readdirSync(root)) {
+                    const conf = path.join(root, entry, 'my.ini');
+                    if (fs.existsSync(conf)) candidates.push(conf);
+                }
+            }
+        } catch (err) {
+            // 读不到 ProgramData 就只看安装目录
+        }
+        for (const confPath of candidates) {
+            if (!fs.existsSync(confPath)) continue;
+            try {
+                const content = fs.readFileSync(confPath, 'utf8');
+                const portMatch = content.match(/^\s*port\s*=\s*(\d+)/im);
+                if (portMatch) return parseInt(portMatch[1], 10);
+            } catch (err) {
+                // 换下一个候选
+            }
+        }
+        return null;
+    }
+
+    // 找一下「从当前目录启动、但不是我们拉起来的」mysqld（官方安装的 Windows 服务就是这种）
+    async function findForeignMysqld(home) {
+        const wanted = path.resolve(home).toLowerCase();
+        try {
+            const {stdout} = await execPromise('tasklist /FI "IMAGENAME eq mysqld.exe" /FO CSV /NH', {
+                windowsHide: true,
+                timeout: 5000,
+            });
+            const pids = Array.from(stdout.matchAll(/"mysqld\.exe","(\d+)"/gi)).map((m) => m[1]);
+            for (const pid of pids) {
+                try {
+                    const {stdout: exeOut} = await execPromise(
+                        `powershell -NoProfile -Command "(Get-Process -Id ${pid} -ErrorAction SilentlyContinue).Path"`,
+                        {windowsHide: true, timeout: 5000}
+                    );
+                    const exe = String(exeOut || '').trim();
+                    if (exe && path.resolve(exe).toLowerCase().startsWith(wanted)) {
+                        return {pid: Number(pid), exe};
+                    }
+                } catch (err) {
+                    // 拿不到路径就跳过这个 pid
+                }
+            }
+        } catch (err) {
+            // tasklist 跑不了就当没有
+        }
+        return null;
     }
 
     function patchMyIniPort(home, port) {
@@ -174,6 +226,13 @@ port=${port}
     async function startMySQLProcess(installDir) {
         const mysqldPath = path.join(installDir, 'bin', 'mysqld.exe');
         if (!fs.existsSync(mysqldPath)) throw new Error('未找到 mysqld.exe');
+        const foreign = await findForeignMysqld(installDir);
+        if (foreign) {
+            throw new Error(
+                `这个 MySQL 已经在跑了（PID ${foreign.pid}，多半是官方安装的 Windows 服务），` +
+                '环境盒不会再起第二个。要用环境盒管理，先在「服务」里停掉它；或者不管它，直接用系统里那个。'
+            );
+        }
         const confPath = path.join(installDir, 'my.ini');
         if (!fs.existsSync(confPath)) throw new Error('未找到 my.ini');
         if (await isMySQLRunning(installDir)) return null;
@@ -433,7 +492,16 @@ port=${port}
             const home = findMySQLHome(version);
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             const stopped = await stopMySQLProcess(home);
-            if (!stopped) return {success: false, message: `MySQL ${version} 未在运行`};
+            if (!stopped) {
+                const foreign = await findForeignMysqld(home);
+                if (foreign) {
+                    return {
+                        success: false,
+                        message: `这个 MySQL 是系统服务在跑（PID ${foreign.pid}），请到「服务」里停它，环境盒不替你停别人的服务`,
+                    };
+                }
+                return {success: false, message: `MySQL ${version} 未在运行`};
+            }
             return {success: true, message: `MySQL ${version} 已停止`};
         } catch (err) {
             return {success: false, message: err.message};
@@ -469,7 +537,10 @@ port=${port}
             const home = findMySQLHome(version);
             if (!home) return {success: true, status: 'unknown'};
             const running = await isMySQLRunning(home);
-            return {success: true, status: running ? 'running' : 'stopped'};
+            if (running) return {success: true, status: 'running'};
+            const foreign = await findForeignMysqld(home);
+            if (foreign) return {success: true, status: 'running', external: true, pid: foreign.pid};
+            return {success: true, status: 'stopped'};
         } catch (err) {
             logToFile(`get-mysql-service-status 异常: ${err.message}`);
             return {success: false, status: 'error', message: err.message};
@@ -521,8 +592,11 @@ port=${port}
         const home = findMySQLHome(version);
         if (!home) return {success: false, message: '未找到安装目录'};
 
-        const port = readPort(home) || cfg.defaultPort;
-        const running = await isMySQLRunning(home);
+        const configured = servicePorts.getPort(userDataPath, 'mysql', version);
+        const port = readPort(home) || configured || cfg.defaultPort;
+        const owned = await isMySQLRunning(home);
+        const foreign = owned ? null : await findForeignMysqld(home);
+        const running = owned || Boolean(foreign);
         let hasPassword = null;
         if (running) {
             const mysqlPath = path.join(home, 'bin', 'mysql.exe');
@@ -536,6 +610,6 @@ port=${port}
             }
         }
 
-        return {success: true, port, hasPassword, running};
+        return {success: true, port, hasPassword, running, external: Boolean(foreign), adopted: Boolean(cfg.adopted)};
     });
 };

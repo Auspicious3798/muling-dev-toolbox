@@ -84,6 +84,7 @@
                 </span>
                 <span class="meta-pill" v-if="mysqlConfigs[v]?.hasPassword === true">有密码</span>
                 <span class="meta-pill subtle" v-else>无密码</span>
+                <span class="meta-pill subtle" v-if="mysqlConfigs[v]?.external" title="这个 MySQL 是官方安装的 Windows 服务在跑，环境盒不接管它的启停">系统服务在跑</span>
               </template>
               <!-- Redis info pills -->
               <template v-else-if="tool === 'redis'">
@@ -476,7 +477,7 @@ export default {
     },
     async refreshMySQLConfigs() {
       if (this.tool!=='mysql') return;
-      for(const v of this.versions) { try{ const r=await window.electronAPI.getMySQLConfig(v); this.mysqlConfigs[v]=r.success?{port:r.port,hasPassword:r.hasPassword}:{port:'未知',hasPassword:null}; } catch { this.mysqlConfigs[v]={port:'未知',hasPassword:null}; } }
+      for(const v of this.versions) { try{ const r=await window.electronAPI.getMySQLConfig(v); this.mysqlConfigs[v]=r.success?{port:r.port,hasPassword:r.hasPassword,external:Boolean(r.external)}:{port:'未知',hasPassword:null,external:false}; } catch { this.mysqlConfigs[v]={port:'未知',hasPassword:null,external:false}; } }
     },
     async switchVersion(version) {
       if(this.actionLoading) return false; this.actionLoading=true;
