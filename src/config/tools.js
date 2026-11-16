@@ -18,12 +18,6 @@ import NginxIcon from '/icons/nginx.svg?url';
 import GolangIcon from '/icons/Golang.svg?url';
 import MinicondaIcon from '/icons/Miniconda.svg?url';
 import JupyterIcon from '/icons/Jupyter.svg?url';
-import NacosIcon from '/icons/nacos.svg?url';
-import SentinelIcon from '/icons/sentinel.svg?url';
-import RabbitmqIcon from '/icons/Rabbitmq.svg?url';
-import MinioIcon from '/icons/minio.svg?url';
-import ElasticsearchIcon from '/icons/elasticsearch.svg?url';
-import KibanaIcon from '/icons/kibana.svg?url';
 import CIcon from '/icons/c.svg?url';
 
 export const TOOLS = [
@@ -77,14 +71,6 @@ export const TOOLS = [
       status: 'getRedisServiceStatus', start: 'startRedisService', stop: 'stopRedisService'
     }
   },
-
-  // ── 中间件 ──
-  { id: 'nacos', name: 'Nacos', group: 'middleware', icon: NacosIcon },
-  { id: 'sentinel', name: 'Sentinel', group: 'middleware', icon: SentinelIcon },
-  { id: 'rabbitmq', name: 'RabbitMQ', group: 'middleware', icon: RabbitmqIcon },
-  { id: 'minio', name: 'MinIO', group: 'middleware', icon: MinioIcon },
-  { id: 'elasticsearch', name: 'Elasticsearch', group: 'middleware', icon: ElasticsearchIcon },
-  { id: 'kibana', name: 'Kibana', group: 'middleware', icon: KibanaIcon },
 
   // ── 编译工具 ──
   { id: 'mingw', name: 'MinGW', group: 'toolchain', icon: CIcon }
