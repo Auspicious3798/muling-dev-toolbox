@@ -77,3 +77,6 @@ assets/revise/
 docs/*.md
 !docs/代码签名.md
 !docs/资源基址.md
+
+# 本地打包/调试脚本目录
+_build/
