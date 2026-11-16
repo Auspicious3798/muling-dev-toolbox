@@ -696,13 +696,14 @@ function createWindow() {
 }
 
 const CLEAN_ENV_ONLY = process.argv.includes('--clean-env');
+const PURGE_ENV_ONLY = process.argv.includes('--purge-env');
 const ADOPT_ENV_INDEX = process.argv.indexOf('--adopt-env');
 const ADOPT_ENV_ONLY = ADOPT_ENV_INDEX >= 0;
 const ADOPT_ENV_TOOL = ADOPT_ENV_ONLY ? String(process.argv[ADOPT_ENV_INDEX + 1] || '') : '';
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
-    if (!CLEAN_ENV_ONLY && !ADOPT_ENV_ONLY) app.quit();
+    if (!CLEAN_ENV_ONLY && !ADOPT_ENV_ONLY && !PURGE_ENV_ONLY) app.quit();
 } else {
     app.on('second-instance', () => {
         showMainWindow();
@@ -710,6 +711,15 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+    // 卸载模式：把本工具写进注册表的环境变量与 PATH 条目撤干净，然后退出
+    if (PURGE_ENV_ONLY) {
+        sandbox.purgeInjectedEnv()
+            .then((res) => logToFile(`[PurgeEnv] vars=${res.removedVars.length} paths=${res.removedPathEntries.length} needsAdmin=${res.needsAdmin}`))
+            .catch((err) => logToFile(`[PurgeEnv] 失败：${err.message}`))
+            .finally(() => setTimeout(() => app.quit(), 500));
+        return;
+    }
+
     // 提权清理模式：只清一遍环境变量就退出，不建窗口
     if (CLEAN_ENV_ONLY) {
         sandbox.cleanLegacyAll()

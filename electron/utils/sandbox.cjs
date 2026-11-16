@@ -959,7 +959,7 @@ async function takeOverEnv(tool) {
     try {
         const userPath = await env.getUserPath();
         const parts = String(userPath || '').split(';').filter(Boolean);
-        const stale = parts.filter((p) => isToolDirEntry(tool, p));
+        const stale = parts.filter((p) => isToolDirEntry(tool, p) || (tool === 'jdk' && isJavaShimEntry(p)));
         if (stale.length) {
             const kept = parts.filter((p) => !stale.includes(p));
             await env.setUserPath(kept.join(';'));
@@ -973,7 +973,7 @@ async function takeOverEnv(tool) {
     try {
         const systemPath = await env.getSystemPath();
         const sysParts = String(systemPath || '').split(';').filter(Boolean);
-        const sysStale = sysParts.filter((p) => isToolDirEntry(tool, p));
+        const sysStale = sysParts.filter((p) => isToolDirEntry(tool, p) || (tool === 'jdk' && isJavaShimEntry(p)));
         if (sysStale.length) {
             const kept = sysParts.filter((p) => !sysStale.includes(p));
             await env.setSystemPath(kept.join(';'));
@@ -982,7 +982,7 @@ async function takeOverEnv(tool) {
         }
     } catch (err) {
         const systemPath = await env.getSystemPath().catch(() => '');
-        const sysStale = String(systemPath || '').split(';').filter((p) => isToolDirEntry(tool, p));
+        const sysStale = String(systemPath || '').split(';').filter((p) => isToolDirEntry(tool, p) || (tool === 'jdk' && isJavaShimEntry(p)));
         if (sysStale.length) {
             messages.push(`系统 PATH 里还有 ${sysStale.length} 条旧的 ${meta.label} 路径，需要以管理员身份再接管一次才能清掉`);
         }
@@ -1012,7 +1012,7 @@ async function takeOverEnv(tool) {
         const systemPath = await env.getSystemPath();
         const shadow = String(systemPath || '')
             .split(';')
-            .filter((p) => p && isToolDirEntry(tool, p));
+            .filter((p) => p && (isToolDirEntry(tool, p) || (tool === 'jdk' && isJavaShimEntry(p))));
         if (shadow.length) {
             messages.push(
                 `注意：系统 PATH 里还有 ${shadow.length} 条旧的 ${meta.label} 路径（${shadow[0]}），`
@@ -1037,7 +1037,7 @@ async function removeSystemToolEntries(tool) {
     try {
         const systemPath = await env.getSystemPath();
         const parts = String(systemPath || '').split(';').filter(Boolean);
-        const stale = parts.filter((entry) => isToolDirEntry(tool, entry));
+        const stale = parts.filter((entry) => isToolDirEntry(tool, entry) || (tool === 'jdk' && isJavaShimEntry(entry)));
         if (!stale.length) {
             return {ok: true, removed: [], message: `系统 PATH 里没有 ${meta.label} 的旧条目`};
         }
@@ -1047,6 +1047,20 @@ async function removeSystemToolEntries(tool) {
     } catch (err) {
         return {ok: false, removed: [], message: `清理系统 PATH 失败：${err.message}`};
     }
+}
+
+/**
+ * Oracle 安装 JDK 时留下的 javapath 转发目录：
+ * 里面只有 java.exe / javaw.exe / javac.exe 几个壳，真正的 JDK 由 Oracle 安装器维护指向，
+ * 所以它不在「JDK 安装目录」的判定里，却同样会让 java 解析到别的 JDK。
+ * 单独认出来，接管/清理时才算得干净。
+ */
+function isJavaShimEntry(entry) {
+    if (!entry) return false;
+    const text = String(entry).trim().replace(/"/g, '');
+    if (!text) return false;
+    return /(^|\\)javapath(\\|$)/i.test(text)
+        || /\\Common Files\\Oracle\\Java\\javapath(\\|$)/i.test(text);
 }
 
 /**
@@ -1334,6 +1348,74 @@ function resetCache() {
     stateCache = null;
 }
 
+/**
+ * 卸载专用：把「我们写进去的东西」原样撤掉。
+ *
+ * 与 cleanLegacyAll（先探针、只清坏条目）不同，这里完全按归属判定：
+ * 值指向沙箱根目录的变量 / PATH 条目就是我们的，一律撤掉；指向别处的一律不碰。
+ * 系统 PATH 需要管理员权限，没权限就返回 needsAdmin 交给调用方提权重跑。
+ */
+async function purgeInjectedEnv() {
+    const env = require('./env.cjs');
+    const root = path.resolve(getRoot()).toLowerCase();
+    const normalize = (value) => String(value || '')
+        .trim()
+        .replace(/"/g, '')
+        .replace(/%LOCALAPPDATA%/ig, process.env.LOCALAPPDATA || '%LOCALAPPDATA%')
+        .replace(/%APPDATA%/ig, process.env.APPDATA || '%APPDATA%');
+    const underRoot = (value) => {
+        const text = normalize(value);
+        if (!text) return false;
+        return path.resolve(text).toLowerCase().startsWith(root) || text.toLowerCase().startsWith(root);
+    };
+
+    const removedVars = [];
+    const removedPathEntries = [];
+    let needsAdmin = false;
+
+    for (const meta of Object.values(TOOL_META)) {
+        const name = meta && meta.envVar;
+        if (!name) continue;
+        try {
+            const value = await env.getUserEnvVariable(name);
+            if (value && underRoot(value)) {
+                await env.deleteUserEnvVariable(name);
+                removedVars.push(name);
+            }
+        } catch (err) {
+            // 单个变量删不掉不影响整体
+        }
+    }
+
+    try {
+        const userPath = await env.getUserPath();
+        const parts = String(userPath || '').split(';').filter(Boolean);
+        const kept = parts.filter((entry) => !underRoot(entry));
+        if (kept.length !== parts.length) {
+            await env.setUserPath(kept.join(';'));
+            removedPathEntries.push(...parts.filter((entry) => underRoot(entry)));
+        }
+    } catch (err) {
+        needsAdmin = true;
+    }
+
+    try {
+        const systemPath = await env.getSystemPath();
+        const parts = String(systemPath || '').split(';').filter(Boolean);
+        const stale = parts.filter((entry) => underRoot(entry));
+        if (stale.length) {
+            const kept = parts.filter((entry) => !underRoot(entry));
+            await env.setSystemPath(kept.join(';'));
+            removedPathEntries.push(...stale.map((entry) => `[系统] ${entry}`));
+        }
+    } catch (err) {
+        // 没有管理员权限时写 HKLM 会失败，交给上层提权重试
+        needsAdmin = true;
+    }
+
+    return {ok: true, removedVars, removedPathEntries, needsAdmin};
+}
+
 module.exports = {
     TOOL_META,
     INJECTABLE_TOOLS,
@@ -1373,6 +1455,7 @@ module.exports = {
     scanLegacy,
     migrate,
     cleanLegacyEnv,
+    purgeInjectedEnv,
     openTerminal,
     getInfo,
     resetCache,
