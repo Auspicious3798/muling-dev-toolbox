@@ -46,19 +46,6 @@
       </div>
     </div>
 
-    <!-- Legacy installation banner -->
-    <div v-if="sandboxLegacy.length" class="legacy-banner">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-      <div class="legacy-text">
-        <strong>检测到 {{ sandboxLegacy.length }} 个旧的 {{ toolLabel }} 安装</strong>
-        <span>它们装在系统目录并写入了系统环境变量，可以迁移进沙箱（不改系统）或直接清理旧变量。</span>
-      </div>
-      <div class="legacy-actions">
-        <button class="mini-btn" @click="migrateLegacy">迁移第一个</button>
-        <button class="mini-btn danger" @click="cleanLegacy">清理旧变量</button>
-      </div>
-    </div>
-
     <!-- Empty state -->
     <div v-if="versions.length === 0 && !loading" class="empty-state">
       <img class="empty-art" src="/art/scene-empty-card.png" alt=""/>
@@ -322,8 +309,7 @@ export default {
     changePasswordMethod() { return this.tool==='mysql'?'changeMySQLPassword':'changeRedisPassword'; },
     sandboxTool() { return (this.sandboxInfo && this.sandboxInfo.tools && this.sandboxInfo.tools[this.tool]) || null; },
     toolRoot() { return this.sandboxTool ? this.sandboxTool.root : ''; },
-    toolInjectable() { return !!(this.sandboxTool && this.sandboxTool.injectable); },
-    sandboxLegacy() { return ((this.sandboxInfo && this.sandboxInfo.legacy) || []).filter((i) => i.tool === this.tool); }
+    toolInjectable() { return !!(this.sandboxTool && this.sandboxTool.injectable); }
   },
   watch: { tool: { immediate: true, handler() { this.refresh(); } } },
   mounted() {
@@ -685,37 +671,6 @@ export default {
         }
         else Lemon.error(r.message || '变量设置没成功');
       } catch (err) { Lemon.error(`变量设置失败了：${err.message}`); }
-      finally { this.actionLoading = false; }
-    },
-    async migrateLegacy() {
-      const item = this.sandboxLegacy[0];
-      if (!item) return;
-      if (!confirm(`把 ${this.toolLabel} ${item.version} 从\n${item.dir}\n迁移到沙箱吗？迁移后旧目录会被清空，系统变量也会清理。`)) return;
-      this.actionLoading = true;
-      try {
-        const r = await window.electronAPI.migrateToSandbox(item.tool, item.version, item.dir);
-        if (r.success) {
-          Lemon.success(`${this.toolLabel} ${item.version} 搬进沙箱啦，旧变量也收拾干净了～`);
-          await this.loadSandbox();
-          await this.refresh();
-        }
-        else Lemon.error(r.message || '搬家没成功，可能文件正被占用');
-      } catch (err) { Lemon.error(`搬家失败了：${err.message}`); }
-      finally { this.actionLoading = false; }
-    },
-    async cleanLegacy() {
-      if (!confirm(`清理旧的 ${this.toolLabel} 系统环境变量吗？\n只清理变量，不会删除已安装的目录。`)) return;
-      this.actionLoading = true;
-      try {
-        const r = await window.electronAPI.cleanLegacyEnv(this.tool);
-        if (r.success) {
-          const removed = r.data && r.data.removedVars;
-          if (removed && removed.length) Lemon.success(`旧变量收拾好了：${removed.join('、')}`);
-          else Lemon.info('找了一圈，没有需要清理的旧变量～');
-          await this.loadSandbox();
-        }
-        else Lemon.error(r.message || '清理没成功，可能有变量正在被占用');
-      } catch (err) { Lemon.error(`清理失败了：${err.message}`); }
       finally { this.actionLoading = false; }
     },
     async openTerminal() {
@@ -1086,17 +1041,6 @@ export default {
 .mini-btn:disabled { opacity: 0.55; cursor: not-allowed; }
 .mini-btn.on { border-color: var(--primary); color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, transparent); }
 .mini-btn.danger:hover:not(:disabled) { border-color: var(--danger, #ef4444); color: var(--danger, #ef4444); }
-
-.legacy-banner {
-  display: flex; align-items: center; gap: var(--space-3);
-  padding: 11px 14px; border-radius: var(--radius-md);
-  background: var(--warning-bg); color: var(--warning-text);
-  font-size: 0.8rem;
-}
-.legacy-text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
-.legacy-text strong { font-size: 0.84rem; }
-.legacy-text span { opacity: 0.85; }
-.legacy-actions { display: flex; gap: var(--space-2); }
 
 /* ═══════════════════════════════════════════════════
    Modal

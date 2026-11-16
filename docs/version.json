@@ -1,6 +1,6 @@
 {
-  "version": "2.1.10",
-  "notes": "卸载接管的环境只解除登记、不再尝试删官方安装目录；启动页与渲染模式的小毛病一并修掉。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.10-release/MulingEnvBox-Setup-2.1.10.exe",
+  "version": "2.1.11",
+  "notes": "环境面板不再弹「检测到 N 个旧的安装」横幅，需要时点「接管电脑上已有的」自己接管。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.11-release/MulingEnvBox-Setup-2.1.11.exe",
   "publishedAt": "2026-11-16"
 }
