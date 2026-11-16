@@ -695,10 +695,11 @@ function createWindow() {
     });
 }
 
+const CLEAN_ENV_ONLY = process.argv.includes('--clean-env');
 const gotSingleInstanceLock = app.requestSingleInstanceLock();
 
 if (!gotSingleInstanceLock) {
-    app.quit();
+    if (!CLEAN_ENV_ONLY) app.quit();
 } else {
     app.on('second-instance', () => {
         showMainWindow();
@@ -706,6 +707,15 @@ if (!gotSingleInstanceLock) {
 }
 
 app.whenReady().then(() => {
+    // 提权清理模式：只清一遍环境变量就退出，不建窗口
+    if (CLEAN_ENV_ONLY) {
+        sandbox.cleanLegacyAll()
+            .then((res) => logToFile(`[CleanEnv] 管理员清理完成 removed=${res.removed.length} warnings=${res.warnings.length}`))
+            .catch((err) => logToFile(`[CleanEnv] 失败：${err.message}`))
+            .finally(() => setTimeout(() => app.quit(), 500));
+        return;
+    }
+
     // 初始化配置管理器
     configManager.initConfig(app.getPath('userData'));
 
@@ -842,6 +852,31 @@ app.whenReady().then(() => {
             return {success: true, data: sandbox.detectExistingInstalls()};
         } catch (err) {
             return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('clean-legacy-env', async () => {
+        try {
+            const result = await sandbox.cleanLegacyAll();
+            logToFile(`[CleanEnv] 清理完成 removed=${(result.removed || []).length} needsAdmin=${result.needsAdmin}`);
+            return {success: true, data: result};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('clean-legacy-env-elevated', async () => {
+        try {
+            const {execFile} = require('child_process');
+            const ps = path.join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
+            const exe = String(process.execPath).replace(/'/g, "''");
+            const script = `Start-Process -FilePath '${exe}' -ArgumentList '--clean-env' -Verb RunAs`;
+            await new Promise((resolve, reject) => {
+                execFile(ps, ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', script], {windowsHide: true}, (err) => (err ? reject(err) : resolve()));
+            });
+            return {success: true, message: '已请求管理员权限，确认后会自动把系统级旧条目清掉'};
+        } catch (err) {
+            return {success: false, message: `提权失败：${err.message}`};
         }
     });
 

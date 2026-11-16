@@ -999,6 +999,59 @@ async function takeOverEnv(tool) {
 }
 
 /**
+ * 一键清理：把 PATH / 变量里指向「别的安装」的旧条目统统摘掉。
+ * 用户级直接处理；系统级有权限就顺手清，没权限返回 needsAdmin 由上层提权再跑一次。
+ */
+const CLEAN_TOOLS = ['jdk', 'python', 'maven', 'gradle', 'nodejs', 'uv', 'mysql', 'redis', 'nginx'];
+
+async function cleanLegacyAll() {
+    const env = require('./env.cjs');
+    const removed = [];
+    const warnings = [];
+    let systemStale = [];
+
+    try {
+        const userPath = await env.getUserPath();
+        const parts = String(userPath || '').split(';').filter(Boolean);
+        const kept = [];
+        for (const entry of parts) {
+            const hit = CLEAN_TOOLS.find((t) => isToolDirEntry(t, entry));
+            if (hit) removed.push(`${hit}: ${entry}`);
+            else kept.push(entry);
+        }
+        if (kept.length !== parts.length) await env.setUserPath(kept.join(';'));
+    } catch (err) {
+        warnings.push(`清理用户 PATH 失败：${err.message}`);
+    }
+
+    try {
+        const systemPath = await env.getSystemPath();
+        const parts = String(systemPath || '').split(';').filter(Boolean);
+        const kept = [];
+        for (const entry of parts) {
+            const hit = CLEAN_TOOLS.find((t) => isToolDirEntry(t, entry));
+            if (hit) systemStale.push(entry);
+            else kept.push(entry);
+        }
+        if (systemStale.length) {
+            await env.setSystemPath(kept.join(';'));
+            removed.push(...systemStale.map((entry) => `system: ${entry}`));
+            systemStale = [];
+        }
+    } catch (err) {
+        if (!systemStale.length) warnings.push(`读取系统 PATH 失败：${err.message}`);
+    }
+
+    return {
+        ok: true,
+        removed,
+        needsAdmin: systemStale.length > 0,
+        systemStale,
+        warnings,
+    };
+}
+
+/**
  * 清理旧系统模式写入的环境变量与 PATH 条目
  * （系统级需要管理员；没有权限时返回 ok:false，不影响迁移本身）
  */
@@ -1146,6 +1199,7 @@ module.exports = {
     guessVersion,
     adopt,
     takeOverEnv,
+    cleanLegacyAll,
     detectExistingInstalls,
     register,
     setToolPassword,

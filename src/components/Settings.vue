@@ -117,6 +117,13 @@
         </div>
       </div>
       <div class="setting-item">
+        <label>清理旧变量</label>
+        <div class="cache-info">
+          <span class="hint-text">把 PATH 里残留的旧 JDK / Python / MySQL 等目录摘掉（系统级需要一次管理员授权）</span>
+          <button class="danger-btn" @click="cleanLegacy" :disabled="cleaningLegacy">{{ cleaningLegacy ? '清理中…' : '一键清理' }}</button>
+        </div>
+      </div>
+      <div class="setting-item">
         <label>全部撤出</label>
         <div class="cache-info">
           <span class="hint-text">把注入过的所有 *_HOME 变量与对应 PATH 条目一次清干净</span>
@@ -275,6 +282,7 @@ export default {
       sandboxRoot: '',
       injectionItems: [],
       detaching: false,
+      cleaningLegacy: false,
       backupBusy: false,
       backupIncludeBinaries: false,
       backupPreview: null,
@@ -511,6 +519,34 @@ export default {
       } catch (err) { Lemon.error(`撤出失败：${err.message}`); }
       finally { this.detaching = false; }
     },
+    async cleanLegacy() {
+      const api = window.electronAPI || {};
+      if (!api.cleanLegacyEnv) { Lemon.error('当前环境不支持一键清理'); return; }
+      this.cleaningLegacy = true;
+      try {
+        const res = await api.cleanLegacyEnv();
+        if (!res || !res.success) { Lemon.error((res && res.message) || '清理失败'); return; }
+        const data = res.data || {};
+        const removed = data.removed || [];
+        if (removed.length) {
+          Lemon.success(`清掉了 ${removed.length} 条旧环境变量条目，新开的终端就干净了～`);
+          removed.slice(0, 5).forEach((line, i) => setTimeout(() => Lemon.info(line), 500 * (i + 1)));
+        } else {
+          Lemon.info('PATH 里没找到残留的旧工具目录，已经很干净了～');
+        }
+        if (data.needsAdmin) {
+          Lemon.info('系统 PATH 里还有几条需要管理员权限，正在请求授权…');
+          const el = await api.cleanLegacyEnvElevated();
+          if (el && el.success) Lemon.info(el.message || '已请求管理员授权');
+          else Lemon.error((el && el.message) || '提权失败，可右键程序「以管理员身份运行」后重试');
+        }
+      } catch (err) {
+        Lemon.error(`清理失败：${err.message}`);
+      } finally {
+        this.cleaningLegacy = false;
+      }
+    },
+
     async detachAll() {
       if (this.detaching) return;
       if (!confirm('把注入过的所有系统变量（各项 *_HOME 及对应 PATH 条目）全部撤出吗？')) return;
