@@ -173,7 +173,8 @@
 
     <div class="adopt-admin" v-if="adoptNeedsAdmin">
       <div class="adopt-admin-text">
-        系统 PATH 里还有旧的 {{ toolLabel }} 路径，它排在用户 PATH 前面，重开终端后仍会优先用旧的。
+        系统 PATH 里还有 {{ conflicts.systemEntries.length }} 条旧的 {{ toolLabel }} 路径，它排在用户 PATH 前面，重开终端后仍会优先用旧的：
+        <span class="adopt-admin-list">{{ conflicts.systemEntries.join(' ; ') }}</span>
       </div>
       <button class="adopt-btn" :disabled="fixingAdmin" @click="fixAdoptAdmin">
         {{ fixingAdmin ? '正在请求授权…' : '以管理员身份清理' }}
@@ -295,6 +296,8 @@ export default {
       sandboxInfo: null, injected: false,
       adoptCandidates: [], adopting: false, adoptHandler: null,
       adoptNeedsAdmin: '', fixingAdmin: false,
+      conflicts: { supported: false, userEntries: [], systemEntries: [] },
+      lastCleanAt: '',
       editingPort: null, portDraft: '', portSaving: false
     };
   },
@@ -367,6 +370,26 @@ export default {
         this.adopting = false;
       }
     },
+    async loadConflicts() {
+      const api = window.electronAPI || {};
+      if (!api.envConflicts) return;
+      try {
+        const r = await api.envConflicts(this.tool);
+        if (!r || !r.success || !r.data) return;
+        this.conflicts = r.data;
+        const sys = (r.data.systemEntries || []);
+        this.adoptNeedsAdmin = sys.length ? this.tool : '';
+        const last = r.data.lastResult;
+        if (last && last.tool === this.tool && last.at && last.at !== this.lastCleanAt) {
+          this.lastCleanAt = last.at;
+          if (last.removed) Lemon.success(`已以管理员身份清掉 ${last.removed} 条系统 PATH 旧条目，重开终端就生效`);
+          else if (!last.ok) Lemon.info(`提权清理没成功：${last.message || '未知原因'}`);
+          else Lemon.info('系统 PATH 里已经没有该工具的旧条目了');
+        }
+      } catch (err) {
+        // 读不到冲突信息不影响主流程
+      }
+    },
     async fixAdoptAdmin() {
       const api = window.electronAPI || {};
       if (!api.adoptEnvElevated) { Lemon.error('当前环境不支持提权清理'); return; }
@@ -375,7 +398,8 @@ export default {
         const r = await api.adoptEnvElevated(this.tool);
         if (r && r.success) {
           Lemon.success(r.message || '已请求管理员权限');
-          this.adoptNeedsAdmin = '';
+          // 等 UAC 那边的进程跑完再回来刷新，拿到清理回执
+          [3000, 7000, 12000].forEach((delay) => setTimeout(() => this.loadConflicts(), delay));
         } else {
           Lemon.error((r && r.message) || '提权失败，可右键程序「以管理员身份运行」后重试');
         }
@@ -398,6 +422,7 @@ export default {
         const notes = (r.data && r.data.messages) || [];
         notes.forEach((line, i) => setTimeout(() => Lemon.info(line), 600 * (i + 1)));
         this.adoptNeedsAdmin = notes.some((line) => String(line).includes('系统 PATH 里还有')) ? this.tool : '';
+        this.loadConflicts();
         this.adoptCandidates = [];
         await this.refresh();
       } catch (err) {
@@ -410,6 +435,7 @@ export default {
       if (this.loading) return;
       this.loading=true; this.apiMissing=false; eventBus.emit('scan-start', this.toolLabel);
       this.loadSandbox();
+      this.loadConflicts();
       try {
         const api = window.electronAPI[this.checkMethod];
         if (!api) { this.apiMissing=true; eventBus.emit('scan-end'); return; }
@@ -953,6 +979,11 @@ export default {
   border-left: 3px solid var(--warning, #f0a020);
 }
 .adopt-admin-text { flex: 1; min-width: 0; font-size: 0.8rem; line-height: 1.6; color: var(--text-secondary); }
+.adopt-admin-list {
+  display: block; margin-top: 2px; word-break: break-all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.74rem; color: var(--text-tertiary, #94a3b8);
+}
 .adopt-panel {
   margin: 0 24px 20px; padding: 16px 18px;
   border-radius: var(--radius-lg);

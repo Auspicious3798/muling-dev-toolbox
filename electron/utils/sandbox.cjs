@@ -1030,6 +1030,29 @@ async function takeOverEnv(tool) {
 /**
  * 提权模式专用：把系统 PATH 里属于该工具的旧条目摘掉（只动 HKLM 的 PATH 这一处）
  */
+/**
+ * 只看不改：报告某个工具在用户/系统 PATH 里还残留多少条「抢道」条目。
+ * 面板拿它决定要不要显示「以管理员身份清理」。
+ */
+async function inspectEnvConflicts(tool) {
+    const meta = getToolMeta(tool);
+    if (!meta || !INJECTABLE_TOOLS.includes(tool)) {
+        return {supported: false, tool, label: (meta && meta.label) || tool, systemEntries: [], userEntries: []};
+    }
+    const env = require('./env.cjs');
+    const match = (entry) => isToolDirEntry(tool, entry) || (tool === 'jdk' && isJavaShimEntry(entry));
+    const pick = (value) => String(value || '').split(';').map((s) => s.trim()).filter(Boolean).filter(match);
+    const userPath = await env.getUserPath().catch(() => '');
+    const systemPath = await env.getSystemPath().catch(() => '');
+    return {
+        supported: true,
+        tool,
+        label: meta.label,
+        userEntries: pick(userPath),
+        systemEntries: pick(systemPath)
+    };
+}
+
 async function removeSystemToolEntries(tool) {
     const meta = getToolMeta(tool);
     if (!meta) return {ok: false, removed: [], message: `未知工具：${tool}`};
@@ -1432,6 +1455,7 @@ module.exports = {
     adopt,
     takeOverEnv,
     cleanLegacyAll,
+    inspectEnvConflicts,
     removeSystemToolEntries,
     detectExistingInstalls,
     register,

@@ -731,9 +731,37 @@ app.whenReady().then(() => {
 
     // 提权接管模式：只把系统 PATH 里该工具的旧条目摘掉，然后退出
     if (ADOPT_ENV_ONLY) {
+        const writeResult = (payload) => {
+            try {
+                const dir = app.getPath('userData');
+                fs.mkdirSync(dir, { recursive: true });
+                fs.writeFileSync(path.join(dir, 'last-env-clean.json'), JSON.stringify(payload, null, 2), 'utf8');
+            } catch (err) {
+                logToFile(`[AdoptEnv] 写回执失败：${err.message}`);
+            }
+        };
         sandbox.removeSystemToolEntries(ADOPT_ENV_TOOL)
-            .then((res) => logToFile(`[AdoptEnv] tool=${ADOPT_ENV_TOOL} ok=${res.ok} removed=${(res.removed || []).length} message=${res.message}`))
-            .catch((err) => logToFile(`[AdoptEnv] 失败：${err.message}`))
+            .then((res) => {
+                logToFile(`[AdoptEnv] tool=${ADOPT_ENV_TOOL} ok=${res.ok} removed=${(res.removed || []).length} message=${res.message}`);
+                writeResult({
+                    tool: ADOPT_ENV_TOOL,
+                    ok: !!res.ok,
+                    removed: (res.removed || []).length,
+                    entries: res.removed || [],
+                    message: res.message || '',
+                    at: new Date().toISOString()
+                });
+            })
+            .catch((err) => {
+                logToFile(`[AdoptEnv] 失败：${err.message}`);
+                writeResult({
+                    tool: ADOPT_ENV_TOOL,
+                    ok: false,
+                    removed: 0,
+                    message: err.message,
+                    at: new Date().toISOString()
+                });
+            })
             .finally(() => setTimeout(() => app.quit(), 500));
         return;
     }
@@ -910,6 +938,25 @@ app.whenReady().then(() => {
             return {success: true, message: '已请求管理员权限，确认后会自动把系统级旧条目清掉'};
         } catch (err) {
             return {success: false, message: `提权失败：${err.message}`};
+        }
+    });
+
+    ipcMain.handle('env-conflicts', async (_event, tool) => {
+        try {
+            const report = await sandbox.inspectEnvConflicts(tool);
+            let lastResult = null;
+            try {
+                const file = path.join(app.getPath('userData'), 'last-env-clean.json');
+                if (fs.existsSync(file)) {
+                    const parsed = JSON.parse(fs.readFileSync(file, 'utf8'));
+                    if (!parsed || !parsed.tool || parsed.tool === tool) lastResult = parsed;
+                }
+            } catch (err) {
+                // 回执读不到就当作没有
+            }
+            return {success: true, data: {...report, lastResult}};
+        } catch (err) {
+            return {success: false, message: err.message};
         }
     });
 

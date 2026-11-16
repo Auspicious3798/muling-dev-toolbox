@@ -1,6 +1,6 @@
 {
-  "version": "2.1.1",
-  "notes": "接管已有环境后真的能用上了：会先摘掉用户 PATH 里的旧条目，系统 PATH 抢道时面板上给「以管理员身份清理」按钮，一键走 UAC；清理旧变量改成先探针再精准清理，只清「命令解析到了却执行不了」的坏条目，用户手动指定的路径不受影响；扫描已有环境补上 Program Files\\Java、Eclipse Adoptium 等目录，多版本 JDK 一次列全。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.1-release/MulingEnvBox-Setup-2.1.1.exe",
+  "version": "2.1.2",
+  "notes": "接管面板上的系统 PATH 抢道提示改成常驻可见：每次刷新都会列出具体是哪几条旧路径，点「以管理员身份清理」走 UAC 清掉，进度结束会回执「已清掉 N 条」；另外写 PATH 前一律先落快照，写完读回校验，不一致自动还原。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.2-release/MulingEnvBox-Setup-2.1.2.exe",
   "publishedAt": "2026-11-16"
 }
