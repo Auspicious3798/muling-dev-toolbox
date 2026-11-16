@@ -142,10 +142,14 @@
       </div>
     </div>
 
-    <div class="adopt-panel" v-if="adoptCandidates.length">
+    <div class="adopt-panel" v-if="adoptScanned">
       <div class="adopt-head">
-        <span>发现 {{ adoptCandidates.length }} 个已安装的 {{ toolLabel }}</span>
-        <button class="adopt-close" @click="adoptCandidates = []">×</button>
+        <span v-if="adoptCandidates.length">发现 {{ adoptCandidates.length }} 个已安装的 {{ toolLabel }}</span>
+        <span v-else>没扫到已安装的 {{ toolLabel }}</span>
+        <button class="adopt-close" @click="adoptScanned = false">×</button>
+      </div>
+      <div class="adopt-empty" v-if="!adoptCandidates.length">
+        它可能装在别的位置，或者装在别的盘。手动选一下安装目录我就记下来，文件不会动。
       </div>
       <div class="adopt-item" v-for="item in adoptCandidates" :key="item.dir">
         <div class="adopt-info">
@@ -154,6 +158,11 @@
         </div>
         <button class="adopt-btn" :disabled="adopting || item.registered" @click="adoptOne(item)">
           {{ item.registered ? '已接管' : '接管' }}
+        </button>
+      </div>
+      <div class="adopt-foot">
+        <button class="adopt-btn ghost" :disabled="pickingDir" @click="pickAdoptDir">
+          {{ pickingDir ? '正在接管…' : '手动选择安装目录…' }}
         </button>
       </div>
     </div>
@@ -282,7 +291,7 @@ export default {
       oldMySQLPassword: '', newMySQLPassword: '', mysqlPasswordChanging: false, showMySQLPassword: false, savedMySQLPassword: null,
       sandboxInfo: null, injected: false,
       adoptCandidates: [], adopting: false, adoptHandler: null,
-      adoptNeedsAdmin: '', fixingAdmin: false,
+      adoptNeedsAdmin: '', fixingAdmin: false, adoptScanned: false, pickingDir: false,
       conflicts: { supported: false, userEntries: [], systemEntries: [] },
       lastCleanAt: '',
       editingPort: null, portDraft: '', portSaving: false
@@ -345,11 +354,11 @@ export default {
           return;
         }
         const list = (r.data || []).filter((item) => item.tool === this.tool);
-        if (!list.length) {
-          Lemon.info(`没在系统里找到已安装的 ${this.toolLabel}，可以先点「立即安装」～`);
-          return;
-        }
         this.adoptCandidates = list;
+        this.adoptScanned = true;
+        if (!list.length) {
+          Lemon.info(`没在系统里找到已安装的 ${this.toolLabel}，可以手动指定它的安装目录，或点「立即安装」～`);
+        }
       } catch (err) {
         Lemon.error(`扫描失败：${err.message}`);
       } finally {
@@ -404,18 +413,42 @@ export default {
           Lemon.error((r && r.message) || '接管失败');
           return;
         }
-        Lemon.success(`已接管 ${this.toolLabel} ${r.data.version}，文件还在原来的位置，环境变量也交给环境盒管了～`);
-        const notes = (r.data && r.data.messages) || [];
-        notes.forEach((line, i) => setTimeout(() => Lemon.info(line), 600 * (i + 1)));
-        this.adoptNeedsAdmin = notes.some((line) => String(line).includes('系统 PATH 里还有')) ? this.tool : '';
-        this.loadConflicts();
-        this.adoptCandidates = [];
+        this.afterAdopt(r.data);
         await this.refresh();
       } catch (err) {
         Lemon.error(`接管失败：${err.message}`);
       } finally {
         this.adopting = false;
       }
+    },
+    // 自动没扫到时，让用户自己挑安装目录
+    async pickAdoptDir() {
+      if (this.pickingDir) return;
+      const api = window.electronAPI || {};
+      if (!api.adoptPickDir) { Lemon.error('当前环境不支持手动选择目录'); return; }
+      this.pickingDir = true;
+      try {
+        const r = await api.adoptPickDir(this.tool);
+        if (!r || !r.success) {
+          Lemon.error((r && r.message) || '接管失败');
+          return;
+        }
+        if (r.data && r.data.canceled) return;
+        this.afterAdopt(r.data);
+        await this.refresh();
+      } catch (err) {
+        Lemon.error(`接管失败：${err.message}`);
+      } finally {
+        this.pickingDir = false;
+      }
+    },
+    afterAdopt(data) {
+      Lemon.success(`已接管 ${this.toolLabel} ${data.version}，文件还在原来的位置，环境变量也交给环境盒管了～`);
+      const notes = (data && data.messages) || [];
+      notes.forEach((line, i) => setTimeout(() => Lemon.info(line), 600 * (i + 1)));
+      this.adoptNeedsAdmin = notes.some((line) => String(line).includes('系统 PATH 里还有')) ? this.tool : '';
+      this.loadConflicts();
+      this.adoptCandidates = [];
     },
     async refresh() {
       if (this.loading) return;
@@ -981,6 +1014,17 @@ export default {
 }
 .adopt-btn:hover:not(:disabled) { background: var(--primary-hover); transform: translateY(-1px); }
 .adopt-btn:disabled { opacity: 0.55; cursor: default; }
+.adopt-btn.ghost {
+  background: transparent; border: 1px solid var(--border-light); color: var(--text-secondary);
+}
+.adopt-btn.ghost:hover:not(:disabled) { background: var(--bg-hover); color: var(--text-primary); }
+.adopt-empty {
+  padding: 6px 0 10px; font-size: 0.78rem; line-height: 1.7; color: var(--text-muted);
+}
+.adopt-foot {
+  display: flex; justify-content: flex-end; padding-top: 10px;
+  border-top: 1px solid var(--border-light);
+}
 .adopt-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   min-height: 132px; padding: 20px;

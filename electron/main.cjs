@@ -990,6 +990,30 @@ app.whenReady().then(() => {
         }
     });
 
+    // 没自动扫到安装时，让用户自己挑目录接管
+    ipcMain.handle('sandbox-adopt-pick', async (_event, tool) => {
+        try {
+            const {dialog} = require('electron');
+            const meta = sandbox.TOOL_META[tool];
+            const pick = await dialog.showOpenDialog(mainWindow, {
+                title: `选择 ${(meta && meta.label) || tool} 的安装目录`,
+                buttonLabel: '就用这个目录',
+                properties: ['openDirectory', 'dontAddToRecent'],
+            });
+            if (pick.canceled || !pick.filePaths || !pick.filePaths.length) {
+                return {success: true, data: {canceled: true}};
+            }
+            const dir = pick.filePaths[0];
+            const result = await sandbox.adopt(tool, dir);
+            if (mainWindow && !mainWindow.isDestroyed()) {
+                mainWindow.webContents.send('sandbox-changed');
+            }
+            return {success: true, data: result};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
     ipcMain.handle('sandbox-open-dir', async (_event, targetPath) => {
         const {shell} = require('electron');
         try {

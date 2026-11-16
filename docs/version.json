@@ -1,6 +1,6 @@
 {
-  "version": "2.1.11",
-  "notes": "环境面板不再弹「检测到 N 个旧的安装」横幅，需要时点「接管电脑上已有的」自己接管。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.11-release/MulingEnvBox-Setup-2.1.11.exe",
+  "version": "2.1.12",
+  "notes": "没自动扫到已安装环境时，可以手动指定安装目录来接管。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.12-release/MulingEnvBox-Setup-2.1.12.exe",
   "publishedAt": "2026-11-16"
 }
