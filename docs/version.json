@@ -1,6 +1,6 @@
 {
-  "version": "2.1.3",
-  "notes": "修复提权清理系统 PATH 时被 cmd 提前展开 %VAR% 导致写入校验失败的问题：写注册表改为直接调用 reg.exe（不经过 cmd），%JAVA_HOME17% 这类写法原样保留；校验失败时仍会自动还原。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.3-release/MulingEnvBox-Setup-2.1.3.exe",
+  "version": "2.1.4",
+  "notes": "修复探针统计：被系统直接终止的命令不再被算进「正常」，数字不再自相矛盾；存在被终止的命令时也不会再说「探针全部正常」。Oracle javapath 转发壳被终止时，提示会说明多半是它指向的 Java 已被卸载，并指引用「以管理员身份清理」去掉这条系统 PATH。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.4-release/MulingEnvBox-Setup-2.1.4.exe",
   "publishedAt": "2026-11-16"
 }

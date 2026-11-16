@@ -530,17 +530,24 @@ export default {
         const crashed = items.filter((item) => item && item.probe && item.probe.verdict === 'crashed');
         const broken = items.filter((item) => item.broken);
         if (items.length) {
-          const quiet = items.filter((item) => !item.broken).length;
-          Lemon.info(`探针跑完：${items.length} 个命令，${quiet} 个正常，${broken.length} 个有问题`
-            + (crashed.length ? `，${crashed.length} 个被系统直接终止` : ''));
+          const crashedList = crashed;
+          const healthy = items.filter((item) => !item.broken
+            && !(item.probe && item.probe.verdict === 'crashed')).length;
+          Lemon.info(`探针跑完：${items.length} 个命令，${healthy} 个正常，${broken.length} 个有问题`
+            + (crashedList.length ? `，${crashedList.length} 个被系统直接终止` : ''));
           broken.slice(0, 3).forEach((item, i) => setTimeout(
             () => Lemon.error(`${item.tool}：${item.probe && item.probe.detail}`),
             400 * (i + 1)
           ));
-          // 被系统直接终止（0xC000000x）的多半是杀毒/权限/策略拦的，不动 PATH，只把路径告诉用户
-          crashed.slice(0, 3).forEach((item, i) => setTimeout(
-            () => Lemon.info(`${item.tool} 先不动：${item.effective || '未知路径'} —— ${item.probe.detail}，`
-              + '可以手动在这个目录里跑一下看看，或用别的版本'),
+          // 被系统直接终止（0xC000000x）的不动 PATH，只把路径和可能的成因说清楚
+          crashedList.slice(0, 3).forEach((item, i) => setTimeout(
+            () => {
+              const isShim = /\\javapath(\\|$)/i.test(String(item.effective || ''));
+              const hint = isShim
+                ? '它其实是 Oracle javapath 的转发壳，跑起来直接被系统终止，多半它指向的 Java 已经被卸载了；接管一个 JDK 之后可以点「以管理员身份清理」把这条系统 PATH 去掉'
+                : '可以手动在这个目录里跑一下看看，或用别的版本';
+              Lemon.info(`${item.tool} 先不动：${item.effective || '未知路径'} —— ${item.probe.detail}，${hint}`);
+            },
             400 * (broken.length + i + 1)
           ));
         }
