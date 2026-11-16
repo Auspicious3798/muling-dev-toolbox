@@ -31,22 +31,16 @@
 import NavMenuItem from './NavMenuItem.vue';
 import AIIcon from '/icons/AI.svg?url';
 import CIcon from '/icons/c.svg?url';
-import ElasticsearchIcon from '/icons/elasticsearch.svg?url';
 import GolangIcon from '/icons/Golang.svg?url';
 import GradleIcon from '/icons/gradle.svg?url';
 import JavaIcon from '/icons/java.svg?url';
 import JupyterIcon from '/icons/Jupyter.svg?url';
-import KibanaIcon from '/icons/kibana.svg?url';
 import MavenIcon from '/icons/maven.svg?url';
 import MinicondaIcon from '/icons/Miniconda.svg?url';
-import MinioIcon from '/icons/minio.svg?url';
 import MysqlIcon from '/icons/mysql.svg?url';
-import NacosIcon from '/icons/nacos.svg?url';
 import NginxIcon from '/icons/nginx.svg?url';
 import PythonIcon from '/icons/Python.svg?url';
-import RabbitmqIcon from '/icons/Rabbitmq.svg?url';
 import RedisIcon from '/icons/Redis.svg?url';
-import SentinelIcon from '/icons/sentinel.svg?url';
 import DashboardIcon from '/icons/Dashboard.svg?url';
 import NodejsIcon from '/icons/nodejs.svg?url';
 import LemonIcon from '/icons/lemon.svg?url';
@@ -79,14 +73,6 @@ export default {
         { id: 'database-group', label: '数据库', icon: '/icons/cat-database.svg', children: [
             {id: 'mysql', label: 'MySQL', icon: MysqlIcon},
             {id: 'redis', label: 'Redis', icon: RedisIcon}
-        ]},
-        { id: 'middleware-group', label: '中间件', icon: '/icons/cat-middleware.svg', children: [
-            {id: 'nacos', label: 'Nacos', icon: NacosIcon},
-            {id: 'sentinel', label: 'Sentinel', icon: SentinelIcon},
-            {id: 'rabbitmq', label: 'RabbitMQ', icon: RabbitmqIcon},
-            {id: 'minio', label: 'MinIO', icon: MinioIcon},
-            {id: 'elasticsearch', label: 'Elasticsearch', icon: ElasticsearchIcon},
-            {id: 'kibana', label: 'Kibana', icon: KibanaIcon}
         ]},
         { id: 'toolchain-group', label: '编译工具', icon: '/icons/cat-toolchain.svg', children: [
             {id: 'mingw', label: 'MinGW', icon: CIcon}
