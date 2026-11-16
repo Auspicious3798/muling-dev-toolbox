@@ -1,6 +1,6 @@
 {
-  "version": "2.1.4",
-  "notes": "修复探针统计：被系统直接终止的命令不再被算进「正常」，数字不再自相矛盾；存在被终止的命令时也不会再说「探针全部正常」。Oracle javapath 转发壳被终止时，提示会说明多半是它指向的 Java 已被卸载，并指引用「以管理员身份清理」去掉这条系统 PATH。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.4-release/MulingEnvBox-Setup-2.1.4.exe",
+  "version": "2.1.5",
+  "notes": "卸载页合并为两项：勾选「已安装的环境」即同时清掉注入的 JAVA_HOME 等变量与指向沙箱的 PATH 条目（默认勾选）。清理旧变量时，把「Run 即被系统终止、且注册表登记的 JavaHome 已不存在」的 Oracle javapath 转发壳纳入自动清理，不再只是提示。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.5-release/MulingEnvBox-Setup-2.1.5.exe",
   "publishedAt": "2026-11-16"
 }

@@ -33,6 +33,38 @@ const PROBES = {
 // 工具根目录里常见的「说明性」子目录，用来识别被搬空的老安装
 const TOOL_ROOT_MARKERS = ['bin', 'lib', 'conf', 'release', 'include', 'jre', 'plugins', 'etc'];
 
+/** Oracle 的 javapath 是个转发壳（java.exe 只是个转发器），路径形如 ...\Common Files\Oracle\Java\javapath\java.exe */
+function isJavapathShim(exePath) {
+    const value = String(exePath || '');
+    return /\\common files\\oracle\\java\\javapath\\[^\\]+$/i.test(value)
+        || /(^|\\)javapath\\[^\\]+$/i.test(value);
+}
+
+/**
+ * 注册表里登记的 Oracle JRE 是否真的还在。
+ * javapath/java.exe 只做转发，目标被卸载后它自己会直接崩（0xC0000409），
+ * 这时注册表里的 JavaHome 往往指向一个已经不存在的目录。
+ */
+function oracleJavaHomeExists() {
+    try {
+        const out = spawnSync(systemExe('reg.exe'), [
+            'query', 'HKLM\\SOFTWARE\\JavaSoft\\Java Runtime Environment', '/s', '/v', 'JavaHome',
+        ], {encoding: 'utf8', timeout: 4000, windowsHide: true});
+        if (!out || out.status !== 0 || !out.stdout) return false;
+        const homes = [];
+        const re = /JavaHome\s+REG_SZ\s+(.+)/gi;
+        let m;
+        while ((m = re.exec(String(out.stdout))) !== null) {
+            const home = m[1].trim();
+            if (home) homes.push(home);
+        }
+        if (!homes.length) return false;
+        return homes.some((home) => isDirectory(home));
+    } catch (err) {
+        return false;
+    }
+}
+
 function systemExe(name) {
     const base = process.env.SystemRoot || 'C:\\Windows';
     return path.join(base, 'System32', name);
@@ -230,8 +262,13 @@ async function diagnoseTool(tool, paths) {
         probe = {verdict: 'missing', exitCode: null, stdout: '', stderr: '', detail: 'PATH 里找不到这条命令'};
     }
 
-    // crashed 只报告不清理：那可能是杀毒/系统策略/权限问题，删了 PATH 反而帮倒忙
-    const broken = probe.verdict === 'silent' || probe.verdict === 'error';
+    // crashed 只报告不清理：那可能是杀毒/系统策略/权限问题，删了 PATH 反而帮倒忙；
+    // 唯一的例外是 Oracle javapath 转发壳：它跑起来就被系统直接终止、注册表里登记的
+    // JavaHome 也都不在了，这就是个空壳，留着只会让 cmd 里敲 java 毫无反应。
+    const shimDead = isJavapathShim(effective)
+        && probe.verdict === 'crashed'
+        && !oracleJavaHomeExists();
+    const broken = probe.verdict === 'silent' || probe.verdict === 'error' || shimDead;
     const state = {
         tool,
         command: spec.command,
@@ -240,6 +277,7 @@ async function diagnoseTool(tool, paths) {
         hits,
         probe,
         broken,
+        deadShim: shimDead,
         crashed: probe.verdict === 'crashed',
         // 需要摘掉的 PATH 条目：就是让命令解析到这个坏目录的那一条
         shadowEntry: broken && effectiveDir ? effectiveDir : '',
@@ -316,4 +354,6 @@ module.exports = {
     isEmptyDir,
     looksLikeEmptiedRoot,
     isDeadLocalEntry,
+    isJavapathShim,
+    oracleJavaHomeExists,
 };

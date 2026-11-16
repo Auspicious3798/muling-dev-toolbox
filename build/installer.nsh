@@ -23,10 +23,8 @@
 !macro customUnWelcomePage
   Var MulingCfgCheck
   Var MulingEnvCheck
-  Var MulingVarCheck
   Var MulingCfgState
   Var MulingEnvState
-  Var MulingVarState
 
   UninstPage custom un.mulingDataPage un.mulingDataPageLeave
 
@@ -37,22 +35,18 @@
       Abort
     ${EndIf}
 
-    ${NSD_CreateLabel} 0 0 100% 24u "卸载会删除软件本体（安装目录）。下面三类数据不在安装目录里，请选择是否一并删除："
+    ${NSD_CreateLabel} 0 0 100% 24u "卸载会删除软件本体（安装目录）。下面两类数据不在安装目录里，请选择是否一并删除："
     Pop $0
 
     ${NSD_CreateCheckbox} 0 30u 100% 30u "个人配置（窗口设置、日志、配置文件）$\r$\n$APPDATA\muling-environment-box"
     Pop $MulingCfgCheck
     ${NSD_SetState} $MulingCfgCheck ${BST_UNCHECKED}
 
-    ${NSD_CreateCheckbox} 0 66u 100% 30u "已安装的环境（JDK / Node / MySQL 等）$\r$\n$LOCALAPPDATA\Muling\env"
+    ${NSD_CreateCheckbox} 0 66u 100% 30u "已安装的环境与相关环境变量（JDK / Node / MySQL 等）$\r$\n$LOCALAPPDATA\Muling\env；注入的 JAVA_HOME 等变量与指向它的 PATH 条目一起清掉"
     Pop $MulingEnvCheck
     ${NSD_SetState} $MulingEnvCheck ${BST_UNCHECKED}
 
-    ${NSD_CreateCheckbox} 0 102u 100% 30u "环境变量（注入的 JAVA_HOME 等变量与 PATH 条目）$\r$\n只删指向上面沙箱目录的那些，指向别处的一律不动"
-    Pop $MulingVarCheck
-    ${NSD_SetState} $MulingVarCheck ${BST_UNCHECKED}
-
-    ${NSD_CreateLabel} 0 138u 100% 24u "不勾选则保留数据，下次安装后可直接继续使用。"
+    ${NSD_CreateLabel} 0 102u 100% 24u "不勾选则保留数据，下次安装后可直接继续使用；勾了「已安装的环境」就会连变量一起收走。"
     Pop $0
 
     nsDialogs::Show
@@ -61,7 +55,6 @@
   Function un.mulingDataPageLeave
     ${NSD_GetState} $MulingCfgCheck $MulingCfgState
     ${NSD_GetState} $MulingEnvCheck $MulingEnvState
-    ${NSD_GetState} $MulingVarCheck $MulingVarState
   FunctionEnd
 !macroend
 
@@ -70,15 +63,14 @@
     RMDir /r "$APPDATA\muling-environment-box"
   ${EndIf}
 
-  ; 先清环境变量，再删目录：--purge-env 模式需要程序本体还在
-  ${If} $MulingVarState == ${BST_CHECKED}
+  ; 先清环境变量，再删目录：--purge-env 模式需要程序本体还在。
+  ; 环境变量只删指向沙箱目录的那些（JAVA_HOME 之类 + 对应 PATH 条目），别处的一律不动。
+  ${If} $MulingEnvState == ${BST_CHECKED}
     DetailPrint "正在清理注入的环境变量与 PATH 条目…"
     nsExec::ExecToLog 'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "Start-Process -FilePath $\"$INSTDIR\沐柠环境盒.exe$\" -ArgumentList --purge-env -Verb RunAs -Wait"'
     Pop $0
     DetailPrint "环境变量清理退出码：$0"
-  ${EndIf}
 
-  ${If} $MulingEnvState == ${BST_CHECKED}
     RMDir /r "$LOCALAPPDATA\Muling\env"
   ${EndIf}
 !macroend

@@ -1116,7 +1116,9 @@ async function cleanLegacyAll() {
     };
     for (const item of diag) {
         if (item.broken && item.shadowEntry) {
-            addTarget(item.shadowEntry, `${item.tool} 命令能启动但没有任何输出（指向的目录已残缺）`);
+            addTarget(item.shadowEntry, item.deadShim
+                ? `${item.tool} 走的是 Oracle javapath 转发壳，它指向的 Java 已经不在了（运行即被系统终止）`
+                : `${item.tool} 命令能启动但没有任何输出（指向的目录已残缺）`);
         }
         for (const raw of item.staleEntries || []) addTarget(raw, `${item.tool} 的旧目录已经被搬空`);
     }
@@ -1224,6 +1226,7 @@ async function cleanLegacyAll() {
             verdict: item.probe ? item.probe.verdict : 'missing',
             detail: item.probe ? item.probe.detail : '',
             broken: Boolean(item.broken),
+            deadShim: Boolean(item.deadShim),
             crashed: Boolean(item.crashed),
         })),
         // 探针跑出「进程被系统直接终止」的，只报告不清理，把可执行文件路径带回去方便自查

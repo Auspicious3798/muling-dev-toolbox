@@ -529,18 +529,24 @@ export default {
         const items = (probe && probe.success && probe.data) || [];
         const crashed = items.filter((item) => item && item.probe && item.probe.verdict === 'crashed');
         const broken = items.filter((item) => item.broken);
+        // 死掉的 javapath 转发壳既算「有问题」也算「被终止」，提示里只算一次
+        const crashedOnly = crashed.filter((item) => !item.broken);
         if (items.length) {
-          const crashedList = crashed;
           const healthy = items.filter((item) => !item.broken
             && !(item.probe && item.probe.verdict === 'crashed')).length;
           Lemon.info(`探针跑完：${items.length} 个命令，${healthy} 个正常，${broken.length} 个有问题`
-            + (crashedList.length ? `，${crashedList.length} 个被系统直接终止` : ''));
+            + (crashedOnly.length ? `，${crashedOnly.length} 个被系统直接终止` : ''));
           broken.slice(0, 3).forEach((item, i) => setTimeout(
-            () => Lemon.error(`${item.tool}：${item.probe && item.probe.detail}`),
+            () => {
+              const isShim = Boolean(item.deadShim);
+              Lemon.error(isShim
+                ? `${item.tool}：走的是 Oracle javapath 转发壳，它指向的 Java 已经不在了（运行即被系统终止），这条会被一并清掉`
+                : `${item.tool}：${item.probe && item.probe.detail}`);
+            },
             400 * (i + 1)
           ));
-          // 被系统直接终止（0xC000000x）的不动 PATH，只把路径和可能的成因说清楚
-          crashedList.slice(0, 3).forEach((item, i) => setTimeout(
+          // 被系统直接终止（0xC000000x）但不属于死壳的不动 PATH，只把路径和可能的成因说清楚
+          crashedOnly.slice(0, 3).forEach((item, i) => setTimeout(
             () => {
               const isShim = /\\javapath(\\|$)/i.test(String(item.effective || ''));
               const hint = isShim
