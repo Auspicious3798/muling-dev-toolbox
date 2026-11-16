@@ -1,6 +1,6 @@
 {
   "name": "muling-environment-box",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "type": "module",
   "main": "electron/main.cjs",
@@ -75,5 +75,5 @@
     "name": "Auspicious3798",
     "email": "taxuexunmei3798@126.com"
   },
-  "license": "UNLICENSED"
+  "license": "MIT"
 }
