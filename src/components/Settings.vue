@@ -275,6 +275,7 @@ export default {
       renderMode: 'auto',
       renderProfile: null,
       renderRestartHint: false,
+      suppressRenderWatch: false,
       cacheSize: 0,
       logsSize: 0,
       clearingCache: false,
@@ -321,12 +322,18 @@ export default {
         const res = await window.electronAPI.getRenderProfile();
         if (res && res.success) {
           this.renderProfile = res;
+          // 回填下拉框时不要反过来触发一次「保存」，否则会多弹一次提示
+          this.suppressRenderWatch = true;
           this.renderMode = res.mode || 'auto';
+          await this.$nextTick();
+          this.suppressRenderWatch = false;
         }
       } catch (err) {}
     },
     async applyRenderMode(mode) {
       if (!window.electronAPI || !window.electronAPI.setRenderMode) return;
+      if (this.suppressRenderWatch) return;
+      if (this.renderProfile && mode === this.renderProfile.mode) return;
       try {
         const res = await window.electronAPI.setRenderMode(mode);
         this.renderRestartHint = !!(res && res.restartRequired);

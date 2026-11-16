@@ -1,5 +1,16 @@
 # 更新日志
 
+## v2.1.9 · 2026-11-16
+
+### 修复
+
+- **切到「画质优先」后下拉框自己跳回「自动」**：`get-render-profile` 返回的 `mode`
+  取自窗口创建时算出的 `lastRenderProfile`，改完设置但还没重启时它是旧值，前端一刷新就被回填成
+  `auto`。现在 `mode` 改为返回「当前保存的选择」（`renderMode`），`lite` / `transparent`
+  仍返回「当前窗口实际生效的状态」，两者不再混用。
+- **改一次渲染模式弹两条「已保存」**：`loadRenderProfile()` 回填 `v-model` 时会再触发一次
+  `watch`，等于又保存了一遍。现在回填时用 `suppressRenderWatch` 跳过，并且在值没变化时直接返回。
+
 ## v2.1.8 · 2026-11-16
 
 ### 修复

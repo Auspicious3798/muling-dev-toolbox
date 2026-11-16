@@ -1265,7 +1265,9 @@ app.whenReady().then(() => {
         const p = lastRenderProfile || computeRenderProfile();
         return {
             success: true,
-            mode: p.mode,
+            // mode 返回「当前保存的选择」，而 lite/transparent 是「当前窗口实际生效的状态」，
+            // 两者在改完设置但还没重启时本来就不一致，不能混着用。
+            mode: renderMode,
             lite: p.lite,
             transparent: p.transparent,
             source: p.source,

@@ -1,6 +1,6 @@
 {
-  "version": "2.1.8",
-  "notes": "接管的版本卡片点「打开目录」不再报「目录不存在」；沙箱概览不再把已接管的目录算作旧安装。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.8-release/MulingEnvBox-Setup-2.1.8.exe",
+  "version": "2.1.9",
+  "notes": "渲染模式切换后不再自己跳回「自动」；回填下拉框不再重复弹保存提示。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.9-release/MulingEnvBox-Setup-2.1.9.exe",
   "publishedAt": "2026-11-16"
 }
