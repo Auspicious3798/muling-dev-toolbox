@@ -30,8 +30,6 @@
 <script>
 import NavMenuItem from './NavMenuItem.vue';
 import AIIcon from '/icons/AI.svg?url';
-import CIcon from '/icons/c.svg?url';
-import GolangIcon from '/icons/Golang.svg?url';
 import GradleIcon from '/icons/gradle.svg?url';
 import JavaIcon from '/icons/java.svg?url';
 import JupyterIcon from '/icons/Jupyter.svg?url';
@@ -64,7 +62,6 @@ export default {
             {id: 'jdk', label: 'JDK', icon: JavaIcon},
             {id: 'maven', label: 'Maven', icon: MavenIcon},
             {id: 'gradle', label: 'Gradle', icon: GradleIcon},
-            {id: 'go', label: 'Go', icon: GolangIcon},
             {id: 'python', label: 'Python', icon: PythonIcon},
             {id: 'uv', label: 'uv', icon: '/icons/uv.svg'},
             {id: 'miniconda', label: 'Miniconda', icon: MinicondaIcon},
@@ -73,9 +70,6 @@ export default {
         { id: 'database-group', label: '数据库', icon: '/icons/cat-database.svg', children: [
             {id: 'mysql', label: 'MySQL', icon: MysqlIcon},
             {id: 'redis', label: 'Redis', icon: RedisIcon}
-        ]},
-        { id: 'toolchain-group', label: '编译工具', icon: '/icons/cat-toolchain.svg', children: [
-            {id: 'mingw', label: 'MinGW', icon: CIcon}
         ]},
         { id: 'ai-assistant', label: 'AI 智能助手', icon: AIIcon, children: [] },
         { id: 'settings', label: '工具箱设置', icon: SettingsIcon, children: [] },

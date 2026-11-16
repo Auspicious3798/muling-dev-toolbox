@@ -15,10 +15,8 @@ import MavenIcon from '/icons/maven.svg?url';
 import GradleIcon from '/icons/gradle.svg?url';
 import NodejsIcon from '/icons/nodejs.svg?url';
 import NginxIcon from '/icons/nginx.svg?url';
-import GolangIcon from '/icons/Golang.svg?url';
 import MinicondaIcon from '/icons/Miniconda.svg?url';
 import JupyterIcon from '/icons/Jupyter.svg?url';
-import CIcon from '/icons/c.svg?url';
 
 export const TOOLS = [
   // ── 前端开发 ──
@@ -44,7 +42,6 @@ export const TOOLS = [
     id: 'gradle', name: 'Gradle', group: 'backend', icon: GradleIcon,
     check: 'checkGradle', switch: 'switchGradle', remove: 'uninstallGradle'
   },
-  { id: 'go', name: 'Go', group: 'backend', icon: GolangIcon },
   {
     id: 'python', name: 'Python', group: 'backend', icon: PythonIcon,
     check: 'checkPython', switch: 'switchPython', remove: 'deletePython'
@@ -70,10 +67,7 @@ export const TOOLS = [
     service: {
       status: 'getRedisServiceStatus', start: 'startRedisService', stop: 'stopRedisService'
     }
-  },
-
-  // ── 编译工具 ──
-  { id: 'mingw', name: 'MinGW', group: 'toolchain', icon: CIcon }
+  }
 ];
 
 /** 具备检测能力的工具才能出现在仪表盘（其余只在导航里进入安装面板）。 */
