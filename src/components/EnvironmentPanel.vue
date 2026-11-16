@@ -89,13 +89,23 @@
             <div class="tile-meta-row">
               <!-- MySQL info pills -->
               <template v-if="tool === 'mysql'">
-                <span class="meta-pill">:{{ mysqlConfigs[v]?.port || '?' }}</span>
+                <span class="meta-pill port-pill" :class="{ 'is-editing': editingPort === v }" :title="editingPort === v ? '输入新端口后回车' : '点击修改端口'" @click.stop="startEditPort(v)">
+                  <template v-if="editingPort === v">
+                    <input class="port-input" v-model="portDraft" type="text" inputmode="numeric" @click.stop @keyup.enter="commitPort(v)" @keyup.esc="cancelPort" @blur="commitPort(v)" />
+                  </template>
+                  <template v-else>:{{ mysqlConfigs[v]?.port || '?' }}</template>
+                </span>
                 <span class="meta-pill" v-if="mysqlConfigs[v]?.hasPassword === true">有密码</span>
                 <span class="meta-pill subtle" v-else>无密码</span>
               </template>
               <!-- Redis info pills -->
               <template v-else-if="tool === 'redis'">
-                <span class="meta-pill">:{{ redisConfigs[v]?.port || '?' }}</span>
+                <span class="meta-pill port-pill" :class="{ 'is-editing': editingPort === v }" :title="editingPort === v ? '输入新端口后回车' : '点击修改端口'" @click.stop="startEditPort(v)">
+                  <template v-if="editingPort === v">
+                    <input class="port-input" v-model="portDraft" type="text" inputmode="numeric" @click.stop @keyup.enter="commitPort(v)" @keyup.esc="cancelPort" @blur="commitPort(v)" />
+                  </template>
+                  <template v-else>:{{ redisConfigs[v]?.port || '?' }}</template>
+                </span>
                 <span class="meta-pill" v-if="redisConfigs[v]?.hasPassword">有密码</span>
                 <span class="meta-pill subtle" v-else>无密码</span>
               </template>
@@ -274,7 +284,8 @@ export default {
       showMySQLPasswordModal: false, currentMySQLVersion: null,
       oldMySQLPassword: '', newMySQLPassword: '', mysqlPasswordChanging: false, showMySQLPassword: false, savedMySQLPassword: null,
       sandboxInfo: null, injected: false,
-      adoptCandidates: [], adopting: false, adoptHandler: null
+      adoptCandidates: [], adopting: false, adoptHandler: null,
+      editingPort: null, portDraft: '', portSaving: false
     };
   },
   computed: {
@@ -490,6 +501,60 @@ export default {
     },
     openPackageManager(version) { this.selectedPythonVersion=version; this.showPackageManager=true; },
     closePackageManager() { this.showPackageManager=false; this.selectedPythonVersion=''; },
+    currentPortOf(version) {
+      const cfg = this.tool === 'mysql' ? this.mysqlConfigs[version] : this.redisConfigs[version];
+      return cfg && cfg.port ? Number(cfg.port) : null;
+    },
+
+    async startEditPort(version) {
+      this.portDraft = String(this.currentPortOf(version) || '');
+      this.editingPort = version;
+      await this.$nextTick();
+      const input = this.$el && this.$el.querySelector ? this.$el.querySelector('.port-input') : null;
+      if (input) { input.focus(); if (input.select) input.select(); }
+    },
+
+    cancelPort() { this.editingPort = null; this.portDraft = ''; },
+
+    async commitPort(version) {
+      if (this.editingPort !== version || this.portSaving) return;
+      const raw = String(this.portDraft || '').trim();
+      const port = Number(raw);
+      const current = this.currentPortOf(version);
+      if (!raw || port === current) { this.cancelPort(); return; }
+      if (!Number.isInteger(port) || port < 1 || port > 65535) {
+        Lemon.error('端口要填 1-65535 之间的数字');
+        this.cancelPort();
+        return;
+      }
+      const api = window.electronAPI || {};
+      if (!api.setServicePort) { Lemon.error('当前环境不支持修改端口'); this.cancelPort(); return; }
+      this.portSaving = true;
+      try {
+        const check = await api.checkServicePort(port);
+        if (check && check.available === false) {
+          Lemon.error(check.message || `端口 ${port} 已被占用，换一个试试`);
+          this.cancelPort();
+          return;
+        }
+        const res = await api.setServicePort(this.tool, version, port);
+        if (res && res.success) {
+          const running = this.serviceStatus[version] === 'running';
+          Lemon.success(`端口已改成 ${port}，${running ? '重启服务后' : '下次启动'}按新端口连接～`);
+          this.cancelPort();
+          await this.refresh();
+        } else {
+          Lemon.error((res && res.message) || '端口没设置成功');
+          this.cancelPort();
+        }
+      } catch (err) {
+        Lemon.error(`设置端口失败：${err.message}`);
+        this.cancelPort();
+      } finally {
+        this.portSaving = false;
+      }
+    },
+
     openMySQLPasswordModal(version) { this.currentMySQLVersion=version; this.oldMySQLPassword=''; this.newMySQLPassword=''; this.savedMySQLPassword=null; this.showMySQLPasswordModal=true; this.loadSavedPassword(version); },
   async loadSavedPassword(version) { try { const r = await window.electronAPI.getMySQLPassword(version); this.savedMySQLPassword = r && r.success ? (r.password === null ? null : r.password) : null; } catch (err) { this.savedMySQLPassword = null; } },
   async copySavedPassword() { const value = this.savedMySQLPassword || ''; try { await navigator.clipboard.writeText(value); Lemon.success('密码已经复制好啦～'); } catch (err) { Lemon.error('复制失败，手动选中复制吧'); } },
@@ -735,6 +800,19 @@ export default {
   font-family: var(--font-mono); font-weight: 600;
 }
 .meta-pill.subtle { color: var(--text-muted); }
+
+/* 端口胶囊：点一下就能改 */
+.meta-pill.port-pill {
+  cursor: pointer; display: inline-flex; align-items: center; gap: 2px;
+  transition: var(--transition-fast, all .15s ease);
+}
+.meta-pill.port-pill:hover { color: var(--accent); border: 1px dashed currentColor; padding: 1px 6px; }
+.meta-pill.port-pill.is-editing { padding: 0; background: transparent; border: none; }
+.meta-pill.port-pill .port-input {
+  width: 58px; padding: 1px 5px; font-size: 0.68rem; font-family: var(--font-mono); font-weight: 600;
+  color: var(--text-primary); background: var(--bg-secondary);
+  border: 1px solid var(--accent); border-radius: var(--radius-full); outline: none; text-align: center;
+}
 
 .tile-badges { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 

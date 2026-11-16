@@ -10,6 +10,7 @@ const {downloadFile} = require('../utils/download.cjs');
 const {installZip, zipProgress} = require('../utils/zip.cjs');
 const sandbox = require('../utils/sandbox.cjs');
 const portUtils = require('../utils/port.cjs');
+const servicePorts = require('../utils/servicePorts.cjs');
 
 module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
@@ -44,9 +45,11 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         return found === null ? defaultPort : found;
     }
 
-    async function resolvePort(customPort, defaultPort) {
-        const requested = customPort && !isNaN(customPort) ? Number(customPort) : defaultPort;
-        return portUtils.resolvePort(requested, {strict: Boolean(customPort), defaultPort});
+    async function resolvePort(customPort, defaultPort, version) {
+        // 端口固定：显式传入的优先，其次是用户在卡片上选的，最后才是版本默认端口；被占用就报错不顺延。
+        const preferred = servicePorts.getPort(userDataPath, 'redis', version) || defaultPort;
+        const requested = customPort && !isNaN(customPort) ? Number(customPort) : preferred;
+        return portUtils.resolvePort(requested, {strict: true, defaultPort: preferred});
     }
 
     function readConfPort(installDir) {
@@ -69,15 +72,20 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         return true;
     }
 
-    async function ensureConfigPort(installDir, fallbackPort) {
-        const current = readConfPort(installDir) || fallbackPort;
-        if (await portUtils.isPortAvailable(current)) {
-            return {port: current, changed: false, original: current};
+    async function ensureConfigPort(installDir, fallbackPort, version) {
+        // 与 MySQL 一致：不再自动顺延，端口被占用就报错让用户改。
+        const preferred = servicePorts.getPort(userDataPath, 'redis', version);
+        const current = readConfPort(installDir) || preferred || fallbackPort;
+        const target = preferred || current;
+        if (target !== current && patchConfPort(installDir, target)) {
+            logToFile(`按用户设置把 Redis 端口改为 ${target}`);
         }
-        const found = await portUtils.findAvailablePort(current);
-        if (found === null) throw new Error(`从 ${current} 起没有找到可用端口`);
-        patchConfPort(installDir, found);
-        return {port: found, changed: true, original: current};
+        if (await portUtils.isPortAvailable(target)) {
+            return {port: target, changed: target !== current, original: current};
+        }
+        throw new Error(
+            `端口 ${target} 已被占用：请在版本卡片上点端口改成别的（比如 ${target + 1}），或先关掉占用它的程序。`
+        );
     }
 
     async function generateRedisConf(installDir, port, password, maxmemory) {
@@ -207,7 +215,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         if (!cfg) return {success: false, message: `不支持的 Redis 版本: ${version}`};
         const {defaultPort} = cfg;
 
-        const portResult = await resolvePort(customPort, defaultPort);
+        const portResult = await resolvePort(customPort, defaultPort, version);
         if (portResult.error) return {success: false, message: portResult.error};
         const targetPort = portResult.port;
 
@@ -351,7 +359,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             const running = await isRedisRunning(version, home);
             if (running) return {success: false, message: `Redis ${version} 已经在运行`};
             const cfg = getRedisVersionConfig(version);
-            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379, version);
             await startRedisProcess(home, confPath, version);
             sandbox.setActive('redis', version);
             mainWindow.webContents.send('redis-changed');
@@ -395,7 +403,7 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
             await stopRedisProcess(version);
             await new Promise(resolve => setTimeout(resolve, 1000));
             const cfg = getRedisVersionConfig(version);
-            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 6379, version);
             await startRedisProcess(home, confPath, version);
             sandbox.setActive('redis', version);
             mainWindow.webContents.send('redis-changed');

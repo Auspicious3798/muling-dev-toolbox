@@ -1229,6 +1229,93 @@ app.whenReady().then(() => {
         }
     });
 
+    // 改端口时顺手把已安装的配置文件也改掉，界面上的端口和下次启动用的端口就一致
+    function patchInstalledServicePort(tool, version, port) {
+        try {
+            const dir = sandbox.installDir(tool, version);
+            if (!dir || !fs.existsSync(dir)) return false;
+            if (tool === 'mysql') {
+                const conf = path.join(dir, 'my.ini');
+                if (!fs.existsSync(conf)) return false;
+                const content = fs.readFileSync(conf, 'utf8');
+                const next = /^\s*port\s*=/im.test(content)
+                    ? content.replace(/^\s*port\s*=.*$/im, `port=${port}`)
+                    : `${content.trimEnd()}\nport=${port}\n`;
+                fs.writeFileSync(conf, next, 'utf8');
+                return true;
+            }
+            if (tool === 'redis') {
+                const conf = path.join(dir, 'redis.windows.conf');
+                if (!fs.existsSync(conf)) return false;
+                const content = fs.readFileSync(conf, 'utf8');
+                const next = /^\s*port\s+\d+/im.test(content)
+                    ? content.replace(/^\s*port\s+\d+\s*$/im, `port ${port}`)
+                    : `port ${port}\n${content}`;
+                fs.writeFileSync(conf, next, 'utf8');
+                return true;
+            }
+            return false;
+        } catch (err) {
+            logToFile(`[ServicePort] 写配置文件失败：${err.message}`);
+            return false;
+        }
+    }
+
+    // ---- 服务端口：读取 / 校验 / 保存 ----
+    ipcMain.handle('get-service-port', async (event, tool, version) => {
+        try {
+            const servicePorts = require('./utils/servicePorts.cjs');
+            const port = servicePorts.getPort(app.getPath('userData'), tool, version);
+            return {
+                success: true,
+                port,
+                defaultPort: servicePorts.defaultPortOf(tool, version),
+            };
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('check-service-port', async (event, port) => {
+        try {
+            const portUtils = require('./utils/port.cjs');
+            const numeric = Number(port);
+            if (!Number.isInteger(numeric) || numeric < 1 || numeric > 65535) {
+                return {success: false, available: false, message: '端口必须是 1 - 65535 之间的整数'};
+            }
+            const available = await portUtils.isPortAvailable(numeric);
+            return {
+                success: true,
+                available,
+                message: available ? `端口 ${numeric} 可以绑定` : `端口 ${numeric} 已被占用`,
+            };
+        } catch (err) {
+            return {success: false, available: false, message: err.message};
+        }
+    });
+
+    ipcMain.handle('set-service-port', async (event, tool, version, port) => {
+        try {
+            const portUtils = require('./utils/port.cjs');
+            const servicePorts = require('./utils/servicePorts.cjs');
+            const numeric = Number(port);
+            if (!servicePorts.isValidPort(numeric)) {
+                return {success: false, message: '端口必须是 1 - 65535 之间的整数'};
+            }
+            const available = await portUtils.isPortAvailable(numeric);
+            if (!available) {
+                return {success: false, message: `端口 ${numeric} 已被占用，换一个再试`};
+            }
+            const saved = servicePorts.setPort(app.getPath('userData'), tool, version, numeric);
+            if (!saved.success) return saved;
+            const configPatched = patchInstalledServicePort(tool, version, numeric);
+            logToFile(`[ServicePort] ${tool}${version ? ` ${version}` : ''} 端口改为 ${numeric}（配置已更新：${configPatched}）`);
+            return {success: true, port: numeric, configPatched, message: `端口已改为 ${numeric}`};
+        } catch (err) {
+            return {success: false, message: err.message};
+        }
+    });
+
     // ---- 沙箱占用统计 ----
     ipcMain.handle('get-sandbox-usage', () => {
         const dirSize = (target) => {

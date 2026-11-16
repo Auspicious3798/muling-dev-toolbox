@@ -109,23 +109,26 @@ http {
     }
 
     async function ensureSitesPorts(sites) {
+        // 端口固定：不再自动挑一个空闲端口，被占用就明确报错，让用户自己改。
         const used = new Set();
-        const changes = [];
         const next = [];
         for (const site of sites) {
-            const original = Number(site.port);
-            let port = original;
-            let taken = used.has(port) || !(await portUtils.isPortAvailable(port));
-            if (taken) {
-                const found = await portUtils.findAvailablePort(port);
-                if (found === null) throw new Error(`站点 ${site.name} 的端口 ${port} 不可用，且没有找到替代端口`);
-                port = found;
-                changes.push({name: site.name, from: original, to: found});
+            const port = Number(site.port);
+            if (!Number.isInteger(port) || port < 1 || port > 65535) {
+                throw new Error(`站点 ${site.name} 的端口 ${site.port} 不合法，请改成 1-65535 之间的数字`);
+            }
+            if (used.has(port)) {
+                throw new Error(`站点 ${site.name} 的端口 ${port} 和其他站点重复，请改成不同的端口`);
+            }
+            if (!(await portUtils.isPortAvailable(port))) {
+                throw new Error(
+                    `站点 ${site.name} 要用的端口 ${port} 已被占用：请把站点端口改成别的，或先关掉占用它的程序。`
+                );
             }
             used.add(port);
             next.push({...site, port});
         }
-        return {sites: next, changes};
+        return {sites: next, changes: []};
     }
 
     function portChangeSummary(changes) {

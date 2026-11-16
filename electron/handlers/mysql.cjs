@@ -13,6 +13,7 @@ const {installZip, zipProgress} = require('../utils/zip.cjs');
 const {createLogger} = require('../utils/logger.cjs');
 const sandbox = require('../utils/sandbox.cjs');
 const portUtils = require('../utils/port.cjs');
+const servicePorts = require('../utils/servicePorts.cjs');
 
 module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
     const downloadDir = path.join(userDataPath, 'downloads');
@@ -51,15 +52,20 @@ module.exports = function registerMySQLHandlers(mainWindow, userDataPath) {
         return true;
     }
 
-    async function ensureConfigPort(home, fallbackPort) {
-        const current = readPort(home) || fallbackPort;
-        if (await portUtils.isPortAvailable(current)) {
-            return {port: current, changed: false, original: current};
+    async function ensureConfigPort(home, fallbackPort, version) {
+        // 端口不再自动顺延：先用用户选定/已配置的端口，不可用就明确报错，让用户改端口。
+        const preferred = servicePorts.getPort(userDataPath, 'mysql', version);
+        const current = readPort(home) || preferred || fallbackPort;
+        const target = preferred || current;
+        if (target !== current && patchMyIniPort(home, target)) {
+            logToFile(`按用户设置把 MySQL 端口改为 ${target}`);
         }
-        const found = await portUtils.findAvailablePort(current);
-        if (found === null) throw new Error(`从 ${current} 起没有找到可用端口`);
-        patchMyIniPort(home, found);
-        return {port: found, changed: true, original: current};
+        if (await portUtils.isPortAvailable(target)) {
+            return {port: target, changed: target !== current, original: current};
+        }
+        throw new Error(
+            `端口 ${target} 已被占用：请在版本卡片上点端口改成别的（比如 ${target + 1}），或先关掉占用它的程序。`
+        );
     }
 
     async function generateMyCnf(installDir, port) {
@@ -248,7 +254,8 @@ port=${port}
             sendProgress(0.3, '解压中');
             await installZip(zipPath, installPath, {log: logToFile, onProgress: zipProgress(sendProgress, 0.3, 0.39)});
             sendProgress(0.4, '初始化配置');
-            const portResult = await portUtils.resolvePort(cfg.defaultPort);
+            const requestedPort = servicePorts.getPort(userDataPath, 'mysql', version) || cfg.defaultPort;
+            const portResult = await portUtils.resolvePort(requestedPort, {strict: true, defaultPort: cfg.defaultPort});
             if (portResult.error) return {success: false, message: portResult.error};
             const targetPort = portResult.port;
             await generateMyCnf(installPath, targetPort);
@@ -364,7 +371,7 @@ port=${port}
             }
             sandbox.setActive('mysql', version);
             const cfg = getMySQLVersionConfig(version);
-            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306, version);
             await startMySQLProcess(home);
             mainWindow.webContents.send('mysql-changed');
             return {
@@ -401,7 +408,7 @@ port=${port}
             if (!home) return {success: false, message: `未找到 MySQL ${version} 的安装目录`};
             if (await isMySQLRunning(home)) return {success: false, message: `MySQL ${version} 已经在运行`};
             const cfg = getMySQLVersionConfig(version);
-            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306, version);
             await startMySQLProcess(home);
             sandbox.setActive('mysql', version);
             return {
@@ -437,7 +444,7 @@ port=${port}
             await stopMySQLProcess(home);
             await new Promise(resolve => setTimeout(resolve, 800));
             const cfg = getMySQLVersionConfig(version);
-            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306);
+            const portInfo = await ensureConfigPort(home, cfg ? cfg.defaultPort : 3306, version);
             await startMySQLProcess(home);
             sandbox.setActive('mysql', version);
             return {
