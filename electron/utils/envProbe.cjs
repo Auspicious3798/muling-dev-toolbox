@@ -169,6 +169,36 @@ function probeExecutable(exePath, args) {
 }
 
 /**
+ * 判断一条 PATH 是不是「本地确实不存在的死条目」
+ *
+ * 只认本机盘符路径（不碰 \\server\share 这类网络路径，离线时会误判），
+ * 并且必须命中工具特征词 / 已知安装根，才允许清理 —— 宁可漏删，不要错删。
+ */
+const DEAD_KEYWORDS = /(java|jdk|jre|python|nodejs|nodejs|node_modules|maven|mvn|gradle|uv|golang|go\\bin|mysql|redis|nginx|conda|mingw)/i;
+const KNOWN_ROOTS = [
+    /\\program files\\java\\/i,
+    /\\program files\\eclipse adoptium\\/i,
+    /\\(local\\)?programs\\python\\/i,
+    /\\(local\\)?programs\\common files\\oracle\\java\\/i,
+    /\\program files\\mysql\\/i,
+    /\\temp\\muling-[^\\]*\\/i,
+];
+
+function isDeadLocalEntry(entry) {
+    const raw = String(entry || '').trim().replace(/^"|"$/g, '');
+    if (!raw) return null;
+    if (raw.includes('\\\\') || raw.startsWith('\\\\')) return null; // 网络路径不碰
+    if (!/^[a-z]:\\/i.test(raw)) return null; // 只处理盘符绝对路径
+    const dir = expandEntry(raw);
+    if (!dir) return null;
+    if (isDirectory(dir)) return null; // 存在就不算死条目
+    const matchedRoot = KNOWN_ROOTS.some((re) => re.test(dir));
+    const matchedKeyword = DEAD_KEYWORDS.test(dir.split('\\').slice(-2).join('\\'));
+    if (!matchedRoot && !matchedKeyword) return null;
+    return {entry: raw, dir, reason: '路径已经不存在（目录被删或原本就写错了）'};
+}
+
+/**
  * 诊断单个工具：找出当前真正生效的那条路径，以及它是不是坏的
  */
 async function diagnoseTool(tool, paths) {
@@ -270,4 +300,5 @@ module.exports = {
     readPathEntries,
     isEmptyDir,
     looksLikeEmptiedRoot,
+    isDeadLocalEntry,
 };

@@ -316,6 +316,18 @@ function detectExistingInstalls() {
         for (const name of fs.readdirSync(jdks)) push('jdk', path.join(jdks, name));
     }
 
+    // 常见 JDK 安装根：多版本共存时也能扫到没进 PATH 的那几个
+    const jdkRoots = [
+        path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Java'),
+        path.join(process.env['ProgramFiles'] || 'C:\\Program Files', 'Eclipse Adoptium'),
+        path.join(process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)', 'Java'),
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Java'),
+    ];
+    for (const jdkRoot of jdkRoots) {
+        if (!jdkRoot || !fs.existsSync(jdkRoot)) continue;
+        for (const name of fs.readdirSync(jdkRoot)) push('jdk', path.join(jdkRoot, name));
+    }
+
     const pythonRoot = path.join(process.env.LOCALAPPDATA || '', 'Programs', 'Python');
     if (pythonRoot && fs.existsSync(pythonRoot)) {
         for (const name of fs.readdirSync(pythonRoot)) push('python', path.join(pythonRoot, name));
@@ -994,6 +1006,23 @@ async function takeOverEnv(tool) {
         messages.push(`写入环境变量失败：${err.message}`);
     }
 
+    // 4) 复核：系统 PATH 里如果还有旧条目，它会排在用户 PATH 前面，
+    //    等于「接管了但没真正生效」，必须如实告诉用户，别让人以为已经切过来了
+    try {
+        const systemPath = await env.getSystemPath();
+        const shadow = String(systemPath || '')
+            .split(';')
+            .filter((p) => p && isToolDirEntry(tool, p));
+        if (shadow.length) {
+            messages.push(
+                `注意：系统 PATH 里还有 ${shadow.length} 条旧的 ${meta.label} 路径（${shadow[0]}），`
+                + '它排在用户 PATH 前面，重开终端后仍会优先用旧的；需要以管理员身份再接管一次才能彻底切过来'
+            );
+        }
+    } catch (err) {
+        // 读不到系统 PATH 就不做这项复核
+    }
+
     writeState();
     return {ok: true, messages};
 }
@@ -1031,6 +1060,20 @@ async function cleanLegacyAll() {
             addTarget(item.shadowEntry, `${item.tool} 命令能启动但没有任何输出（指向的目录已残缺）`);
         }
         for (const raw of item.staleEntries || []) addTarget(raw, `${item.tool} 的旧目录已经被搬空`);
+    }
+
+    // 还有一类纯垃圾：目录早就被删了，PATH 里还留着这条（只认工具特征词 / 已知安装根）
+    const deadEntries = [];
+    try {
+        const parsed = await envProbe.readPathEntries();
+        for (const entry of [...parsed.user, ...parsed.system]) {
+            const dead = envProbe.isDeadLocalEntry(entry.raw);
+            if (!dead) continue;
+            addTarget(entry.raw, dead.reason);
+            deadEntries.push(`${entry.scope}: ${dead.entry}`);
+        }
+    } catch (err) {
+        warnings.push(`检查失效路径失败：${err.message}`);
     }
 
     const insideSandbox = (entry) => {
@@ -1111,6 +1154,7 @@ async function cleanLegacyAll() {
         ok: true,
         removed,
         affectedVars,
+        deadEntries,
         needsAdmin: staleSystem.length > 0,
         systemStale: staleSystem,
         warnings,
