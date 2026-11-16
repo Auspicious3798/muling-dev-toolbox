@@ -14,7 +14,6 @@ const registerGradleHandlers = require('./handlers/gradle.cjs');
 const registerUvHandlers = require('./handlers/uv.cjs');
 const registerNodejsHandlers = require('./handlers/nodejs.cjs');
 const registerNginxHandlers = require('./handlers/nginx.cjs');
-const registerMiddlewareHandlers = require('./handlers/middleware.cjs');
 const registerTerminalHandlers = require('./terminal.cjs');
 const registerIntegrityHandlers = require('./integrity.cjs');
 const registerBackupHandlers = require('./backup.cjs');
@@ -1137,7 +1136,6 @@ app.whenReady().then(() => {
     createWindow();
     ensureTray();
     registerNginxHandlers(mainWindow, app.getPath('userData'));
-    registerMiddlewareHandlers(mainWindow, app.getPath('userData'));
     registerJDKHandlers(mainWindow, app.getPath('userData'));
     registerPythonHandlers(mainWindow, app.getPath('userData'));
     registerMysqlHandlers(mainWindow, app.getPath('userData'));

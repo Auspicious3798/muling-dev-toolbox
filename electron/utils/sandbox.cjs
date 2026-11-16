@@ -27,12 +27,6 @@ const TOOL_META = {
     gradle: {prefix: 'gradle-', entries: ['bin'], envVar: 'GRADLE_HOME', label: 'Gradle'},
     uv: {prefix: 'uv-', entries: [''], envVar: 'UV_HOME', label: 'uv'},
     nodejs: {prefix: 'nodejs-', entries: [''], envVar: 'NODE_HOME', label: 'Node.js'},
-    nacos: {prefix: 'nacos-', entries: ['bin'], envVar: 'NACOS_HOME', label: 'Nacos'},
-    sentinel: {prefix: 'sentinel-', entries: [''], envVar: 'SENTINEL_HOME', label: 'Sentinel'},
-    rabbitmq: {prefix: 'rabbitmq-', entries: ['sbin'], envVar: 'RABBITMQ_HOME', label: 'RabbitMQ'},
-    minio: {prefix: 'minio-', entries: [''], envVar: 'MINIO_HOME', label: 'MinIO'},
-    elasticsearch: {prefix: 'elasticsearch-', entries: ['bin'], envVar: 'ES_HOME', label: 'Elasticsearch'},
-    kibana: {prefix: 'kibana-', entries: ['bin'], envVar: 'KIBANA_HOME', label: 'Kibana'},
 };
 
 // 只有命令行工具允许「注入系统变量」

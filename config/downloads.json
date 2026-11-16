@@ -350,55 +350,6 @@
           "type": "zip"
         }
       }
-    },
-    "nacos": {
-      "version": "2.4.3",
-      "versions": {
-        "2.4.3": {
-          "url": "https://github.com/alibaba/nacos/releases/download/2.4.3/nacos-server-2.4.3.zip",
-          "type": "zip"
-        }
-      }
-    },
-    "sentinel": {
-      "version": "1.8.8",
-      "versions": {
-        "1.8.8": {
-          "url": "https://github.com/alibaba/Sentinel/releases/download/1.8.8/sentinel-dashboard-1.8.8.jar",
-          "type": "jar"
-        }
-      }
-    },
-    "rabbitmq": {
-      "version": "3.13.7",
-      "versions": {
-        "3.13.7": {
-          "url": "https://github.com/rabbitmq/rabbitmq-server/releases/download/v3.13.7/rabbitmq-server-windows-3.13.7.zip",
-          "type": "zip"
-        }
-      }
-    },
-    "minio": {
-      "version": "2025.04.22",
-      "versions": {}
-    },
-    "elasticsearch": {
-      "version": "8.15.0",
-      "versions": {
-        "8.15.0": {
-          "url": "https://artifacts.elastic.co/downloads/elasticsearch/elasticsearch-8.15.0-windows-x86_64.zip",
-          "type": "zip"
-        }
-      }
-    },
-    "kibana": {
-      "version": "8.15.0",
-      "versions": {
-        "8.15.0": {
-          "url": "https://artifacts.elastic.co/downloads/kibana/kibana-8.15.0-windows-x86_64.zip",
-          "type": "zip"
-        }
-      }
     }
   }
 }
