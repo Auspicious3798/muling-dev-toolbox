@@ -1342,12 +1342,19 @@ function getInfo() {
             versions: installed,
         };
     }
+    // 已经接管（登记进沙箱）的安装目录不算「旧的安装」，否则接管完横幅还挂在界面上
+    const legacy = scanLegacy().filter((item) => {
+        const info = tools[item.tool];
+        if (!info) return true;
+        const target = path.resolve(item.dir).toLowerCase();
+        return !info.versions.some((v) => v && v.dir && path.resolve(v.dir).toLowerCase() === target);
+    });
     return {
         root: getRoot(),
         launcher: getLauncherPath(),
         statePath: getStatePath(),
         tools,
-        legacy: scanLegacy(),
+        legacy,
     };
 }
 

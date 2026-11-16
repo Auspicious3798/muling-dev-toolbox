@@ -1,6 +1,6 @@
 {
-  "version": "2.1.6",
-  "notes": "注入系统变量后才做一次自检：直接跑一遍被注入的 exe，并看 where 解析到哪；如果这份装坏了会提示重装，如果被系统 PATH 里的旧 java 抢先会提示去「以管理员身份清理」。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.6-release/MulingEnvBox-Setup-2.1.6.exe",
+  "version": "2.1.7",
+  "notes": "接管之后的安装目录不再被算作「旧的安装」，接管完横幅自动消失；旧安装列表只显示真正还没接管的那几个。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.7-release/MulingEnvBox-Setup-2.1.7.exe",
   "publishedAt": "2026-11-16"
 }
