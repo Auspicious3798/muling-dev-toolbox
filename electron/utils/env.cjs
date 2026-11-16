@@ -1,4 +1,4 @@
-const { exec } = require('child_process');
+const { exec, execFile, execFileSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
@@ -28,7 +28,6 @@ function stamp() {
  */
 function readRegRaw(hive, name) {
     try {
-        const { execFileSync } = require('child_process');
         const out = execFileSync(REG, ['query', hive, '/v', name], { windowsHide: true, encoding: 'utf8' });
         const match = out.match(new RegExp(`${name}\\s+REG_(?:EXPAND_)?SZ\\s+(.*)`, 'i'));
         return match && match[1] ? match[1].trim() : '';
@@ -85,15 +84,20 @@ function pruneBackups(dir, keep = 30) {
 
 /**
  * 用 reg add 写 PATH：保留 REG_EXPAND_SZ 类型，不会像 setx 那样截断到 1024 字符。
+ * 必须走 execFile（参数数组），不能拼成一条命令交给 cmd —— cmd 会把 %JAVA_HOME17% 这类
+ * 变量在传进 reg.exe 之前就展开掉，写进注册表的值就跟期望的不一样了。
  */
 function writePathViaReg(hive, value) {
     return new Promise((resolve, reject) => {
-        const escaped = String(value).replace(/"/g, '\\"');
-        const cmd = `${REG} add "${hive}" /v Path /t REG_EXPAND_SZ /d "${escaped}" /f`;
-        exec(cmd, {windowsHide: true, timeout: 15000}, (err) => {
-            if (err) return reject(new Error(`写入 PATH 失败：${err.message}`));
-            resolve();
-        });
+        execFile(REG, ['add', hive, '/v', 'Path', '/t', 'REG_EXPAND_SZ', '/d', String(value), '/f'],
+            {windowsHide: true, timeout: 15000},
+            (err, stdout, stderr) => {
+                if (err) {
+                    const detail = String(stderr || '').trim() || err.message;
+                    return reject(new Error(`写入 PATH 失败：${detail}`));
+                }
+                resolve();
+            });
     });
 }
 
@@ -115,10 +119,20 @@ async function guardedPathWrite(hive, buildValue, label) {
     if (value === before) return {changed: false, backupFile};
     await writePathViaReg(hive, value);
     const after = readRegRaw(hive, 'Path');
-    if (after !== value) {
+    // 只忽略尾部多余的分号/空白，长度和内容仍要逐字对齐
+    const norm = (v) => String(v || '').replace(/[;\s]+$/, '');
+    if (norm(after) !== norm(value)) {
         // 读回不一致：立刻还原，避免把用户的 PATH 留成半截
         try { await writePathViaReg(hive, snapshot); } catch (err) { /* 还原也失败就只能报错 */ }
-        throw new Error(`${label} PATH 写入校验失败（期望 ${value.length} 字符，实际 ${after.length} 字符），已还原`);
+        const at = (() => {
+            const a = norm(after);
+            const b = norm(value);
+            for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
+                if (a[i] !== b[i]) return i;
+            }
+            return -1;
+        })();
+        throw new Error(`${label} PATH 写入校验失败（期望 ${value.length} 字符，实际 ${after.length} 字符，首个差异位置 ${at}），已还原`);
     }
     return {changed: true, backupFile, before, after};
 }
