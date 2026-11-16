@@ -212,7 +212,7 @@ function guessVersion(tool, dir) {
 /**
  * 接管一个已经存在的安装目录（不复制、不移动文件）
  */
-function adopt(tool, dir, version) {
+async function adopt(tool, dir, version) {
     const meta = getToolMeta(tool);
     if (!meta) throw new Error(`未知工具: ${tool}`);
     const target = path.resolve(String(dir || ''));
@@ -224,9 +224,16 @@ function adopt(tool, dir, version) {
     if (!finalVersion) throw new Error('没能识别出版本号，请手动填写');
 
     register(tool, finalVersion, target, {activate: true});
+    let messages = [];
+    try {
+        const takeover = await takeOverEnv(tool);
+        messages = (takeover && takeover.messages) || [];
+    } catch (err) {
+        messages = [`接管环境变量时出错：${err.message}`];
+    }
     syncInjection(tool).catch(() => {
     });
-    return {tool, version: finalVersion, dir: target, label: meta.label};
+    return {tool, version: finalVersion, dir: target, label: meta.label, messages};
 }
 
 const DETECT_COMMANDS = {
@@ -719,12 +726,25 @@ async function setInjection(tool, enabled) {
             .join(';');
         await setUserPath(cleaned);
 
-        // 还原成注入前的值；原本没有这个变量才删除
+        // 还原注入前的值；原本没有这个变量才删除
         const backup = state.injectionBackup[tool];
         if (backup && backup.value) {
             await setUserEnvVariable(meta.envVar, backup.value);
         } else {
             await removeUserEnvVariable(meta.envVar);
+        }
+        // 接管时删掉的旧 PATH 条目，撤出时补回去
+        if (backup && backup.takeover && backup.takeover.pathEntries && backup.takeover.pathEntries.length) {
+            try {
+                const currentPath = await getUserPath();
+                const existing = String(currentPath || '').split(';').filter(Boolean);
+                const missing = backup.takeover.pathEntries.filter(
+                    (p) => !existing.some((e) => e.toLowerCase() === String(p).toLowerCase())
+                );
+                if (missing.length) await setUserPath([...existing, ...missing].join(';'));
+            } catch (err) {
+                // 补不回去就算了，别把撤出流程卡住
+            }
         }
         delete state.injectionBackup[tool];
     }
@@ -878,6 +898,107 @@ function copyDirSync(src, dest) {
 }
 
 /**
+ * 判断某个 PATH 条目是不是「这个工具」的安装目录（接管时用来找出旧条目）
+ */
+function isToolDirEntry(tool, entry) {
+    if (!entry) return false;
+    let candidate = String(entry).trim().replace(/^"|"$/g, '');
+    if (!candidate) return false;
+    candidate = candidate.replace(/%([A-Za-z0-9_()]+)%/g, (m, name) => process.env[name] || '');
+    if (candidate.includes('%')) return false;
+    try {
+        if (!fs.existsSync(candidate) || !fs.statSync(candidate).isDirectory()) return false;
+    } catch (err) {
+        return false;
+    }
+    const resolved = path.resolve(candidate);
+    const root = path.resolve(getRoot()).toLowerCase();
+    if (resolved.toLowerCase().startsWith(root)) return false;
+    if (looksInstalled(tool, resolved)) return true;
+    return looksInstalled(tool, path.dirname(resolved));
+}
+
+/**
+ * 接管之后把该工具的环境配置收归环境盒管理：
+ * 1) 把用户/系统 PATH 里指向其它安装的条目挑出来（能从用户级删的立即删）
+ * 2) 用户级 JAVA_HOME 之类的变量改指到接管目录
+ * 3) 用户 PATH 最前面放 %JAVA_HOME%\bin
+ * 删掉的东西全部记进 state.injectionBackup[tool].takeover，撤出注入时还原。
+ */
+async function takeOverEnv(tool) {
+    const meta = getToolMeta(tool);
+    if (!meta) return {ok: false, messages: ['未知工具']};
+    if (!INJECTABLE_TOOLS.includes(tool)) {
+        return {ok: true, messages: [`${meta.label} 走沙箱终端，不需要改系统变量`]};
+    }
+    const dir = getActiveDir(tool);
+    if (!dir) return {ok: false, messages: ['还没有可用的版本']};
+
+    const env = require('./env.cjs');
+    const state = readState();
+    if (!state.injectionBackup) state.injectionBackup = {};
+    const backup = state.injectionBackup[tool] || {varName: meta.envVar, value: ''};
+    if (!backup.takeover) backup.takeover = {pathEntries: [], systemEntries: []};
+    state.injectionBackup[tool] = backup;
+
+    const messages = [];
+
+    // 1) 旧 PATH 条目：用户级直接删，系统级尽力而为
+    try {
+        const userPath = await env.getUserPath();
+        const parts = String(userPath || '').split(';').filter(Boolean);
+        const stale = parts.filter((p) => isToolDirEntry(tool, p));
+        if (stale.length) {
+            const kept = parts.filter((p) => !stale.includes(p));
+            await env.setUserPath(kept.join(';'));
+            backup.takeover.pathEntries = [...new Set([...(backup.takeover.pathEntries || []), ...stale])];
+            messages.push(`清掉了用户 PATH 里 ${stale.length} 条旧的 ${meta.label} 路径`);
+        }
+    } catch (err) {
+        messages.push(`清理用户 PATH 失败：${err.message}`);
+    }
+
+    try {
+        const systemPath = await env.getSystemPath();
+        const sysParts = String(systemPath || '').split(';').filter(Boolean);
+        const sysStale = sysParts.filter((p) => isToolDirEntry(tool, p));
+        if (sysStale.length) {
+            const kept = sysParts.filter((p) => !sysStale.includes(p));
+            await env.setSystemPath(kept.join(';'));
+            backup.takeover.systemEntries = [...new Set([...(backup.takeover.systemEntries || []), ...sysStale])];
+            messages.push(`清掉了系统 PATH 里 ${sysStale.length} 条旧的 ${meta.label} 路径`);
+        }
+    } catch (err) {
+        const systemPath = await env.getSystemPath().catch(() => '');
+        const sysStale = String(systemPath || '').split(';').filter((p) => isToolDirEntry(tool, p));
+        if (sysStale.length) {
+            messages.push(`系统 PATH 里还有 ${sysStale.length} 条旧的 ${meta.label} 路径，需要以管理员身份再接管一次才能清掉`);
+        }
+    }
+
+    // 2) 旧的 JAVA_HOME 之类：记下原值再改指到接管目录
+    try {
+        const current = await env.getUserEnvVariable(meta.envVar);
+        if (current && path.resolve(current).toLowerCase() !== path.resolve(dir).toLowerCase()) {
+            if (!backup.value) backup.value = current;
+            messages.push(`用户变量 ${meta.envVar} 原来指向 ${current}，已改为 ${dir}`);
+        }
+    } catch (err) {
+        // 读不到就跳过
+    }
+
+    // 3) 写入受管的变量与 PATH 条目
+    try {
+        await setInjection(tool, true);
+    } catch (err) {
+        messages.push(`写入环境变量失败：${err.message}`);
+    }
+
+    writeState();
+    return {ok: true, messages};
+}
+
+/**
  * 清理旧系统模式写入的环境变量与 PATH 条目
  * （系统级需要管理员；没有权限时返回 ok:false，不影响迁移本身）
  */
@@ -1024,6 +1145,7 @@ module.exports = {
     looksInstalled,
     guessVersion,
     adopt,
+    takeOverEnv,
     detectExistingInstalls,
     register,
     setToolPassword,

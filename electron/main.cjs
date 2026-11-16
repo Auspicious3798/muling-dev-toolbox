@@ -847,7 +847,7 @@ app.whenReady().then(() => {
 
     ipcMain.handle('sandbox-adopt', async (_event, tool, dir, version) => {
         try {
-            const result = sandbox.adopt(tool, dir, version);
+            const result = await sandbox.adopt(tool, dir, version);
             if (mainWindow && !mainWindow.isDestroyed()) {
                 mainWindow.webContents.send('sandbox-changed');
             }

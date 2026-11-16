@@ -366,7 +366,9 @@ export default {
           Lemon.error((r && r.message) || '接管失败');
           return;
         }
-        Lemon.success(`已接管 ${this.toolLabel} ${r.data.version}，文件还在原来的位置～`);
+        Lemon.success(`已接管 ${this.toolLabel} ${r.data.version}，文件还在原来的位置，环境变量也交给环境盒管了～`);
+        const notes = (r.data && r.data.messages) || [];
+        notes.forEach((line, i) => setTimeout(() => Lemon.info(line), 600 * (i + 1)));
         this.adoptCandidates = [];
         await this.refresh();
       } catch (err) {
