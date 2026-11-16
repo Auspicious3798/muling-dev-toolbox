@@ -1,6 +1,6 @@
 {
-  "version": "2.1.12",
-  "notes": "没自动扫到已安装环境时，可以手动指定安装目录来接管。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.12-release/MulingEnvBox-Setup-2.1.12.exe",
+  "version": "2.1.13",
+  "notes": "手动指定目录接管时，版本号识别不出来的（如解压版 Redis）会自己问程序，问不出来就用目录名记下，不再卡住。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.13-release/MulingEnvBox-Setup-2.1.13.exe",
   "publishedAt": "2026-11-16"
 }

@@ -274,16 +274,27 @@ async function adopt(tool, dir, version) {
     if (!fs.statSync(target).isDirectory()) throw new Error('请选择安装目录');
     if (!looksInstalled(tool, target)) throw new Error(`这个目录看起来不是 ${meta.label} 的安装目录`);
 
-    const finalVersion = String(version || guessVersion(tool, target) || '').trim();
-    if (!finalVersion) throw new Error('没能识别出版本号，请手动填写');
+    let finalVersion = String(version || guessVersion(tool, target) || '').trim();
+    if (!finalVersion) {
+        // 目录名里没版本号（E:\develop\Redis 这类），问一下程序自己
+        finalVersion = String(probeVersion(tool, target) || '').trim();
+    }
+    if (!finalVersion) {
+        // 还是问不出来就用目录名兜底，至少让人能在卡片上认出是哪一个
+        finalVersion = path.basename(target) || 'custom';
+    }
 
     register(tool, finalVersion, target, {activate: true});
     let messages = [];
+    if (!/^[\d.]+$/.test(finalVersion)) {
+        messages.push(`没识别出 ${meta.label} 的版本号，先按「${finalVersion}」记下，能用就行`);
+    }
     try {
         const takeover = await takeOverEnv(tool);
-        messages = (takeover && takeover.messages) || [];
+        const notes = (takeover && takeover.messages) || [];
+        if (notes.length) messages = messages.concat(notes);
     } catch (err) {
-        messages = [`接管环境变量时出错：${err.message}`];
+        messages.push(`接管环境变量时出错：${err.message}`);
     }
     syncInjection(tool).catch(() => {
     });
