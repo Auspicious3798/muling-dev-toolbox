@@ -1,54 +1,31 @@
 :root {
-  color-scheme: light dark;  --bg: #17181a;
-  --bg-soft: #1b1c1f;
-  --panel: #1f2023;
-  --panel-2: #26272b;
-  --line: rgba(255, 255, 255, 0.08);
-  --line-strong: rgba(255, 255, 255, 0.16);
-  --text: #e4e4e5;
-  --muted: #9a9b9e;
-  --accent: #4a9c86;
-  --accent-strong: #3b8873;
-  --accent-soft: rgba(74, 156, 134, 0.12);
-  --danger: #e0736f;
-  --danger-soft: rgba(224, 115, 111, 0.12);
-  --warn: #d8a657;
-  --syn-keyword: #8fb0cf;
-  --syn-string: #a3b98b;
-  --syn-number: #c9a97a;
-  --syn-comment: #8a8d92;
-  --syn-function: #b8a8c8;
-  --syn-ident: #e4e4e5;
-  --syn-op: #a9abad;
-  --radius: 6px;
+  color-scheme: light;
+  --bg: #eef2f8;
+  --bg-soft: #f7f9fc;
+  --panel: #ffffff;
+  --panel-2: #f2f6fb;
+  --line: #e3e9f1;
+  --line-strong: #cfd8e3;
+  --text: #1b2430;
+  --muted: #64748b;
+  --accent: #2f6fed;
+  --accent-strong: #2563eb;
+  --accent-soft: rgba(47, 111, 237, 0.1);
+  --danger: #d92d20;
+  --danger-soft: #fef3f2;
+  --warn: #b45309;
+  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06);
+  --shadow-md: 0 6px 18px rgba(16, 24, 40, 0.08);
+  --syn-keyword: #1e40af;
+  --syn-string: #15803d;
+  --syn-number: #b45309;
+  --syn-comment: #94a3b8;
+  --syn-function: #7c3aed;
+  --syn-ident: #1b2430;
+  --syn-op: #64748b;
+  --radius: 8px;
   --mono: "Cascadia Code", "JetBrains Mono", Consolas, "Courier New", monospace;
   --sans: system-ui, -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
-}
-
-@media (prefers-color-scheme: light) {
-  :root {
-    --bg: #f3f3f4;
-    --bg-soft: #ebebed;
-    --panel: #ffffff;
-    --panel-2: #f7f7f8;
-    --line: rgba(0, 0, 0, 0.08);
-    --line-strong: rgba(0, 0, 0, 0.16);
-    --text: #1e1f21;
-    --muted: #5f6165;
-    --accent: #0f766e;
-    --accent-strong: #0b5f59;
-    --accent-soft: rgba(15, 118, 110, 0.1);
-    --danger: #c0392b;
-    --danger-soft: rgba(192, 57, 43, 0.08);
-    --warn: #9a6700;
-    --syn-keyword: #2b5b8c;
-    --syn-string: #3f7a3f;
-    --syn-number: #96601f;
-    --syn-comment: #8a8d92;
-    --syn-function: #6b4c8a;
-    --syn-ident: #1e1f21;
-    --syn-op: #5f6165;
-  }
 }
 
 * { box-sizing: border-box; }
@@ -427,7 +404,7 @@ button { font-family: inherit; }
   resize: vertical;
 }
 
-.sql-input::selection { background: rgba(74, 156, 134, 0.3); color: transparent; }
+.sql-input::selection { background: rgba(47, 111, 237, 0.22); color: transparent; }
 .sql-input::placeholder { color: var(--muted); }
 
 .sql-editor {
@@ -850,3 +827,69 @@ button { font-family: inherit; }
 @media (prefers-reduced-motion: reduce) {
   * { transition-duration: 0.01ms !important; animation-duration: 0.01ms !important; }
 }
+
+/* ---------- 蓝白主题细化（对齐企业门户样式） ---------- */
+.topbar {
+  background: var(--panel);
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.sidebar { background: var(--panel); }
+
+.side-head { padding: 14px 14px 8px; }
+
+.db-trigger {
+  background: var(--panel);
+  border-color: var(--line);
+  box-shadow: var(--shadow-sm);
+  padding: 7px 10px;
+}
+
+.table-list li { border-radius: 6px; padding: 7px 10px; }
+.table-list li:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.table-list li.is-active {
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: none;
+  font-weight: 600;
+}
+.table-list li.is-active .tbl-meta { color: rgba(255, 255, 255, 0.82); }
+
+.tab { font-size: 12.5px; padding: 7px 14px; }
+.tab.is-active { color: var(--accent); font-weight: 600; }
+
+.grid-wrap,
+.result-card,
+.ddl,
+.sql-editor,
+.db-pop,
+.ctx-menu,
+.modal {
+  border-radius: 10px;
+  box-shadow: var(--shadow-sm);
+}
+
+.grid thead th { background: var(--panel-2); color: var(--muted); }
+.grid tbody tr:hover td { background: var(--accent-soft); }
+
+.btn { background: var(--panel); border-color: var(--line-strong); }
+.btn:hover { background: var(--panel-2); border-color: var(--accent); color: var(--accent-strong); }
+.btn.primary { background: var(--accent); border-color: var(--accent); }
+.btn.primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+
+.chip.is-active,
+.type-filter .chip.is-active { background: var(--accent-soft); color: var(--accent-strong); border-color: var(--accent); }
+
+.db-item.is-active {
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+.brand-logo { background: var(--accent-soft); padding: 2px; border-radius: 7px; }
+
+.db-pop { box-shadow: var(--shadow-md); }
+.ctx-menu { box-shadow: var(--shadow-md); }
+.modal { box-shadow: 0 18px 40px rgba(16, 24, 40, 0.18); }
+.toast { background: #1b2430; color: #ffffff; border-color: #1b2430; }
+.toast.is-error { background: var(--danger); border-color: var(--danger); color: #ffffff; }

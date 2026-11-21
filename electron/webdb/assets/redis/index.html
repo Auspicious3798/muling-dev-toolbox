@@ -4,7 +4,7 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Web Redis · 沐柠环境盒</title>
-  <link rel="stylesheet" href="/styles.css?v=7"/>
+  <link rel="stylesheet" href="/styles.css?v=13"/>
 </head>
 <body>
 <header class="topbar">
@@ -20,7 +20,10 @@
   <aside class="sidebar">
     <div class="side-head">
       <span>键空间</span>
-      <button id="btn-new" class="btn ghost small" type="button">+ 新建</button>
+      <span class="side-head-actions">
+        <button id="btn-export-pattern" class="btn ghost small" type="button" title="把当前模式匹配的键导出成 JSON 或命令脚本">导出</button>
+        <button id="btn-new" class="btn ghost small" type="button">+ 新建</button>
+      </span>
     </div>
     <select id="db-select" class="select" aria-label="选择数据库"></select>
     <div class="side-search">
@@ -57,9 +60,12 @@
             <span id="key-type-badge" class="badge"></span>
             <span id="key-length" class="badge"></span>
             <span id="key-ttl" class="badge"></span>
+            <span id="key-memory" class="badge subtle"></span>
+            <span id="key-encoding" class="badge subtle"></span>
           </div>
         </div>
         <div class="key-actions">
+          <button id="btn-export-key" class="btn ghost small" type="button" disabled>导出</button>
           <button id="btn-rename" class="btn ghost small" type="button" disabled>重命名</button>
           <button id="btn-refresh-key" class="btn ghost small" type="button" disabled>刷新</button>
           <button id="btn-delete" class="btn danger small" type="button" disabled>删除</button>
@@ -87,16 +93,37 @@
     <div class="panel hidden" id="panel-cli">
       <div class="cli-wrap">
         <div id="cli-out" class="cli-out"></div>
+        <div id="cli-favs" class="cli-favs"></div>
         <div class="cli-input-row">
           <span class="cli-prompt">&gt;</span>
           <input id="cli-input" class="input grow mono cli-input" type="text" placeholder="例如 GET user:1 / KEYS * / INFO server" autocomplete="off" spellcheck="false"/>
+          <button id="btn-cli-fav" class="btn ghost small" type="button" title="收藏当前命令">收藏</button>
           <button id="btn-cli-run" class="btn primary small" type="button">执行</button>
         </div>
-        <div class="cli-hint">当前连接 db<span id="cli-db">0</span> · ↑↓ 可翻历史命令 · 输出为本机只读展示</div>
+        <div class="cli-toolbar">
+          <button id="btn-import-cmd" class="btn ghost small" type="button">导入命令脚本</button>
+          <span id="cli-hint" class="hint">当前连接 db<span id="cli-db">0</span> · ↑↓ 翻历史 · 危险命令需点两次</span>
+        </div>
+        <div id="import-bar" class="import-bar hidden">
+          <span id="import-bar-text" class="hint">准备导入…</span>
+          <button id="btn-import-stop" class="btn ghost small" type="button">取消</button>
+        </div>
       </div>
     </div>
   </section>
 </main>
+
+<div id="key-ctx" class="ctx-menu hidden" role="menu" aria-label="键操作">
+  <button class="ctx-item" data-act="open" type="button" role="menuitem">打开这个键</button>
+  <button class="ctx-item" data-act="copy-name" type="button" role="menuitem">复制键名</button>
+  <button class="ctx-item" data-act="copy-value" type="button" role="menuitem">复制值</button>
+  <div class="ctx-sep" role="separator"></div>
+  <button class="ctx-item" data-act="ttl" type="button" role="menuitem">设置 TTL…</button>
+  <button class="ctx-item" data-act="rename" type="button" role="menuitem">重命名…</button>
+  <button class="ctx-item" data-act="export" type="button" role="menuitem">导出这个键…</button>
+  <div class="ctx-sep" role="separator"></div>
+  <button class="ctx-item danger" data-act="delete" type="button" role="menuitem">删除这个键…</button>
+</div>
 
 <div id="modal" class="modal-mask hidden">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
@@ -131,7 +158,40 @@
   </div>
 </div>
 
+<div id="export-modal" class="modal-mask hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="export-title">
+    <h3 id="export-title" class="modal-title">导出数据</h3>
+    <p id="export-subject" class="modal-hint hint-info"></p>
+    <div class="field">
+      <span class="field-label">格式</span>
+      <div class="fmt-row" id="export-formats">
+        <button class="fmt-chip is-active" data-format="cmd" type="button">Redis 命令</button>
+        <button class="fmt-chip" data-format="json" type="button">JSON</button>
+      </div>
+    </div>
+    <p class="modal-hint hint-info">命令脚本可直接用「导入命令脚本」回放；JSON 适合备份或给程序读。单键最多 10000 个元素、模式最多 500 个键。</p>
+    <div class="modal-actions">
+      <button id="btn-export-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-export-ok" class="btn primary" type="button">导出</button>
+    </div>
+  </div>
+</div>
+
+<div id="import-modal" class="modal-mask hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="import-title">
+    <h3 id="import-title" class="modal-title">导入命令脚本</h3>
+    <p id="import-subject" class="modal-hint hint-info"></p>
+    <p class="modal-hint hint-info">按行执行 redis-cli 风格命令（支持引号与 # 注释），导入过程会分块执行并显示进度，失败会定位到行。</p>
+    <p class="modal-hint imp-warn">导入不可回滚，建议先备份或在测试库执行。</p>
+    <div class="modal-actions">
+      <button id="btn-import-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-import-ok" class="btn primary" type="button">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<input id="import-cmd-file" type="file" accept=".txt,.redis,.conf,.cmds,text/plain" hidden/>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
-<script src="/app.js?v=7"></script>
+<script src="/app.js?v=9"></script>
 </body>
 </html>
