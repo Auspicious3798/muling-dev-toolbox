@@ -1,6 +1,6 @@
 {
-  "version": "2.1.15",
-  "notes": "接管来的 MySQL 现在能从进程和 Windows 服务两条线索认出「它已经在跑」，不会再让你重复启动。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.1.15-release/MulingEnvBox-Setup-2.1.15.exe",
-  "publishedAt": "2026-11-16"
+  "version": "2.2.0",
+  "notes": "新增插件中心：MCP 控制中枢、浏览器里的 Web MySQL 与 Web Redis，装上即用；两个数据库控制台换成蓝白 / 红白亮色风格。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.2.0-release/MulingEnvBox-Setup-2.2.0.exe",
+  "publishedAt": "2026-11-21"
 }
