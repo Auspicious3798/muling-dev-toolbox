@@ -1,5 +1,39 @@
 # 更新日志
 
+## v2.2.0 · 2026-11-21
+
+### 新增
+
+- **插件中心**：左侧「插件中心」里按需安装能力插件，装完自动挂到「我的插件」分组，
+  卸载即还原；插件清单维护在 `src/plugins/registry.js`。
+- **MCP 控制中枢**：把环境盒能力以 MCP（Streamable HTTP + 令牌）开放给 DSH / Codex 这类智能体，
+  提供 `toolbox_overview`、`toolbox_check_tool`、`toolbox_service`、`toolbox_run_command`、
+  `toolbox_check_port`、`toolbox_system_stats` 六个工具，并在插件里实时看到调用流水、成功率与耗时。
+- **Web MySQL**（插件）：浏览器里的 MySQL 管理台。库/表树、WHERE 筛选、排序分页、表结构（字段/索引/DDL），
+  多语句 SQL 控制台；库和表都有右键菜单（新建/重命名/清空/删除，破坏性操作需二次输入名字确认）；
+  数据页支持双击改单元格、新增行、删除行与会话内撤销；支持结果集导出 CSV / SQL / JSON，
+  以及导入任意 `.sql` 脚本（支持 `DELIMITER`、触发器、`/*!40101 */`、大文件分块与进度、失败定位、取消）。
+- **Web Redis**（插件）：浏览器里的 Redis 工作台。SCAN 扫键与类型过滤、键右键菜单；hash/list/set/zset
+  全部逐字段写回（`HSET/HDEL`、`LSET/LREM`、`SADD/SREM`、`ZADD/ZREM`），大键游标分页，不再整键覆盖；
+  string 值 JSON 高亮与美化/压缩；显示 `MEMORY USAGE` 与 `OBJECT ENCODING`；键/模式导出 JSON 或
+  redis-cli 脚本，命令脚本导入；命令行带历史、收藏与危险命令二次确认。
+- SQL 编辑器与 Redis 值编辑器都加了语法高亮，SQL 输入区支持多行。
+- MCP 面板与两个 Web 控制台接入品牌 Logo。
+
+### 变更
+
+- Web MySQL / Web Redis 的数据源改为**绑定环境盒接管的实例**：只列出 `checkMySQL` / `checkRedis`
+  里的版本，端口与密码由环境盒自动读取，不再手填；后端会再次校验版本，防止绕过界面传任意连接。
+- 两个 Web 控制台改为亮色企业门户风格：**MySQL 蓝、Redis 红**，选中项为实心色块，浅色下重新调过
+  代码高亮配色。
+
+### 修复
+
+- Web MySQL 的 SQL 查询结果对象行没按列展开，导致整列显示 NULL。
+- `get-system-stats` 在 CPU 采样间隔过短时算出 NaN，仪表盘显示 `NaN%`。
+- 数据库连接失败时错误直接透传，现在会提示「可以在数据源里换一个已接管实例」。
+- 插件详情抽屉背景半透明，背后内容会透出来形成重影。
+
 ## v2.1.15 · 2026-11-17
 
 ### 修复

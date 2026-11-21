@@ -6,7 +6,7 @@
 
 **把 JDK、Python、MySQL、Redis 这些装起来最烦的东西，变成点两下的事。**
 
-<a href="https://www.muling-download.site"><img src="https://img.shields.io/badge/Version-2.1.15-2dd4bf?style=flat-square" alt="Version"></a>
+<a href="https://www.muling-download.site"><img src="https://img.shields.io/badge/Version-2.2.0-2dd4bf?style=flat-square" alt="Version"></a>
 <img src="https://img.shields.io/badge/Platform-Windows%2010%20%7C%2011-0078D6?style=flat-square&logo=windows" alt="Platform">
 <img src="https://img.shields.io/badge/Electron-41-47848F?style=flat-square&logo=electron" alt="Electron">
 <img src="https://img.shields.io/badge/Vue-3.5-42b883?style=flat-square&logo=vuedotjs" alt="Vue">
@@ -88,6 +88,20 @@ JDK 从 8 到 26、Python 从 3.9 到 3.13、MySQL 8.0/8.4/9.3……同一个工
 
 3306 被占用？安装或启动 MySQL 时自动往后找可用端口并回写配置，不用自己改 `my.ini`。
 
+### 🧩 插件市场：能力按需装
+
+2.2 新增插件体系。左侧「插件中心」里挑插件、点安装，装完自动挂到「我的插件」分组，卸载即还原，
+所有状态只存在本地。目前上架三个：
+
+| 插件 | 做什么 |
+|---|---|
+| **MCP 控制中枢** | 把环境盒能力以 MCP 接口开放给 DSH / Codex 等智能体（查工具版本、起停 MySQL/Redis/Nginx、执行终端命令、查端口与系统状态），并在插件里实时看调用流水、成功率、耗时 |
+| **Web MySQL** | 浏览器里的 MySQL 管理台：库表树、筛选排序、表结构、SQL 控制台、行编辑与撤销、CSV/SQL/JSON 导出、`.sql` 脚本导入 |
+| **Web Redis** | 浏览器里的 Redis 工作台：SCAN 扫键、各类型逐字段编辑、TTL、JSON 美化、键/脚本导出、命令导入、CLI 历史与危险命令二次确认 |
+
+两个 Web 控制台只监听 `127.0.0.1`，地址里带一次性令牌，且只能绑定环境盒自己接管的 MySQL / Redis
+实例，退出环境盒服务立即失效。
+
 ### 🧹 其他
 
 - 断点续传 + 断网重试 + 备用源
@@ -119,7 +133,7 @@ JDK 从 8 到 26、Python 从 3.9 到 3.13、MySQL 8.0/8.4/9.3……同一个工
 ## 下载
 
 - 官网：<https://www.muling-download.site>
-- 安装包：`MulingEnvBox-Setup-2.1.15.exe`（NSIS，支持自定义安装目录）
+- 安装包：`MulingEnvBox-Setup-2.2.0.exe`（NSIS，支持自定义安装目录）
 
 系统要求：**Windows 10 / 11（64 位）**，约 300MB 磁盘空间（不含工具）。
 
@@ -154,7 +168,7 @@ npm run electron:build
 
 ```
 dist_electron/
-├── MulingEnvBox-Setup-2.1.15.exe   ← 给别人装的就是这个
+├── MulingEnvBox-Setup-2.2.0.exe   ← 给别人装的就是这个
 ├── win-unpacked/                ← 免安装版，双击 exe 直接跑
 │   └── 沐柠环境盒.exe
 └── builder-effective-config.yaml
@@ -198,6 +212,8 @@ electron/
 ├── integrity.cjs            一键体检
 ├── backup.cjs               .mlenv 备份 / 还原
 ├── handlers/                各工具的安装、启动、卸载逻辑
+├── mcp/                     MCP 控制中枢：服务器、工具、调用日志
+├── webdb/                   Web MySQL / Web Redis：服务、SQL 切分器、静态控制台
 └── utils/
     ├── sandbox.cjs          沙箱核心：目录、state.json、注入、快捷方式
     ├── download.cjs         下载：断点续传、重试、速度
@@ -207,6 +223,7 @@ electron/
 src/
 ├── App.vue                  路由（字符串 activeTool 分发）
 ├── components/              各页面组件
+├── plugins/                 插件清单、安装状态、视图注册表
 └── styles/theme.css         玻璃质感设计 token
 config/downloads.json        所有工具的下载地址与版本
 scripts/                     美术烘焙、签名校验等工具脚本
