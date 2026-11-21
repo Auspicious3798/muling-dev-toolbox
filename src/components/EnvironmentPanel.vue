@@ -115,6 +115,11 @@
           <button @click.stop="openVersionTerminal(v)" class="act-btn icon-btn" :disabled="actionLoading" title="在此版本环境打开终端">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
           </button>
+          <button v-if="tool === 'mysql' || tool === 'redis'" @click.stop="openWebConsole()" class="act-btn ghost"
+                  :disabled="actionLoading" :title="webConsoleTitle">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z"/></svg>
+            Web
+          </button>
           <button v-if="tool === 'mysql' || tool === 'redis'" @click.stop="toggleService(v)"
                   :class="['act-btn', serviceStatus[v] === 'running' ? 'ghost danger' : 'ghost success']" :disabled="actionLoading">
             <svg v-if="serviceStatus[v] !== 'running'" width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
@@ -274,6 +279,7 @@ import SettingsIcon from '../../public/icons/setting.svg?url';
 import PackageManager from './PackageManager.vue';
 import eventBus from '../eventBus';
 import Lemon from '@/utils/lemon';
+import { isInstalled } from '@/plugins/store';
 
 export default {
   name: 'EnvironmentPanel',
@@ -311,6 +317,17 @@ export default {
     switchMethod() { const m={jdk:'switchJDK',python:'switchPython',mysql:'switchMySQL',redis:'switchRedis',maven:'switchMaven',gradle:'switchGradle',uv:'switchUv',nodejs:'switchNodejs',miniconda:'switchMiniconda'}; return m[this.tool]; },
     hasServiceLog() { return ['mysql','redis','nginx'].includes(this.tool); },
     canCopyConnection() { return ['mysql','redis'].includes(this.tool); },
+    webConsoleId() {
+      if (this.tool === 'mysql') return 'web-mysql';
+      if (this.tool === 'redis') return 'web-redis';
+      return '';
+    },
+    webConsoleTitle() {
+      const label = this.tool === 'mysql' ? 'Web MySQL' : 'Web Redis';
+      return isInstalled(this.webConsoleId)
+        ? `在浏览器里用 ${label} 管理这个实例`
+        : `${label} 插件还没装，点一下去插件中心`;
+    },
     adoptSupported() { return !!window.electronAPI.detectExistingInstalls && ['jdk','python','mysql','redis','maven','gradle','uv','nodejs','nginx'].includes(this.tool); },
     deleteMethod() { const m={jdk:'deleteJDK',python:'deletePython',mysql:'deleteMySQL',redis:'deleteRedis',maven:'uninstallMaven',gradle:'uninstallGradle',nodejs:'uninstallNodejs',uv:'uninstallUv',miniconda:'deleteMiniconda'}; return m[this.tool]; },
     startServiceMethod() { return this.tool==='mysql'?'startMySQLService':'startRedisService'; },
@@ -722,6 +739,10 @@ export default {
     },
     async openVersionTerminal(version) {
       eventBus.emit('terminal:open', { tool: this.tool, version });
+    },
+    openWebConsole() {
+      if (!this.webConsoleId) return;
+      eventBus.emit('plugin:open', this.webConsoleId);
     },
     async onTileClick(version) {
       if (this.actionLoading) return;

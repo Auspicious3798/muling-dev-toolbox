@@ -11,7 +11,7 @@
     </div>
     <div class="nav-items">
       <NavMenuItem
-          v-for="item in menuItems"
+          v-for="item in navItems"
           :key="item.id"
           :item="item"
           :active-id="activeTool"
@@ -42,6 +42,8 @@ import DashboardIcon from '/icons/Dashboard.svg?url';
 import NodejsIcon from '/icons/nodejs.svg?url';
 import LemonIcon from '/icons/lemon.svg?url';
 import SettingsIcon from '/icons/setting.svg?url';
+import PluginIcon from '/icons/plugin.svg?url';
+import { pluginNavItems } from '@/plugins/store';
 
 export default {
   name: 'NavMenu',
@@ -74,6 +76,30 @@ export default {
         { id: 'about', label: '关于沐柠', icon: LemonIcon, children: [] }
       ]
     };
+  },
+  computed: {
+    /**
+     * 静态菜单 + 插件中心入口 + 动态的「我的插件」分组。
+     * 已安装插件一多，导航里就会自动多出对应子项，卸载后同一帧消失。
+     */
+    navItems() {
+      const pluginEntries = pluginNavItems();
+      const items = [
+        this.menuItems[0],
+        { id: 'plugin-center', label: '插件中心', icon: PluginIcon, children: [] }
+      ];
+      if (pluginEntries.length) {
+        items.push({
+          id: 'my-plugins',
+          label: '我的插件',
+          icon: '🧩',
+          children: pluginEntries,
+          badge: pluginEntries.length
+        });
+      }
+      items.push(...this.menuItems.slice(1));
+      return items;
+    }
   },
   methods: {
     handleSelect(id) {

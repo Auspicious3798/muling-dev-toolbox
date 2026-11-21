@@ -452,6 +452,21 @@ module.exports = function registerRedisHandlers(mainWindow, userDataPath) {
         }
     });
 
+    ipcMain.handle('get-redis-password', async (event, version) => {
+        try {
+            const home = findRedisHome(version);
+            if (!home) return {success: false, message: '未找到安装目录'};
+            const confPath = path.join(home, 'redis.windows.conf');
+            if (!fs.existsSync(confPath)) return {success: false, message: '配置文件不存在'};
+            const content = fs.readFileSync(confPath, 'utf8');
+            const match = content.match(/^requirepass\s+(.+)$/m);
+            return {success: true, password: match ? match[1].trim() : '', installed: true};
+        } catch (err) {
+            logToFile(`读取 Redis ${version} 密码失败: ${err.message}`);
+            return {success: false, message: err.message};
+        }
+    });
+
     ipcMain.handle('change-redis-password', async (event, version, oldPassword, newPassword) => {
         try {
             const home = findRedisHome(version);

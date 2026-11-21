@@ -15,6 +15,8 @@ const registerGradleHandlers = require('./handlers/gradle.cjs');
 const registerUvHandlers = require('./handlers/uv.cjs');
 const registerNodejsHandlers = require('./handlers/nodejs.cjs');
 const registerNginxHandlers = require('./handlers/nginx.cjs');
+const registerMcpHandlers = require('./mcp/index.cjs');
+const { registerWebdbHandlers } = require('./webdb/index.cjs');
 const registerTerminalHandlers = require('./terminal.cjs');
 const registerIntegrityHandlers = require('./integrity.cjs');
 const registerBackupHandlers = require('./backup.cjs');
@@ -1146,6 +1148,10 @@ app.whenReady().then(() => {
     registerGradleHandlers(mainWindow, app.getPath('userData'));
     registerUvHandlers(mainWindow, app.getPath('userData'));
     registerNodejsHandlers(mainWindow, app.getPath('userData'));
+    // MCP 控制中枢：把环境盒能力开放给 DSH / Codex 这类智能体
+    registerMcpHandlers(mainWindow, app.getPath('userData'));
+    // 数据库 Web 客户端：Web MySQL / Web Redis
+    registerWebdbHandlers(mainWindow, app.getPath('userData'));
 
     ipcMain.handle('get-system-stats', async () => {
         const os = require('os');
@@ -1159,7 +1165,11 @@ app.whenReady().then(() => {
                     const usage = start.map((s, i) => {
                         const idle = end[i].idle - s.idle;
                         const total = (end[i].user + end[i].nice + end[i].sys + end[i].idle + end[i].irq) - (s.user + s.nice + s.sys + s.idle + s.irq);
-                        return 1 - idle / total;
+                        // 采样间隔太短时 total 可能为 0，直接相除会得到 NaN
+                        if (!total || total <= 0) return 0;
+                        const value = 1 - idle / total;
+                        if (!Number.isFinite(value)) return 0;
+                        return Math.min(1, Math.max(0, value));
                     });
                     const avgUsage = usage.reduce((a, b) => a + b, 0) / usage.length;
                     resolve(avgUsage * 100);

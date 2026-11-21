@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Web Redis · 沐柠环境盒</title>
+  <link rel="stylesheet" href="/styles.css?v=7"/>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="brand-logo" src="/logo.png" alt="沐柠环境盒"/>
+    <span class="brand-text">Web Redis</span>
+  </div>
+  <span id="conn-badge" class="conn-badge">正在连接…</span>
+  <button id="btn-refresh" class="btn" type="button">刷新</button>
+</header>
+
+<main class="layout">
+  <aside class="sidebar">
+    <div class="side-head">
+      <span>键空间</span>
+      <button id="btn-new" class="btn ghost small" type="button">+ 新建</button>
+    </div>
+    <select id="db-select" class="select" aria-label="选择数据库"></select>
+    <div class="side-search">
+      <input id="key-pattern" class="input" type="search" placeholder="键名模式，支持 *" value="*" autocomplete="off"/>
+    </div>
+    <div class="chips" id="type-filter" role="group" aria-label="按类型过滤">
+      <button class="chip is-active" data-type="" type="button">全部</button>
+      <button class="chip" data-type="string" type="button">string</button>
+      <button class="chip" data-type="hash" type="button">hash</button>
+      <button class="chip" data-type="list" type="button">list</button>
+      <button class="chip" data-type="set" type="button">set</button>
+      <button class="chip" data-type="zset" type="button">zset</button>
+      <button class="chip" data-type="stream" type="button">stream</button>
+    </div>
+    <ul id="key-list" class="key-list" aria-label="键列表"></ul>
+    <div class="side-foot">
+      <button id="btn-more" class="btn ghost small" type="button" disabled>加载更多</button>
+      <span id="key-count"></span>
+    </div>
+  </aside>
+
+  <section class="content">
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="detail" role="tab" type="button">键详情</button>
+      <button class="tab" data-tab="cli" role="tab" type="button">命令行</button>
+      <span id="db-hint" class="db-hint"></span>
+    </div>
+
+    <div class="panel" id="panel-detail">
+      <div class="key-head">
+        <div class="key-title">
+          <h2 id="key-name">未选择键</h2>
+          <div class="key-meta">
+            <span id="key-type-badge" class="badge"></span>
+            <span id="key-length" class="badge"></span>
+            <span id="key-ttl" class="badge"></span>
+          </div>
+        </div>
+        <div class="key-actions">
+          <button id="btn-rename" class="btn ghost small" type="button" disabled>重命名</button>
+          <button id="btn-refresh-key" class="btn ghost small" type="button" disabled>刷新</button>
+          <button id="btn-delete" class="btn danger small" type="button" disabled>删除</button>
+        </div>
+      </div>
+
+      <div id="rename-bar" class="inline-bar hidden">
+        <label class="inline-label" for="rename-input">新键名</label>
+        <input id="rename-input" class="input grow" type="text" autocomplete="off"/>
+        <button id="btn-rename-ok" class="btn small" type="button">确定</button>
+        <button id="btn-rename-cancel" class="btn ghost small" type="button">取消</button>
+      </div>
+
+      <div class="inline-bar">
+        <label class="inline-label" for="ttl-input">TTL（秒）</label>
+        <input id="ttl-input" class="input ttl-input" type="number" min="1" step="1" placeholder="留空表示永久"/>
+        <button id="btn-ttl-apply" class="btn small" type="button" disabled>应用</button>
+        <button id="btn-ttl-persist" class="btn ghost small" type="button" disabled>设为永久</button>
+        <span id="ttl-hint" class="inline-label"></span>
+      </div>
+
+      <div id="editor" class="editor"></div>
+    </div>
+
+    <div class="panel hidden" id="panel-cli">
+      <div class="cli-wrap">
+        <div id="cli-out" class="cli-out"></div>
+        <div class="cli-input-row">
+          <span class="cli-prompt">&gt;</span>
+          <input id="cli-input" class="input grow mono cli-input" type="text" placeholder="例如 GET user:1 / KEYS * / INFO server" autocomplete="off" spellcheck="false"/>
+          <button id="btn-cli-run" class="btn primary small" type="button">执行</button>
+        </div>
+        <div class="cli-hint">当前连接 db<span id="cli-db">0</span> · ↑↓ 可翻历史命令 · 输出为本机只读展示</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="modal" class="modal-mask hidden">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+    <h3 id="modal-title" class="modal-title">新建键</h3>
+    <div class="field">
+      <label class="field-label" for="new-name">键名</label>
+      <input id="new-name" class="input" type="text" autocomplete="off" placeholder="例如 user:1"/>
+    </div>
+    <div class="field">
+      <label class="field-label" for="new-type">类型</label>
+      <select id="new-type" class="select">
+        <option value="string">string</option>
+        <option value="hash">hash</option>
+        <option value="list">list</option>
+        <option value="set">set</option>
+        <option value="zset">zset</option>
+        <option value="stream">stream</option>
+      </select>
+    </div>
+    <div class="field">
+      <label class="field-label" for="new-value">初始值</label>
+      <textarea id="new-value" class="textarea" rows="4" spellcheck="false" placeholder="string 直接填内容；hash / zset 每行 field=value 或 score=member；list / set 每行一项"></textarea>
+    </div>
+    <div class="field">
+      <label class="field-label" for="new-ttl">TTL（秒，可空）</label>
+      <input id="new-ttl" class="input" type="number" min="0" step="1" placeholder="留空表示永久"/>
+    </div>
+    <div class="modal-actions">
+      <button id="btn-new-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-new-ok" class="btn primary" type="button">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="/app.js?v=7"></script>
+</body>
+</html>

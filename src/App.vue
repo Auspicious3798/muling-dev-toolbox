@@ -29,6 +29,8 @@
         <div class="control-btn close-btn" @click="closeWindow">✕</div>
       </div>
       <Dashboard v-if="activeTool === 'dashboard'" @install="openDrawerFromDashboard" @select-tool="handleToolSelect"/>
+      <PluginCenter v-else-if="activeTool === 'plugin-center'" @open-plugin="openPluginPage"/>
+      <PluginHost v-else-if="isPluginRoute" :plugin-id="activePluginId" @open-center="openPluginCenter"/>
       <Settings v-else-if="activeTool === 'settings'"/>
       <div v-else-if="activeTool === 'about' || activeTool === 'product'" class="merged-page">
         <ProductIntro/>
@@ -71,9 +73,12 @@ import Dashboard from './components/Dashboard.vue';
 import Settings from './components/Settings.vue';
 import NginxManager from './components/NginxManager.vue';
 import ProductIntro from './components/ProductIntro.vue';
+import PluginCenter from './components/PluginCenter.vue';
+import PluginHost from './components/PluginHost.vue';
 import TerminalPanel from './components/TerminalPanel.vue';
 import LemonToast from './components/LemonToast.vue';
 import eventBus from './eventBus';
+import { isInstalled } from './plugins/store';
 import { taskCenter, startTask, updateTask, finishTask, clearTask } from './utils/taskCenter';
 import '@/styles/theme.css';
 
@@ -90,6 +95,8 @@ export default {
     Settings,
     NginxManager,
     ProductIntro,
+    PluginCenter,
+    PluginHost,
     TerminalPanel,
     LemonToast,
   },
@@ -114,6 +121,13 @@ export default {
       if (!active || active.status !== 'running') return null;
       return this.drawerVisible ? null : active;
     },
+    /** 插件页面路由形如 plugin:mcp-control */
+    isPluginRoute() {
+      return typeof this.activeTool === 'string' && this.activeTool.startsWith('plugin:');
+    },
+    activePluginId() {
+      return this.isPluginRoute ? this.activeTool.slice('plugin:'.length) : '';
+    },
   },
   mounted() {
     this.initTheme();
@@ -125,6 +139,8 @@ export default {
     eventBus.on('scan-end', this.handleScanEnd);
     eventBus.on('navigate:settings', this.handleNavigateToSettings);
     eventBus.on('terminal:open', this.openTerminalPanel);
+    eventBus.on('plugin:changed', this.handlePluginChanged);
+    eventBus.on('plugin:open', this.handlePluginOpen);
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.handleSystemThemeChange);
     setTimeout(() => this.restoreServices(), 1800);
   },
@@ -136,6 +152,8 @@ export default {
     eventBus.off('scan-end', this.handleScanEnd);
     eventBus.off('navigate:settings', this.handleNavigateToSettings);
     eventBus.off('terminal:open', this.openTerminalPanel);
+    eventBus.off('plugin:changed', this.handlePluginChanged);
+    eventBus.off('plugin:open', this.handlePluginOpen);
     window.matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.handleSystemThemeChange);
   },
   methods: {
@@ -246,6 +264,28 @@ export default {
       this.terminalOpen = false;
       this.activeTool = toolId;
       this.drawerVisible = false;
+    },
+    openPluginCenter() {
+      this.activeTool = 'plugin-center';
+    },
+    openPluginPage(id) {
+      this.handleToolSelect(`plugin:${id}`);
+    },
+    /** 卸载正在浏览的插件后，别把用户留在空白页 */
+    handlePluginChanged({ id, action }) {
+      if (action === 'uninstall' && this.activeTool === `plugin:${id}`) {
+        this.activeTool = 'plugin-center';
+      }
+    },
+    /** 环境卡片上的「Web」按钮：装了就直接进插件页，没装就去插件中心并打开详情 */
+    handlePluginOpen(id) {
+      if (!id) return;
+      if (isInstalled(id)) {
+        this.handleToolSelect(`plugin:${id}`);
+      } else {
+        this.activeTool = 'plugin-center';
+        this.$nextTick(() => eventBus.emit('plugin:focus', id));
+      }
     },
     syncCloseBehavior() {
       if (!window.electronAPI || !window.electronAPI.setCloseBehavior) return;

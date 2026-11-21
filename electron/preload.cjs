@@ -240,4 +240,29 @@ contextBridge.exposeInMainWorld('electronAPI', {
     terminalSummary: () => ipcRenderer.invoke('terminal-summary'),
     onTerminalData: (callback) => ipcOn('terminal-data', callback),
     onTerminalExit: (callback) => ipcOn('terminal-exit', callback),
+
+    // MCP 控制中枢：把环境盒能力开放给 DSH / Codex 等智能体
+    mcpGetStatus: () => ipcRenderer.invoke('mcp-get-status'),
+    mcpGetTools: () => ipcRenderer.invoke('mcp-get-tools'),
+    mcpStart: () => ipcRenderer.invoke('mcp-start'),
+    mcpStop: () => ipcRenderer.invoke('mcp-stop'),
+    mcpUpdateConfig: (patch) => ipcRenderer.invoke('mcp-update-config', patch),
+    mcpGetToken: () => ipcRenderer.invoke('mcp-get-token'),
+    mcpRegenerateToken: () => ipcRenderer.invoke('mcp-regenerate-token'),
+    mcpGetStats: (range) => ipcRenderer.invoke('mcp-get-stats', range),
+    mcpGetCalls: (limit) => ipcRenderer.invoke('mcp-get-calls', limit),
+    mcpClearCalls: () => ipcRenderer.invoke('mcp-clear-calls'),
+    mcpSelfTest: () => ipcRenderer.invoke('mcp-self-test'),
+    onMcpActivity: (callback) => ipcOn('mcp-activity', callback),
+
+    // 数据库 Web 客户端：Web MySQL / Web Redis
+    getRedisPassword: (version) => ipcRenderer.invoke('get-redis-password', version),
+    webdbStatus: () => ipcRenderer.invoke('webdb-status'),
+  webdbGetConn: (kind) => ipcRenderer.invoke('webdb-get-conn', kind),
+  webdbSetConn: (kind, conn) => ipcRenderer.invoke('webdb-set-conn', kind, conn),
+    webdbStart: (payload) => ipcRenderer.invoke('webdb-start', payload),
+    webdbStop: (kind) => ipcRenderer.invoke('webdb-stop', kind),
+    webdbOpen: (kind) => ipcRenderer.invoke('webdb-open', kind),
+    webdbSetPort: (kind, port) => ipcRenderer.invoke('webdb-set-port', kind, port),
+    onWebdbChanged: (callback) => ipcOn('webdb-changed', callback),
 });

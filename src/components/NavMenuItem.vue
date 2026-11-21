@@ -19,6 +19,7 @@
         <span v-else class="nav-icon-fallback">{{ item.icon || '' }}</span>
       </span>
       <span class="item-label">{{ item.label }}</span>
+      <span v-if="item.badge" class="item-badge">{{ item.badge }}</span>
       <span v-if="hasChildren" class="item-arrow">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <polyline points="9 6 15 12 9 18"></polyline>
@@ -206,6 +207,19 @@ export default {
 
 .menu-item:hover .item-label {
   transform: translateX(2px);
+}
+
+.item-badge {
+  flex-shrink: 0;
+  min-width: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--text-nav-hover) 14%, transparent);
+  color: var(--text-nav-muted);
+  font-size: 0.66rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.7;
+  text-align: center;
 }
 
 .item-arrow {

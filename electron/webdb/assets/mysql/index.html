@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>Web MySQL · 沐柠环境盒</title>
+  <link rel="stylesheet" href="/styles.css?v=19"/>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <img class="brand-logo" src="/logo.png" alt="沐柠环境盒"/>
+    <span class="brand-text">Web MySQL</span>
+  </div>
+  <span id="conn-badge" class="conn-badge">连接中…</span>
+  <button id="btn-refresh" class="btn ghost" type="button">刷新</button>
+</header>
+
+<main class="layout">
+  <aside class="sidebar">
+    <div class="side-head">
+      <span>数据库</span>
+      <button id="btn-db-refresh" class="icon-btn" type="button" title="刷新数据库列表">↻</button>
+    </div>
+
+    <div class="db-picker">
+      <button id="db-trigger" class="db-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" title="选择数据库（在库名上点右键可删除、新建）">
+        <span id="db-current" class="db-current">—</span>
+        <span class="db-caret" aria-hidden="true">▾</span>
+      </button>
+      <div id="db-pop" class="db-pop hidden" role="listbox" aria-label="数据库列表">
+        <div class="db-pop-head">
+          <span>数据库</span>
+          <button id="btn-db-new" class="btn ghost small" type="button">+ 新建</button>
+        </div>
+        <ul id="db-list" class="db-list"></ul>
+      </div>
+    </div>
+
+    <div class="side-search">
+      <input id="table-search" class="input" type="search" placeholder="过滤表名…" autocomplete="off"/>
+    </div>
+    <ul id="table-list" class="table-list" aria-label="数据表"></ul>
+    <div id="table-count" class="side-foot">共 0 张表</div>
+  </aside>
+
+  <section class="content">
+    <div class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="data" role="tab" type="button">数据</button>
+      <button class="tab" data-tab="structure" role="tab" type="button">结构</button>
+      <button class="tab" data-tab="sql" role="tab" type="button">SQL 查询</button>
+      <span id="current-table" class="current-table"></span>
+    </div>
+
+    <div class="panel" id="panel-data">
+      <div class="toolbar">
+        <input id="where-input" class="input grow" type="text" placeholder="WHERE 条件（可选），例如 id > 10 AND name LIKE 'a%'" autocomplete="off"/>
+        <button id="btn-apply" class="btn" type="button">应用</button>
+        <button id="btn-reset" class="btn ghost" type="button">重置</button>
+        <select id="page-size" class="select compact" aria-label="每页条数">
+          <option value="50">50 行</option>
+          <option value="100">100 行</option>
+          <option value="300">300 行</option>
+        </select>
+        <button id="btn-data-refresh" class="btn ghost" type="button">刷新</button>
+        <button id="btn-export" class="btn ghost" type="button">导出</button>
+      </div>
+      <div class="edit-bar">
+        <button id="btn-add-row" class="btn small" type="button">新增行</button>
+        <button id="btn-save-edits" class="btn primary small" type="button" disabled>保存修改</button>
+        <button id="btn-undo" class="btn ghost small" type="button" disabled>撤销</button>
+        <span id="edit-hint" class="edit-hint">双击单元格可修改</span>
+      </div>
+      <div class="grid-wrap">
+        <table id="grid" class="grid"></table>
+      </div>
+      <div class="pager">
+        <button id="btn-prev" class="btn ghost" type="button">‹ 上一页</button>
+        <span id="page-info" class="page-info">—</span>
+        <button id="btn-next" class="btn ghost" type="button">下一页 ›</button>
+        <span id="row-count" class="row-count"></span>
+      </div>
+    </div>
+
+    <div class="panel hidden" id="panel-structure">
+      <h2 class="section-title">字段</h2>
+      <div class="grid-wrap">
+        <table id="col-table" class="grid"></table>
+      </div>
+      <h2 class="section-title">索引</h2>
+      <div class="grid-wrap">
+        <table id="idx-table" class="grid"></table>
+      </div>
+      <div class="ddl-head">
+        <h2 class="section-title">建表语句</h2>
+        <button id="btn-copy-ddl" class="btn ghost small" type="button">复制</button>
+      </div>
+      <pre id="ddl" class="ddl"></pre>
+    </div>
+
+    <div class="panel hidden" id="panel-sql">
+      <div class="sql-head">
+        <span class="sql-hint">支持多条语句，Ctrl / ⌘ + Enter 执行</span>
+        <button id="btn-import-sql" class="btn ghost small" type="button">导入 .sql</button>
+        <button id="btn-sql-clear" class="btn ghost small" type="button">清空</button>
+        <button id="btn-sql-run" class="btn primary small" type="button">执行</button>
+      </div>
+      <div class="sql-editor">
+        <pre id="sql-highlight" class="sql-highlight" aria-hidden="true"></pre>
+        <textarea id="sql-input" class="sql-input" spellcheck="false" placeholder="SELECT * FROM users LIMIT 20;  -- 也可以用 INSERT / UPDATE / DDL"></textarea>
+      </div>
+      <div id="sql-status" class="sql-status"></div>
+      <div id="import-bar" class="import-bar hidden">
+        <span id="import-file" class="import-file">—</span>
+        <div class="import-progress"><div id="import-progress-fill" class="import-progress-fill"></div></div>
+        <span id="import-progress-text" class="import-progress-text">准备中…</span>
+        <button id="btn-import-cancel" class="btn ghost small" type="button">取消</button>
+      </div>
+      <div id="import-report" class="import-report hidden"></div>
+      <div id="sql-results" class="sql-results"></div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<div id="db-ctx" class="ctx-menu hidden" role="menu">
+  <button class="ctx-item" data-act="open" type="button">打开这个库</button>
+  <button class="ctx-item" data-act="copy" type="button">复制库名</button>
+  <button class="ctx-item" data-act="reload" type="button">刷新库列表</button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" data-act="create" type="button">新建数据库…</button>
+  <button class="ctx-item danger" data-act="drop" type="button">删除这个库…</button>
+</div>
+
+<div id="db-modal" class="modal-mask hidden" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 id="db-modal-title" class="modal-title">新建数据库</h3>
+    <div class="field">
+      <label class="field-label" for="db-modal-name">库名</label>
+      <input id="db-modal-name" class="input mono" type="text" autocomplete="off" spellcheck="false" placeholder="例如 muling_demo"/>
+    </div>
+    <div class="field" id="db-modal-charset-field">
+      <label class="field-label" for="db-modal-charset">字符集</label>
+      <select id="db-modal-charset" class="select">
+        <option value="utf8mb4">utf8mb4（推荐）</option>
+        <option value="utf8">utf8</option>
+        <option value="gbk">gbk</option>
+        <option value="latin1">latin1</option>
+      </select>
+    </div>
+    <p id="db-modal-hint" class="modal-hint hidden"></p>
+    <div class="modal-actions">
+      <button id="btn-db-modal-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-db-modal-ok" class="btn primary" type="button">创建</button>
+    </div>
+  </div>
+</div>
+
+<div id="tbl-ctx" class="ctx-menu hidden" role="menu">
+  <button class="ctx-item" data-act="open" type="button">打开这个表</button>
+  <button class="ctx-item" data-act="structure" type="button">查看表结构</button>
+  <button class="ctx-item" data-act="copy" type="button">复制表名</button>
+  <button class="ctx-item" data-act="copy-ddl" type="button">复制建表语句</button>
+  <button class="ctx-item" data-act="export" type="button">导出数据…</button>
+  <button class="ctx-item" data-act="reload" type="button">刷新表列表</button>
+  <div class="ctx-sep"></div>
+  <button class="ctx-item" data-act="rename" type="button">重命名表…</button>
+  <button class="ctx-item danger" data-act="truncate" type="button">清空数据…</button>
+  <button class="ctx-item danger" data-act="drop" type="button">删除这个表…</button>
+</div>
+
+<div id="tbl-modal" class="modal-mask hidden" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 id="tbl-modal-title" class="modal-title">重命名表</h3>
+    <div class="field">
+      <label class="field-label" for="tbl-modal-name" id="tbl-modal-label">新表名</label>
+      <input id="tbl-modal-name" class="input mono" type="text" autocomplete="off" spellcheck="false" placeholder="例如 orders_backup"/>
+    </div>
+    <p id="tbl-modal-hint" class="modal-hint hidden"></p>
+    <div class="modal-actions">
+      <button id="btn-tbl-modal-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-tbl-modal-ok" class="btn primary" type="button">确定</button>
+    </div>
+  </div>
+</div>
+
+<div id="export-modal" class="modal-mask hidden" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 class="modal-title">导出数据</h3>
+    <p id="export-subject" class="modal-hint hint-info">导出当前表的数据</p>
+    <div class="field">
+      <span class="field-label">格式</span>
+      <div class="fmt-row" id="export-formats">
+        <button class="fmt-chip is-active" type="button" data-fmt="csv">CSV</button>
+        <button class="fmt-chip" type="button" data-fmt="sql">SQL</button>
+        <button class="fmt-chip" type="button" data-fmt="json">JSON</button>
+      </div>
+    </div>
+    <div class="field">
+      <label class="field-label" for="export-scope">范围</label>
+      <select id="export-scope" class="select">
+        <option value="all">全部匹配行（最多 50000 行）</option>
+        <option value="page">当前页（50 行）</option>
+      </select>
+    </div>
+    <p id="export-hint" class="modal-hint hint-info">会带上当前的 WHERE 条件和排序。</p>
+    <div class="modal-actions">
+      <button id="btn-export-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-export-ok" class="btn primary" type="button">导出</button>
+    </div>
+  </div>
+</div>
+
+<div id="row-modal" class="modal-mask hidden" role="dialog" aria-modal="true">  <div class="modal wide">
+    <h3 class="modal-title">新增一行</h3>
+    <p class="modal-hint">只填需要的字段，留空表示 NULL；自增主键可以跳过。</p>
+    <div id="row-fields" class="row-fields"></div>
+    <div class="modal-actions">
+      <button id="btn-row-modal-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-row-modal-ok" class="btn primary" type="button">插入</button>
+    </div>
+  </div>
+</div>
+
+<div id="import-modal" class="modal-mask hidden" role="dialog" aria-modal="true">
+  <div class="modal">
+    <h3 class="modal-title">导入 SQL 脚本</h3>
+    <p id="import-subject" class="modal-hint hint-info">把脚本导入到当前库</p>
+    <div class="field">
+      <span class="field-label">文件</span>
+      <p id="import-file-meta" class="import-file-meta">尚未选择文件</p>
+    </div>
+    <div class="field">
+      <span class="field-label">文件编码</span>
+      <select id="import-charset" class="select">
+        <option value="utf-8" selected>UTF-8（默认）</option>
+        <option value="gbk">GBK / GB18030</option>
+      </select>
+    </div>
+    <label class="check-row"><input id="import-continue" type="checkbox"/> 遇错继续执行（默认遇错即停）</label>
+    <div id="import-confirm-wrap" class="field hidden">
+      <span class="field-label">确认目标库</span>
+      <input id="import-confirm" class="input mono" type="text" autocomplete="off" spellcheck="false"/>
+    </div>
+    <p id="import-hint" class="modal-hint hint-info">脚本里的 DELIMITER、USE、SET 会按原顺序执行；导入不可回滚。</p>
+    <div class="modal-actions">
+      <button id="btn-import-modal-cancel" class="btn ghost" type="button">取消</button>
+      <button id="btn-import-start" class="btn primary" type="button">开始导入</button>
+    </div>
+  </div>
+</div>
+<input id="import-file-input" type="file" accept=".sql,text/plain" class="hidden"/>
+
+<script src="/app.js?v=19"></script>
+</body>
+</html>
