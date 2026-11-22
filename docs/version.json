@@ -1,6 +1,6 @@
 {
   "version": "2.2.0",
   "notes": "新增插件中心：MCP 控制中枢、浏览器里的 Web MySQL 与 Web Redis，装上即用；两个数据库控制台换成蓝白 / 红白亮色风格。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.2.0-release/MulingEnvBox-Setup-2.2.0.exe",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.2.0/MulingEnvBox-Setup-2.2.0.exe",
   "publishedAt": "2026-11-21"
 }
