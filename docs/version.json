@@ -1,6 +1,6 @@
 {
-  "version": "2.2.0",
-  "notes": "新增插件中心：MCP 控制中枢、浏览器里的 Web MySQL 与 Web Redis，装上即用；两个数据库控制台换成蓝白 / 红白亮色风格。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.2.0/MulingEnvBox-Setup-2.2.0.exe",
-  "publishedAt": "2026-11-21"
+  "version": "2.3.0",
+  "notes": "新增端口进程核查器插件：实时看到谁占着端口、一键结束进程；启动页改为亮色企业风并显示真实启动步骤；仪表盘头像优先使用 Windows 账户头像；Web MySQL / Web Redis 数据源改回可手填端口与密码。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.3.0/MulingEnvBox-Setup-2.3.0.exe",
+  "publishedAt": "2026-11-22"
 }
