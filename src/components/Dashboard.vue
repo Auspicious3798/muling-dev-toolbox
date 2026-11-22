@@ -9,7 +9,7 @@
       </div>
       <div class="welcome-section">
         <div class="welcome-lemon">
-          <img src="/art/xiaoning-portrait-disc.png" alt="小柠"/>
+          <img :src="avatarSrc" alt="用户头像" @error="onAvatarError"/>
         </div>
         <div class="welcome-text">
           <h1>{{ greeting }}，{{ username }}</h1>
@@ -174,6 +174,7 @@ export default {
   data() {
     return {
       username: '',
+      avatarSrc: '/art/xiaoning-portrait-disc.png',
       currentDate: '',
       cpuUsage: 0,
       memoryUsage: 0,
@@ -258,6 +259,22 @@ export default {
         try { this.username = await window.electronAPI.getUsername(); }
         catch (err) { this.username = '用户'; }
       } else { this.username = '用户'; }
+      this.loadUserAvatar();
+    },
+    onAvatarError() {
+      if (this.avatarSrc !== '/art/xiaoning-portrait-disc.png') {
+        this.avatarSrc = '/art/xiaoning-portrait-disc.png';
+      }
+    },
+    async loadUserAvatar() {      if (!window.electronAPI || !window.electronAPI.getUserAvatar) return;
+      try {
+        const result = await window.electronAPI.getUserAvatar();
+        if (result && result.ok && result.dataUrl) {
+          this.avatarSrc = result.dataUrl;
+        }
+      } catch (err) {
+        // 读取失败就保持小柠默认头像
+      }
     },
     updateDateTime() {
       const now = new Date();

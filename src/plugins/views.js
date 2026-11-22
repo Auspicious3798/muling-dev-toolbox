@@ -9,11 +9,13 @@
 import McpControlCenter from '@/components/plugins/McpControlCenter.vue';
 import WebMysqlPlugin from '@/components/plugins/WebMysqlPlugin.vue';
 import WebRedisPlugin from '@/components/plugins/WebRedisPlugin.vue';
+import PortManager from '@/components/plugins/PortManager.vue';
 
 export const PLUGIN_VIEWS = {
   'mcp-control': McpControlCenter,
   'web-mysql': WebMysqlPlugin,
-  'web-redis': WebRedisPlugin
+  'web-redis': WebRedisPlugin,
+  'port-manager': PortManager
 };
 
 /** 取插件视图组件，没注册返回 null。 */

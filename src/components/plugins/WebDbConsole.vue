@@ -38,7 +38,7 @@
             <span v-if="running" class="wdb-tip">运行中改端口需重启 Web 服务</span>
           </div>
           <div class="wdb-actions">
-            <button v-if="!running" class="wdb-btn primary" type="button" :disabled="busy || !dbReady" @click="start">
+            <button v-if="!running" class="wdb-btn primary" type="button" :disabled="busy" @click="start">
               {{ busy ? '正在启动…' : '启动 Web 服务' }}
             </button>
             <button v-else class="wdb-btn danger" type="button" :disabled="busy" @click="stop">
@@ -57,25 +57,37 @@
             <span class="wdb-chip" :class="{ 'is-idle': !versions.length }">{{ boundLabel }}</span>
           </div>
           <div class="wdb-row">
-            <span class="wdb-label">绑定实例</span>
-            <select
-              v-model="version"
-              class="wdb-select"
-              :disabled="busy || running || !versions.length"
-              @change="onVersionChange"
-            >
+            <span class="wdb-label">版本</span>
+            <select v-model="version" class="wdb-select" :disabled="running" @change="onVersionChange">
+              <option value="">不指定版本</option>
               <option v-for="item in versions" :key="item" :value="item">{{ meta.label }} {{ item }}</option>
             </select>
-            <span class="wdb-tip">仅限环境盒接管/安装的实例</span>
+            <span class="wdb-tip">选一个版本会带出环境盒里记录的端口和密码</span>
           </div>
           <div class="wdb-row">
             <span class="wdb-label">连接端口</span>
-            <code class="wdb-value ro">{{ dbPort || '读取中…' }}</code>
+            <input
+              v-model.number="dbDraft"
+              class="wdb-input short"
+              type="number"
+              min="1"
+              max="65535"
+              :disabled="running"
+              :placeholder="kind === 'mysql' ? '3306' : '6379'"
+            />
+            <span class="wdb-tip">只连 127.0.0.1</span>
           </div>
           <div class="wdb-row">
             <span class="wdb-label">{{ meta.passwordLabel }}</span>
-            <code class="wdb-value ro">{{ passwordText }}</code>
-            <button class="wdb-mini" type="button" :disabled="!passwordLoaded || !password" @click="showPassword = !showPassword">
+            <input
+              v-model="password"
+              class="wdb-input mono"
+              :type="showPassword ? 'text' : 'password'"
+              :disabled="running"
+              :placeholder="meta.passwordPlaceholder"
+              autocomplete="new-password"
+            />
+            <button class="wdb-mini" type="button" @click="showPassword = !showPassword">
               {{ showPassword ? '隐藏' : '显示' }}
             </button>
           </div>
@@ -90,12 +102,11 @@
               @click="startDbService"
             >启动 {{ meta.label }}</button>
           </div>
-          <p v-if="!versions.length" class="wdb-warn">
-            环境盒里还没有接管的 {{ meta.label }} 实例。先去左侧「{{ meta.label }}」页面安装或接管一个版本，再回来绑定。
+          <p v-if="running" class="wdb-hint">
+            运行中：要先在「Web 服务」里停止，才能改端口和密码。
           </p>
           <p v-else class="wdb-hint">
-            端口和密码都直接读环境盒里这个实例的配置，不需要手填；要连别的库，请先在左侧把它接管进来。
-            <template v-if="running">切换实例需先停止 Web 服务。</template>
+            端口和密码默认读环境盒里这个版本的配置，也可以直接改成别的实例；启动成功后会自动记住。
           </p>
         </section>
 
@@ -122,28 +133,30 @@ const KIND_META = {
     title: 'Web MySQL',
     subtitle: '浏览器里的 MySQL 管理台：库、表结构、数据浏览和 SQL 控制台',
     passwordLabel: 'root 密码',
+    passwordPlaceholder: 'root 的密码，没有就留空',
     steps: [
       '先在左侧「MySQL」页面装好或接管一个版本，需要时启动 MySQL 服务。',
-      '回到这里在「数据源」里绑定这个实例，端口和密码由环境盒自动读取。',
+      '回到这里选版本（会带出环境盒里记录的端口和密码），也可以直接手填端口和密码。',
       '点「启动 Web 服务」，环境盒会在本机 127.0.0.1 上开一个带令牌的管理台。',
       '点「打开」会拉起默认浏览器，可以像 Navicat 一样浏览表、筛选数据、执行 SQL。',
       '关掉环境盒或点「停止 Web 服务」，管理台立即失效。'
     ],
-    note: '只能绑定环境盒接管或安装的 MySQL 实例；端口和 root 密码直接读环境盒配置，不需要手填。令牌每次启动都会更换。'
+    note: '默认读取环境盒里这个版本的端口和密码，也可以改成任意实例；只连 127.0.0.1，令牌每次启动都会更换。'
   },
   redis: {
     label: 'Redis',
     title: 'Web Redis',
     subtitle: '浏览器里的 Redis 工作台：键浏览、各类型编辑、TTL、命令行',
     passwordLabel: '访问密码',
+    passwordPlaceholder: 'requirepass，没有就留空',
     steps: [
       '先在左侧「Redis」页面装好或接管一个版本，需要时启动 Redis 服务。',
-      '回到这里在「数据源」里绑定这个实例，端口和 requirepass 由环境盒自动读取。',
+      '回到这里选版本（会带出环境盒里记录的端口和 requirepass），也可以直接手填。',
       '点「启动 Web 服务」，环境盒会在本机 127.0.0.1 上开一个带令牌的工作台。',
       '点「打开」拉起浏览器，可以按模式扫键、查看并编辑 string/hash/list/set/zset、调整 TTL。',
       '「命令行」页可以直接执行 Redis 命令，比如 GET、KEYS、INFO。'
     ],
-    note: '只能绑定环境盒接管或安装的 Redis 实例；端口和密码直接读环境盒配置，不需要手填。所有请求都走 127.0.0.1。'
+    note: '默认读取环境盒里这个版本的端口和密码，也可以改成任意实例；所有请求都走 127.0.0.1。'
   }
 };
 
@@ -160,6 +173,7 @@ export default {
       versions: [],
       version: '',
       dbPort: 0,
+      dbDraft: this.kind === 'mysql' ? 3306 : 6379,
       password: '',
       passwordLoaded: false,
       showPassword: false,
@@ -183,9 +197,6 @@ export default {
     serverVersion() {
       return (this.status && this.status.serverVersion) || '';
     },
-    hasPassword() {
-      return this.passwordLoaded && Boolean(this.password);
-    },
     serviceText() {
       if (!this.versions.length) return '未安装';
       if (this.serviceStatus === 'running') return '运行中';
@@ -198,18 +209,8 @@ export default {
       return '';
     },
     boundLabel() {
-      if (!this.versions.length) return '未绑定实例';
-      if (!this.version) return '待选择实例';
+      if (!this.version) return '手动填写';
       return this.meta.label + ' ' + this.version;
-    },
-    passwordText() {
-      if (!this.passwordLoaded) return '读取中…';
-      if (!this.password) return '（空密码）';
-      if (this.showPassword) return this.password;
-      return '••••••••';
-    },
-    dbReady() {
-      return Boolean(this.version) && this.versions.length > 0;
     }
   },
   mounted() {
@@ -277,51 +278,62 @@ export default {
       this.loadInstanceInfo();
     },
     async loadInstanceInfo() {
-      if (!this.version) return;
       const api = window.electronAPI;
+      const fallbackPort = this.kind === 'mysql' ? 3306 : 6379;
       try {
-        const config = this.kind === 'mysql'
-          ? await api.getMySQLConfig(this.version)
-          : await api.getRedisConfig(this.version);
-        if (config && config.success) this.dbPort = Number(config.port) || 0;
+        const config = this.version
+          ? (this.kind === 'mysql' ? await api.getMySQLConfig(this.version) : await api.getRedisConfig(this.version))
+          : null;
+        this.dbPort = config && config.success ? (Number(config.port) || 0) : 0;
       } catch (err) {
         this.dbPort = 0;
       }
+      this.dbDraft = this.dbPort || fallbackPort;
       this.passwordLoaded = false;
       this.password = '';
       try {
-        const secret = this.kind === 'mysql'
-          ? await api.getMySQLPassword(this.version)
-          : await api.getRedisPassword(this.version);
+        const secret = this.version
+          ? (this.kind === 'mysql' ? await api.getMySQLPassword(this.version) : await api.getRedisPassword(this.version))
+          : null;
         this.password = secret && secret.success ? (secret.password || '') : '';
       } catch (err) {
         this.password = '';
-      } finally {
-        this.passwordLoaded = true;
       }
+      if (this.version && typeof api.webdbGetConn === 'function') {
+        try {
+          const saved = await api.webdbGetConn(this.kind);
+          if (saved && saved.ok && saved.conn && saved.conn.version === this.version) {
+            if (Number(saved.conn.port) > 0) this.dbDraft = Number(saved.conn.port);
+            if (saved.conn.password != null) this.password = String(saved.conn.password);
+          }
+        } catch (err) {
+          // 没有历史连接就用环境盒配置
+        }
+      }
+      this.passwordLoaded = true;
       const statusFn = this.kind === 'mysql' ? api.getMySQLServiceStatus : api.getRedisServiceStatus;
-      try {
-        const result = statusFn ? await statusFn(this.version) : null;
-        this.serviceStatus = result && result.success ? result.status : 'unknown';
-      } catch (err) {
+      if (this.version && statusFn) {
+        try {
+          const result = await statusFn(this.version);
+          this.serviceStatus = result && result.success ? result.status : 'unknown';
+        } catch (err) {
+          this.serviceStatus = 'unknown';
+        }
+      } else {
         this.serviceStatus = 'unknown';
       }
     },
     async start() {
-      if (!this.version) {
-        this.note('先绑定一个 ' + this.meta.label + ' 实例', true);
-        return;
-      }
       this.busy = true;
       this.note('');
       try {
         const conn = {
           host: '127.0.0.1',
-          port: Number(this.dbPort) || (this.kind === 'mysql' ? 3306 : 6379),
+          port: Number(this.dbDraft) || (this.kind === 'mysql' ? 3306 : 6379),
           password: this.password,
           user: this.kind === 'mysql' ? 'root' : '',
           db: 0,
-          version: this.version
+          version: this.version || ''
         };
         const result = await window.electronAPI.webdbStart({
           kind: this.kind,
@@ -333,9 +345,8 @@ export default {
           await this.refreshStatus();
         } else {
           const raw = (result && result.message) || '启动失败';
-          const hint = /access denied|authentication failed|invalid password|WRONGPASS/i.test(raw)
-            ? '。端口和密码读取自环境盒，确认这个实例的密码是否与配置一致，或换一个已接管的实例'
-            : '';
+          const denied = /access denied|authentication failed|invalid password|WRONGPASS/i.test(raw);
+          const hint = denied ? '。可以在「数据源」里改一下端口和密码再试' : '';
           this.note(raw + hint, true);
         }
       } catch (err) {
@@ -447,8 +458,6 @@ export default {
 .wdb-row { display: flex; align-items: center; gap: 8px; min-height: 28px; flex-wrap: wrap; }
 .wdb-label { width: 66px; flex-shrink: 0; font-size: 12px; color: var(--text-muted); }
 .wdb-value { flex: 1; min-width: 0; padding: 4px 8px; border-radius: var(--radius-sm); background: var(--bg-secondary); border: 1px solid var(--border-light); font-family: var(--font-mono); font-size: 11.5px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wdb-value.mono { flex: 0 1 auto; letter-spacing: 0.04em; }
-.wdb-value.ro { flex: 1; background: transparent; border-style: dashed; color: var(--text-secondary); cursor: default; }
 .wdb-input, .wdb-select { width: 120px; padding: 4px 8px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); background: var(--bg-input); color: var(--text-primary); font-size: 12px; }
 .wdb-input.short { width: 96px; }
 .wdb-input.mono { flex: 1 1 160px; min-width: 120px; width: auto; font-family: var(--font-mono); letter-spacing: 0.04em; }
@@ -468,6 +477,9 @@ export default {
 .wdb-btn.primary:hover:not(:disabled) { background: var(--primary-hover); color: var(--text-inverse); }
 .wdb-btn.danger { color: var(--danger-text); border-color: var(--danger-border); background: var(--danger-bg); }
 .wdb-btn.danger:hover:not(:disabled) { color: var(--danger-text); border-color: var(--danger); }
+.wdb-btn.small { padding: 4px 10px; font-size: 11.5px; }
+.wdb-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--primary); font-size: 11.5px; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+.wdb-link:hover { color: var(--primary-hover); }
 
 .wdb-hint { margin: 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.6; }
 .wdb-tip { font-size: 11.5px; color: var(--text-muted); }

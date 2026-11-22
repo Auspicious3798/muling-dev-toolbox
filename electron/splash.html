@@ -15,214 +15,361 @@
             font-family: "Inter", "HarmonyOS Sans SC", "Microsoft YaHei", system-ui, sans-serif;
             -webkit-app-region: drag;
             user-select: none;
+            color: #0f172a;
         }
 
-        .splash {
-            position: relative;
+        .stage {
             width: 100%;
             height: 100%;
             display: grid;
             place-items: center;
-        }
-
-        .glow {
-            position: absolute;
-            width: 320px;
-            height: 320px;
-            border-radius: 50%;
-            background: radial-gradient(circle, rgba(20, 184, 166, 0.36) 0%, rgba(20, 184, 166, 0.12) 42%, rgba(20, 184, 166, 0) 70%);
-            filter: blur(6px);
-            animation: breathe 3.6s ease-in-out infinite;
+            padding: 14px;
         }
 
         .card {
-            position: relative;
-            width: 366px;
-            padding: 26px 26px 22px;
-            border-radius: 22px;
-            background: linear-gradient(160deg, rgba(30, 41, 59, 0.86) 0%, rgba(11, 17, 32, 0.9) 62%, rgba(11, 17, 32, 0.94) 100%);
-            border: 1px solid rgba(255, 255, 255, 0.14);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            padding: 20px 22px 16px;
+            border-radius: 18px;
+            background: #ffffff;
+            border: 1px solid #e6ebf2;
             box-shadow:
-                0 26px 56px rgba(2, 6, 23, 0.62),
-                inset 0 1px 0 rgba(255, 255, 255, 0.16);
-            overflow: hidden;
+                0 18px 44px rgba(15, 23, 42, 0.14),
+                0 2px 6px rgba(15, 23, 42, 0.06);
+            animation: enter 240ms ease-out both;
         }
 
-        .card::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            background: radial-gradient(120% 90% at 50% -20%, rgba(94, 234, 212, 0.16), transparent 62%);
-            pointer-events: none;
+        .head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
 
-        .lemon-wrap {
-            position: relative;
-            width: 84px;
-            height: 84px;
-            margin: 0 auto 14px;
-            display: grid;
-            place-items: center;
-        }
-
-        .lemon-wrap::after {
-            content: "";
-            position: absolute;
-            inset: -8px;
-            border-radius: 26px;
-            background: radial-gradient(circle, rgba(251, 191, 36, 0.34), transparent 68%);
-            animation: pulse 2.6s ease-in-out infinite;
-        }
-
-        .lemon-wrap img {
-            position: relative;
-            width: 96px;
-            height: 96px;
-            display: block;
-            border-radius: 24px;
+        .mark {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
             object-fit: cover;
-            animation: float 3.2s ease-in-out infinite;
-            filter: drop-shadow(0 12px 24px rgba(2, 6, 23, 0.5));
+            background: #f1f5f9;
+            flex: none;
         }
 
-        .brand {
-            text-align: center;
-            font-size: 1.02rem;
-            font-weight: 700;
-            letter-spacing: 0.4px;
-            color: #f8fafc;
+        .titles { min-width: 0; flex: 1; }
+
+        .name {
+            font-size: 14.5px;
+            font-weight: 600;
+            letter-spacing: 0.2px;
+            color: #0f172a;
+            white-space: nowrap;
         }
 
-        .brand span {
-            color: #5eead4;
+        .kicker {
+            margin-top: 2px;
+            font-size: 9.5px;
+            font-weight: 600;
+            letter-spacing: 1.4px;
+            color: #94a3b8;
+            text-transform: uppercase;
+        }
+
+        .version {
+            flex: none;
+            padding: 3px 8px;
+            border-radius: 999px;
+            border: 1px solid #e6ebf2;
+            background: #f8fafc;
+            color: #64748b;
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .divider {
+            height: 1px;
+            margin: 14px 0 12px;
+            background: #eef2f6;
         }
 
         .hint {
-            margin-top: 6px;
-            text-align: center;
-            font-size: 0.78rem;
-            color: rgba(203, 213, 225, 0.82);
-            min-height: 18px;
-            transition: opacity 220ms ease;
+            font-size: 12px;
+            line-height: 1.6;
+            color: #64748b;
+            min-height: 19px;
+            transition: opacity 200ms ease;
         }
 
-        .hint.fade {
-            opacity: 0;
+        .hint.fade { opacity: 0; }
+
+        .steps {
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
         }
 
-        .track {
-            position: relative;
-            margin-top: 18px;
-            height: 2px;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, 0.18);
-            overflow: hidden;
-        }
-
-        .track::after {
-            content: "";
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 42%;
-            height: 100%;
-            border-radius: 999px;
-            background: linear-gradient(90deg, rgba(20, 184, 166, 0) 0%, #2dd4bf 42%, #5eead4 62%, rgba(20, 184, 166, 0) 100%);
-            animation: slide 1.7s cubic-bezier(0.65, 0, 0.35, 1) infinite;
-        }
-
-        .foot {
-            margin-top: 12px;
+        .step {
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 6px;
-            font-size: 0.68rem;
-            letter-spacing: 0.6px;
-            color: rgba(148, 163, 184, 0.72);
+            gap: 9px;
+            font-size: 12px;
+            color: #94a3b8;
         }
 
-        .dot {
+        .step .bullet {
+            flex: none;
+            width: 13px;
+            height: 13px;
+            border-radius: 50%;
+            border: 1.5px solid #dbe3ec;
+            display: grid;
+            place-items: center;
+            transition: border-color 200ms ease, background 200ms ease;
+        }
+
+        .step .bullet::after {
+            content: "";
             width: 4px;
             height: 4px;
             border-radius: 50%;
-            background: rgba(94, 234, 212, 0.9);
-            animation: blink 1.4s ease-in-out infinite;
+            background: transparent;
+            transition: background 200ms ease;
         }
 
-        .dot:nth-child(2) { animation-delay: 0.2s; }
-        .dot:nth-child(3) { animation-delay: 0.4s; }
+        .step .label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-        @keyframes slide {
-            0% { transform: translateX(-120%); }
-            100% { transform: translateX(260%); }
+        .step .state {
+            font-size: 10.5px;
+            color: #cbd5e1;
+            font-variant-numeric: tabular-nums;
         }
 
-        @keyframes breathe {
-            0%, 100% { transform: scale(0.92); opacity: 0.72; }
-            50% { transform: scale(1.06); opacity: 1; }
+        .step.is-now { color: #0f766e; }
+
+        .step.is-now .bullet {
+            border-color: #0d9488;
+            background: #ecfdf5;
         }
 
-        @keyframes pulse {
-            0%, 100% { transform: scale(0.94); opacity: 0.55; }
-            50% { transform: scale(1.1); opacity: 0.9; }
+        .step.is-now .bullet::after { background: #0d9488; }
+
+        .step.is-now .state { color: #0d9488; }
+
+        .step.is-done { color: #475569; }
+
+        .step.is-done .bullet {
+            border-color: #0d9488;
+            background: #0d9488;
         }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0) rotate(-2deg); }
-            50% { transform: translateY(-5px) rotate(2deg); }
+        .step.is-done .bullet::after {
+            width: 7px;
+            height: 4px;
+            border-radius: 0;
+            background: transparent;
+            border-left: 1.5px solid #fff;
+            border-bottom: 1.5px solid #fff;
+            transform: rotate(-45deg) translate(0.5px, -0.5px);
         }
 
-        @keyframes blink {
-            0%, 100% { opacity: 0.25; }
-            50% { opacity: 1; }
+        .step.is-done .state { color: #94a3b8; }
+
+        .spacer { flex: 1; min-height: 10px; }
+
+        .progress {
+            position: relative;
+            height: 4px;
+            border-radius: 999px;
+            background: #eef2f6;
+            overflow: hidden;
+        }
+
+        .progress .fill {
+            position: absolute;
+            inset: 0;
+            width: 8%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #0d9488, #14b8a6);
+            transition: width 420ms cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .progress .shine {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 34%;
+            background: linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.55) 50%, rgba(255, 255, 255, 0) 100%);
+            animation: shine 1.8s linear infinite;
+            opacity: 0.85;
+        }
+
+        .foot {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            font-size: 10.5px;
+            color: #94a3b8;
+        }
+
+        .foot .left {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+
+        .foot .left span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+        .pulse {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #14b8a6;
+            flex: none;
+            animation: beat 1.6s ease-in-out infinite;
+        }
+
+        .card.is-error { border-color: #fecaca; }
+
+        .card.is-error .hint { color: #b42318; }
+
+        .card.is-error .progress .fill { background: #d92d20; }
+
+        .card.is-error .progress .shine { display: none; }
+
+        .card.is-error .pulse { background: #d92d20; animation: none; }
+
+        @keyframes enter {
+            from { opacity: 0; transform: scale(0.985) translateY(4px); }
+            to { opacity: 1; transform: none; }
+        }
+
+        @keyframes shine {
+            from { transform: translateX(-120%); }
+            to { transform: translateX(360%); }
+        }
+
+        @keyframes beat {
+            0%, 100% { opacity: 0.35; transform: scale(0.9); }
+            50% { opacity: 1; transform: scale(1.05); }
         }
 
         @media (prefers-reduced-motion: reduce) {
-            .glow, .lemon-wrap::after, .lemon-wrap svg, .track::after, .dot {
-                animation: none;
-            }
+            .progress .shine, .pulse { animation: none; }
+            .card { animation: none; }
         }
     </style>
 </head>
 <body>
-<div class="splash">
-    <div class="glow"></div>
-    <div class="card">
-        <div class="lemon-wrap">
-            <img src="assets/xiaoning-portrait.png" alt="小柠"/>
+<div class="stage">
+    <div class="card" id="card">
+        <div class="head">
+            <img class="mark" src="assets/brand-128.png" alt="沐柠环境盒"/>
+            <div class="titles">
+                <div class="name">沐柠环境盒</div>
+                <div class="kicker">DEV TOOLBOX</div>
+            </div>
+            <div class="version" id="version">v—</div>
         </div>
-        <div class="brand">沐柠<span>环境盒</span></div>
-        <div class="hint" id="hint">正在为您准备沙箱环境…</div>
-        <div class="track"></div>
+        <div class="divider"></div>
+        <div class="hint" id="hint">正在准备沙箱环境</div>
+        <div class="steps" id="steps">
+            <div class="step" data-step="1">
+                <span class="bullet"></span>
+                <span class="label">检查本机运行环境</span>
+                <span class="state" data-state="1">等待</span>
+            </div>
+            <div class="step" data-step="2">
+                <span class="bullet"></span>
+                <span class="label">载入沙箱环境变量</span>
+                <span class="state" data-state="2">等待</span>
+            </div>
+            <div class="step" data-step="3">
+                <span class="bullet"></span>
+                <span class="label">打开工作台</span>
+                <span class="state" data-state="3">等待</span>
+            </div>
+        </div>
+        <div class="spacer"></div>
+        <div class="progress">
+            <div class="fill" id="fill"></div>
+            <div class="shine"></div>
+        </div>
         <div class="foot">
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span class="dot"></span>
-            <span style="margin-left:4px">小柠正在布置工作台</span>
+            <span class="left"><span class="pulse"></span><span id="foot">小柠正在布置工作台</span></span>
+            <span id="foot-version">本地沙箱</span>
         </div>
     </div>
 </div>
 <script>
     (function () {
-        const texts = [
-            '正在为您准备沙箱环境…',
-            '马上就好啦…',
-            '正在点亮小柠…',
-            '检查一下工具箱里的小家伙们…'
-        ];
-        const hint = document.getElementById('hint');
-        let index = 0;
+        const params = new URLSearchParams(location.search);
+        const appVersion = params.get('v') || '';
+        const versionEl = document.getElementById('version');
+        if (appVersion) versionEl.textContent = 'v' + appVersion;
 
-        setInterval(() => {
-            if (!hint) return;
-            hint.classList.add('fade');
-            setTimeout(() => {
-                index = (index + 1) % texts.length;
-                hint.textContent = texts[index];
-                hint.classList.remove('fade');
-            }, 220);
-        }, 1300);
+        const card = document.getElementById('card');
+        const hint = document.getElementById('hint');
+        const fill = document.getElementById('fill');
+        const foot = document.getElementById('foot');
+        const steps = Array.from(document.querySelectorAll('.step'));
+        const progressByStep = { 1: 22, 2: 58, 3: 86, 4: 100 };
+        let current = 0;
+
+        const hints = {
+            1: '正在检查本机运行环境',
+            2: '正在载入沙箱环境变量',
+            3: '正在打开工作台',
+            4: '准备完成，马上进入'
+        };
+
+        function setStep(step) {
+            current = Math.max(current, Math.min(step, 4));
+            steps.forEach((node) => {
+                const index = Number(node.dataset.step);
+                node.classList.toggle('is-done', index < current);
+                node.classList.toggle('is-now', index === current);
+                const state = node.querySelector('.state');
+                if (index < current) state.textContent = '完成';
+                else if (index === current) state.textContent = '进行中';
+                else state.textContent = '等待';
+            });
+            if (hints[current]) {
+                hint.classList.add('fade');
+                setTimeout(() => {
+                    hint.textContent = hints[current];
+                    hint.classList.remove('fade');
+                }, 160);
+            }
+            fill.style.width = (progressByStep[current] || 8) + '%';
+            if (current >= 4) foot.textContent = '准备完成';
+        }
+
+        function fail(message) {
+            card.classList.add('is-error');
+            hint.textContent = message || '启动遇到一点问题';
+            hint.classList.remove('fade');
+            fill.style.width = '100%';
+            foot.textContent = '可以关闭窗口后重试，或查看日志';
+            if (window.stopRotate) window.stopRotate();
+        }
+
+        window.__splash = { step: setStep, fail };
+
+        // 先点亮第一步；主进程没有给信号时也自己往前走，避免卡住像死机
+        setStep(1);
+
+        const fallback = setInterval(() => {
+            if (current >= 4) {
+                clearInterval(fallback);
+                return;
+            }
+            if (current < 2) setStep(2);
+            else if (current < 3) setStep(3);
+        }, 1400);
 
         window.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') event.preventDefault();

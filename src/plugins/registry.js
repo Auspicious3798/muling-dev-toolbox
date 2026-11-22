@@ -146,6 +146,39 @@ export const PLUGINS = [
     changelog: [
       { version: '1.0.0', date: '2026-11-19', notes: '首个版本：键浏览、五种类型编辑、TTL、新建与命令行。' }
     ]
+  },
+  {
+    id: 'port-manager',
+    name: '端口进程核查器',
+    subtitle: '谁占着 8080？看一眼就知道',
+    version: '1.0.0',
+    author: '沐柠官方',
+    official: true,
+    status: 'available',
+    category: 'efficiency',
+    icon: '/icons/plugin-port.svg',
+    accent: 'slate',
+    size: '18 KB',
+    updated: '2026-11-22',
+    tags: ['端口', '进程', '排障', 'netstat'],
+    integrates: ['nav', 'page'],
+    permissions: [
+      '读取本机监听中的 TCP 端口与对应进程（netstat 级别）',
+      '读取进程名、路径与内存占用',
+      '结束指定进程（taskkill /T /F，需要点两次确认）'
+    ],
+    description:
+      '开发时最烦的「端口被占用」，这里一眼看完：实时列出本机所有监听端口、占用进程、PID 和内存，环境盒接管的服务会单独标出来，旁边就能一键结束进程，不用再开 CMD 敲 netstat 查 PID。',
+    features: [
+      '实时列表：端口、进程、PID、监听地址、内存占用',
+      '自动识别环境盒接管的端口（MySQL / Redis / Nginx / Web 控制台等）',
+      '按「全部 / 环境盒相关 / 常见端口 / 其他进程」筛选，支持搜端口与进程名',
+      '4 秒自动刷新，也可以手动刷新',
+      '一键结束进程，系统进程点两次确认，环境盒自己不会被误杀'
+    ],
+    changelog: [
+      { version: '1.0.0', date: '2026-11-22', notes: '首个版本：端口扫描、进程识别、筛选与一键结束进程。' }
+    ]
   }
 ];
 

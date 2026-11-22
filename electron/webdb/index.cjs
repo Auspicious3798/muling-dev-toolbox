@@ -102,21 +102,6 @@ async function startServer(kind, conn, portOverride) {
   if (!KINDS.includes(kind)) return { ok: false, message: `未知的数据库类型：${kind}` };
   await stopServer(kind);
 
-  // 只允许绑定环境盒接管/安装的实例，避免渲染层传入任意连接信息
-  const label = kind === 'mysql' ? 'MySQL' : 'Redis';
-  if (!conn || typeof conn !== 'object' || !conn.version) {
-    return { ok: false, message: `请先绑定一个环境盒接管的 ${label} 实例` };
-  }
-  let installed = [];
-  try {
-    installed = require('../utils/sandbox.cjs').listInstalled(kind).map((item) => item.version);
-  } catch (err) {
-    installed = [];
-  }
-  if (!installed.includes(conn.version)) {
-    return { ok: false, message: `${label} ${conn.version} 不在环境盒管理范围内，请先在左侧页面安装或接管` };
-  }
-
   const config = loadConfig(currentUserDataPath);
   const port = Number(portOverride) || portOf(config, kind);
   if (!Number.isInteger(port) || port < 1024 || port > 65535) {

@@ -17,6 +17,7 @@ const registerNodejsHandlers = require('./handlers/nodejs.cjs');
 const registerNginxHandlers = require('./handlers/nginx.cjs');
 const registerMcpHandlers = require('./mcp/index.cjs');
 const { registerWebdbHandlers } = require('./webdb/index.cjs');
+const { registerPortmanHandlers } = require('./portman/index.cjs');
 const registerTerminalHandlers = require('./terminal.cjs');
 const registerIntegrityHandlers = require('./integrity.cjs');
 const registerBackupHandlers = require('./backup.cjs');
@@ -25,6 +26,7 @@ let mainWindow;
 let tray = null;
 let splashWindow = null;
 let splashShownAt = 0;
+let splashCreatedAt = 0;
 let isQuitting = false;
 let closeBehavior = 'tray';
 // 渲染档位：auto 按硬件探测，lite/full 由用户在设置里强制
@@ -62,11 +64,88 @@ function writeLaunchState(state) {
     }
 }
 
-function createSplashWindow(useTransparent = true) {
-    if (splashWindow && !splashWindow.isDestroyed()) return splashWindow;
+let userAvatarCache = null;
+let userAvatarCachedAt = 0;
+const USER_AVATAR_TTL = 5 * 60 * 1000;
+
+function readUserAvatar() {
+    const now = Date.now();
+    if (userAvatarCache && now - userAvatarCachedAt < USER_AVATAR_TTL) return userAvatarCache;
+
+    const pickMime = (file) => {
+        const ext = path.extname(file).toLowerCase();
+        if (ext === '.png') return 'image/png';
+        if (ext === '.bmp') return 'image/bmp';
+        return 'image/jpeg';
+    };
+
+    try {
+        const raw = execFileSync('whoami', ['/user', '/fo', 'csv', '/nh'], {
+            encoding: 'utf8',
+            windowsHide: true,
+            timeout: 4000,
+        });
+        const sid = String(raw).trim().split(',').pop().replace(/"/g, '').trim();
+        if (!/^S-1-5-21-[\d-]+$/.test(sid)) throw new Error(`无法解析用户 SID: ${sid}`);
+
+        const candidates = [];
+        try {
+            const out = execFileSync(
+                'powershell.exe',
+                [
+                    '-NoProfile',
+                    '-NonInteractive',
+                    '-Command',
+                    `$p=Get-ItemProperty 'HKLM:\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\AccountPicture\\Users\\${sid}' -ErrorAction SilentlyContinue; if($p){$p.Image448;$p.Image240;$p.Image192;$p.Image96}`,
+                ],
+                { encoding: 'utf8', windowsHide: true, timeout: 5000 }
+            );
+            out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).forEach((file) => candidates.push(file));
+        } catch (err) {
+            logToFile(`[Avatar] 读取注册表头像失败: ${err.message}`);
+        }
+
+        const folders = [
+            path.join('C:\\Users\\Public\\AccountPictures', sid),
+            path.join(process.env.APPDATA || '', 'Microsoft', 'Windows', 'AccountPictures'),
+        ];
+        for (const folder of folders) {
+            try {
+                fs.readdirSync(folder)
+                    .filter((name) => /\.(jpe?g|png|bmp)$/i.test(name))
+                    .forEach((name) => candidates.push(path.join(folder, name)));
+            } catch (err) {
+                // 目录不存在是常态，忽略
+            }
+        }
+
+        for (const file of candidates) {
+            try {
+                const stat = fs.statSync(file);
+                if (!stat.isFile() || stat.size < 1024 || stat.size > 8 * 1024 * 1024) continue;
+                const dataUrl = `data:${pickMime(file)};base64,${fs.readFileSync(file).toString('base64')}`;
+                userAvatarCache = { ok: true, dataUrl, path: file };
+                userAvatarCachedAt = now;
+                logToFile(`[Avatar] 使用系统头像 ${file}`);
+                return userAvatarCache;
+            } catch (err) {
+                // 换下一个候选
+            }
+        }
+        throw new Error('没有找到可用的系统头像文件');
+    } catch (err) {
+        userAvatarCache = { ok: false, reason: err.message };
+        userAvatarCachedAt = now;
+        logToFile(`[Avatar] 回退到默认头像: ${err.message}`);
+        return userAvatarCache;
+    }
+}
+
+function createSplashWindow(useTransparent = true) {    if (splashWindow && !splashWindow.isDestroyed()) return splashWindow;
+    splashCreatedAt = Date.now();
 
     splashWindow = new BrowserWindow({
-        width: 420,
+        width: 480,
         height: 300,
         frame: false,
         transparent: useTransparent,
@@ -79,7 +158,7 @@ function createSplashWindow(useTransparent = true) {
         skipTaskbar: true,
         hasShadow: false,
         show: false,
-        backgroundColor: useTransparent ? '#00000000' : '#0b1120',
+        backgroundColor: useTransparent ? '#00000000' : '#eef2f8',
         webPreferences: {
             nodeIntegration: false,
             contextIsolation: true,
@@ -89,7 +168,7 @@ function createSplashWindow(useTransparent = true) {
     });
 
     splashWindow.setAlwaysOnTop(true, 'screen-saver');
-    splashWindow.loadFile(path.join(__dirname, 'splash.html')).catch((err) => {
+    splashWindow.loadFile(path.join(__dirname, 'splash.html'), { query: { v: app.getVersion() } }).catch((err) => {
         logToFile(`[Splash] 启动页加载失败 ${err.message}`);
     });
 
@@ -115,8 +194,15 @@ function createSplashWindow(useTransparent = true) {
     return splashWindow;
 }
 
-function destroySplash() {
-    if (!splashWindow || splashWindow.isDestroyed()) {
+function splashStep(step) {
+    if (!splashWindow || splashWindow.isDestroyed()) return;
+    const value = Number(step) || 1;
+    splashWindow.webContents
+        .executeJavaScript(`window.__splash && window.__splash.step(${value})`)
+        .catch(() => {});
+}
+
+function destroySplash() {    if (!splashWindow || splashWindow.isDestroyed()) {
         splashWindow = null;
         return;
     }
@@ -554,6 +640,7 @@ function createWindow() {
     const revealWindow = () => {
         if (revealed || !mainWindow || mainWindow.isDestroyed()) return;
         revealed = true;
+        splashStep(3);
 
         if (IS_AUTOSTART) {
             destroySplash();
@@ -562,7 +649,7 @@ function createWindow() {
             return;
         }
 
-        const since = splashShownAt || Date.now();
+        const since = splashShownAt || splashCreatedAt || Date.now();
         const remain = Math.max(0, splashMinMs - (Date.now() - since));
         const finish = () => {
             fadeInMainWindow();
@@ -1152,6 +1239,9 @@ app.whenReady().then(() => {
     registerMcpHandlers(mainWindow, app.getPath('userData'));
     // 数据库 Web 客户端：Web MySQL / Web Redis
     registerWebdbHandlers(mainWindow, app.getPath('userData'));
+    // 端口进程核查器
+    registerPortmanHandlers(mainWindow, app.getPath('userData'));
+    splashStep(2);
 
     ipcMain.handle('get-system-stats', async () => {
         const os = require('os');
@@ -1187,6 +1277,8 @@ app.whenReady().then(() => {
         const os = require('os');
         return os.userInfo().username;
     });
+
+    ipcMain.handle('get-user-avatar', async () => readUserAvatar());
 
     ipcMain.handle('get-cache-size', async () => {
         const downloadDir = path.join(app.getPath('userData'), 'downloads');

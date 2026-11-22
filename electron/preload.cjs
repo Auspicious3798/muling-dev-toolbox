@@ -146,6 +146,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
     openGitHub: () => ipcRenderer.invoke('open-github'),
 
     getUsername: () => ipcRenderer.invoke('get-username'),
+    getUserAvatar: () => ipcRenderer.invoke('get-user-avatar'),
 
     listPackages: (version) => ipcRenderer.invoke('list-packages', version),
     installPackage: (version, packageName) => ipcRenderer.invoke('install-package', version, packageName),
@@ -258,11 +259,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     // 数据库 Web 客户端：Web MySQL / Web Redis
     getRedisPassword: (version) => ipcRenderer.invoke('get-redis-password', version),
     webdbStatus: () => ipcRenderer.invoke('webdb-status'),
-  webdbGetConn: (kind) => ipcRenderer.invoke('webdb-get-conn', kind),
-  webdbSetConn: (kind, conn) => ipcRenderer.invoke('webdb-set-conn', kind, conn),
+    webdbGetConn: (kind) => ipcRenderer.invoke('webdb-get-conn', kind),
+    webdbSetConn: (kind, conn) => ipcRenderer.invoke('webdb-set-conn', kind, conn),
     webdbStart: (payload) => ipcRenderer.invoke('webdb-start', payload),
     webdbStop: (kind) => ipcRenderer.invoke('webdb-stop', kind),
     webdbOpen: (kind) => ipcRenderer.invoke('webdb-open', kind),
     webdbSetPort: (kind, port) => ipcRenderer.invoke('webdb-set-port', kind, port),
     onWebdbChanged: (callback) => ipcOn('webdb-changed', callback),
+
+    portmanList: () => ipcRenderer.invoke('portman-list'),
+    portmanKill: (payload) => ipcRenderer.invoke('portman-kill', payload),
 });
