@@ -22,8 +22,8 @@ const PROBES = {
     jdk: {command: 'java', exe: 'java.exe', args: ['-version']},
     python: {command: 'python', exe: 'python.exe', args: ['--version']},
     nodejs: {command: 'node', exe: 'node.exe', args: ['--version']},
-    maven: {command: 'mvn', exe: 'mvn.cmd', args: ['-v']},
-    gradle: {command: 'gradle', exe: 'gradle.bat', args: ['-v']},
+    maven: {command: 'mvn', exe: 'mvn.cmd', args: ['-v'], needsJava: true},
+    gradle: {command: 'gradle', exe: 'gradle.bat', args: ['-v'], needsJava: true},
     uv: {command: 'uv', exe: 'uv.exe', args: ['--version']},
     mysql: {command: 'mysql', exe: 'mysql.exe', args: ['--version']},
     redis: {command: 'redis-server', exe: 'redis-server.exe', args: ['--version']},
@@ -129,11 +129,12 @@ function looksLikeEmptiedRoot(dir) {
 }
 
 /** 用 where.exe 拿到整条解析链（按 PATH 顺序） */
-function whereAll(command) {
+function whereAll(command, env) {
     const result = spawnSync(systemExe('where.exe'), [command], {
         encoding: 'utf8',
         windowsHide: true,
         timeout: 8000,
+        env: env || process.env,
     });
     if (result.status !== 0 || !result.stdout) return [];
     return result.stdout
@@ -142,19 +143,34 @@ function whereAll(command) {
         .filter(Boolean);
 }
 
-function spawnOf(exePath, args) {
+/** 给 cmd 用的参数引号（只处理需要引号的情况，避免把 -v 也包起来） */
+function quoteCmdArg(value) {
+    const text = String(value == null ? '' : value);
+    if (!text) return '""';
+    if (/[\s"&<>|^]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+    return text;
+}
+
+function spawnOf(exePath, args, env) {
     const ext = path.extname(exePath).toLowerCase();
-    if (ext === '.cmd' || ext === '.bat') {
-        return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${exePath}"`, ...args], {
-            encoding: 'utf8',
-            windowsHide: true,
-            timeout: 8000,
-        });
-    }
-    return spawnSync(exePath, args, {
+    const options = {
         encoding: 'utf8',
         windowsHide: true,
         timeout: 8000,
+        env: env || process.env,
+    };
+    if (ext === '.cmd' || ext === '.bat') {
+        // 注意：不能把「带引号的路径」当成独立 argv 传给 cmd.exe —— Node 会再转义一层，
+        // cmd 收到的是 \"C:\...\mvn.cmd\"，直接报「不是内部或外部命令」。这里自己拼
+        // 一整行并加 windowsVerbatimArguments，交给 cmd /s /c 解析。
+        const line = `""${exePath}" ${args.map(quoteCmdArg).join(' ')}"`;
+        return spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', line], {
+            ...options,
+            windowsVerbatimArguments: true,
+        });
+    }
+    return spawnSync(exePath, args, {
+        ...options,
         windowsVerbatimArguments: false,
     });
 }
@@ -162,14 +178,14 @@ function spawnOf(exePath, args) {
 /**
  * 在隐藏的后台进程里跑一次，看真实结果
  */
-function probeExecutable(exePath, args) {
+function probeExecutable(exePath, args, options = {}) {
     if (!exePath) return {verdict: 'missing', exitCode: null, stdout: '', stderr: '', detail: '找不到可执行文件'};
     if (!fs.existsSync(exePath)) {
         return {verdict: 'missing', exitCode: null, stdout: '', stderr: '', detail: `文件不存在：${exePath}`};
     }
     let result;
     try {
-        result = spawnOf(exePath, args);
+        result = spawnOf(exePath, args, options.env);
     } catch (err) {
         return {verdict: 'error', exitCode: null, stdout: '', stderr: String(err.message || err), detail: '启动失败'};
     }
@@ -201,7 +217,8 @@ function probeExecutable(exePath, args) {
         if (exitCode === 0 || /version|usage|help|apache|openjdk|python|node|uv|mysql|redis|nginx|gradle/i.test(stdout + stderr)) {
             return {verdict: 'ok', exitCode, stdout, stderr, detail: '可以正常运行'};
         }
-        return {verdict: 'error', exitCode, stdout, stderr, detail: `运行报错（退出码 ${exitCode}）`};
+        const excerpt = (stderr || stdout).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)[0] || '';
+        return {verdict: 'error', exitCode, stdout, stderr, detail: `运行报错（退出码 ${exitCode}）${excerpt ? '：' + excerpt : ''}`};
     }
     // 一个字节都没有：典型的「目录被搬空 / 只剩壳」
     return {
@@ -269,6 +286,10 @@ async function diagnoseTool(tool, paths) {
         && probe.verdict === 'crashed'
         && !oracleJavaHomeExists();
     const broken = probe.verdict === 'silent' || probe.verdict === 'error' || shimDead;
+    // mvn / gradle 的启动脚本需要 JAVA_HOME；这里探不到 JDK 只是环境问题，
+    // 不代表这条 PATH 指向的目录坏了，不能因此把它当「死路径」清理掉。
+    const javaEnvIssue = Boolean(spec.needsJava) && probe.verdict === 'error'
+        && /JAVA_HOME/i.test(probe.stderr || '');
     const state = {
         tool,
         command: spec.command,
@@ -276,7 +297,8 @@ async function diagnoseTool(tool, paths) {
         effectiveDir,
         hits,
         probe,
-        broken,
+        javaEnvIssue,
+        broken: broken && !javaEnvIssue,
         deadShim: shimDead,
         crashed: probe.verdict === 'crashed',
         // 需要摘掉的 PATH 条目：就是让命令解析到这个坏目录的那一条

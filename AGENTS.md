@@ -36,3 +36,6 @@
 - 本机 PowerShell 是 **5.1**，`Get-Content` / `Set-Content` 默认按 ANSI 处理，**禁止用来改 UTF-8 文本**（会毁掉中文）；一律用编辑工具改。
 - `npm run build` / `electron:build` 需要完整文件权限（esbuild 要起子进程）。
 - Web 控制台的静态资源带 `?v=N` 查询串，改 `electron/webdb/assets/**` 后要同步升版本号，否则浏览器会用缓存。
+- `package.json` 的 `build.compression` 固定为 `"normal"`：本机 electron-builder 自带的 32 位 `7za.exe` 在 `-mx=9`（maximum）下会崩（exit 3221225477 / C0000005），改用 normal 后稳定通过，安装包大小基本不变。
+- 注入环境变量（`setUserPath` / `setUserEnvVariable` / `setSystemPath`）写注册表后必须广播 `WM_SETTINGCHANGE("Environment")`，并刷新本进程的 `Path`；否则已经开着的资源管理器 / 终端看不到新 PATH，会表现为「注入成功但 mvn 找不到」。
+- `electron/utils/envProbe.cjs` 调 `.cmd/.bat` 必须用「拼整行 + windowsVerbatimArguments」或者 `shell: true`，不能把带引号的路径当成独立 argv 传给 cmd.exe（Node 会二次转义，cmd 收到 `\"...\"`）。

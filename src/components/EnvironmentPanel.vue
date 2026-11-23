@@ -713,8 +713,13 @@ export default {
 
           const check = enable && r.selfCheck;
           if (check && check.own && check.own.verdict !== 'ok') {
-            setTimeout(() => Lemon.error(`注入成功，但自检没跑起来：${check.own.detail}\n${check.exe}\n`
-              + '这份可能装坏了，建议先卸载再重装一次'), 500);
+            setTimeout(() => {
+              const javaHint = check.needsJava && !check.javaHome
+                ? '\nMaven / Gradle 需要 JAVA_HOME 指向 JDK：先在左边装好或注入一个 JDK，再回来点一次注入。'
+                : '';
+              Lemon.error(`注入成功，但自检没跑起来：${check.own.detail}\n${check.exe}${javaHint}`
+                + (javaHint ? '' : '\n这份可能装坏了，建议先卸载再重装一次'));
+            }, 500);
           } else if (check && check.shadowed) {
             setTimeout(() => Lemon.info(`注入了，但新终端里 ${this.toolLabel} 仍会优先用到\n${check.effective}\n`
               + '它排在用户 PATH 前面；在面板上点「以管理员身份清理」把系统 PATH 里的旧条目摘掉才行'), 500);

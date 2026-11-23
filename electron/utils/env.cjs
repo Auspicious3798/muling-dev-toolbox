@@ -238,6 +238,7 @@ async function setSystemPath(newPath, { log = () => {} } = {}) {
     const result = await guardedPathWrite(SYSTEM_ENV_KEY, () => String(newPath), '系统');
     if (result.backupFile) log(`系统 PATH 快照已保存: ${result.backupFile}`);
     log(result.changed ? `系统 PATH 写入成功，长度=${String(newPath).length}` : '系统 PATH 无变化，跳过写入');
+    if (result.changed) await broadcastEnvironmentChange({ log });
     return result;
 }
 
@@ -254,6 +255,49 @@ async function refreshSystemPath({ extra = {}, log = () => {} } = {}) {
         process.env.Path = systemPath.replace(/%([^%]+)%/g, (_, name) => process.env[name] || `%${name}%`);
     } catch (err) {
         log(`刷新环境变量失败: ${err.message}`);
+    }
+}
+
+/**
+ * 广播 WM_SETTINGCHANGE("Environment")。
+ * 注册表写完不会自动通知系统：explorer.exe 手里还是旧环境，之后新开的 cmd / PowerShell
+ * 会继承旧 PATH —— 于是「注入成功但新终端里 mvn 找不到」。JDK 经常不受影响，
+ * 是因为 java.exe 往往早就在 PATH 上或已经重开过终端。
+ */
+function broadcastEnvironmentChange({ log = () => {} } = {}) {
+    return new Promise((resolve) => {
+        const ps = [
+            "$sig = '[DllImport(\"user32.dll\", SetLastError=true, CharSet=CharSet.Auto)] public static extern IntPtr SendMessageTimeout(IntPtr hWnd, uint Msg, UIntPtr wParam, string lParam, uint fuFlags, uint uTimeout, out UIntPtr lpdwResult);'",
+            'Add-Type -MemberDefinition $sig -Name NativeMethods -Namespace Win32 -ErrorAction Stop | Out-Null',
+            '$result = [UIntPtr]::Zero',
+            '[Win32.NativeMethods]::SendMessageTimeout([IntPtr]0xffff, 0x001A, [UIntPtr]::Zero, \"Environment\", 2, 3000, [ref]$result) | Out-Null',
+            'exit 0',
+        ].join('; ');
+        exec(`powershell -NoProfile -Command "${ps.replace(/"/g, '\\"')}"`, { windowsHide: true, timeout: 8000 }, (error) => {
+            if (error) log(`广播环境变量变更失败（不影响已写入的值）: ${error.message}`);
+            else log('已广播环境变量变更');
+            resolve(!error);
+        });
+    });
+}
+
+/**
+ * 把注册表里的 用户 + 系统 PATH 重新展开到当前进程。
+ * 注入/撤出之后调用一次，进程内的 where / 环境体检 才能跟「新开的终端」一致；
+ * 否则 Electron 进程还拿着启动时的旧 PATH，会误报「命令找不到」。
+ */
+async function refreshProcessPathFromRegistry({ log = () => {} } = {}) {
+    try {
+        const [user, system] = await Promise.all([getUserPath(), getSystemPath()]);
+        const raw = [user, system].filter(Boolean).join(';');
+        if (!raw) return false;
+        const expand = (text) => String(text).replace(/%([^%]+)%/g, (whole, name) => process.env[name] || whole);
+        process.env.Path = raw.split(';').filter(Boolean).map(expand).join(';');
+        log(`进程 PATH 已按注册表刷新，长度=${process.env.Path.length}`);
+        return true;
+    } catch (err) {
+        log(`刷新进程 PATH 失败: ${err.message}`);
+        return false;
     }
 }
 
@@ -274,7 +318,7 @@ function setUserEnvVariable(name, value, { log = () => {} } = {}) {
             }
             log(`环境变量设置成功: ${name}=${value}`);
             process.env[name] = value;
-            resolve();
+            broadcastEnvironmentChange({ log }).then(() => resolve());
         });
     });
 }
@@ -332,6 +376,7 @@ async function setUserPath(newPath, { log = () => {} } = {}) {
     const result = await guardedPathWrite('HKCU\\Environment', () => String(newPath), '用户');
     if (result.backupFile) log(`用户 PATH 快照已保存: ${result.backupFile}`);
     log(result.changed ? `用户 PATH 写入成功，长度=${String(newPath).length}` : '用户 PATH 无变化，跳过写入');
+    if (result.changed) await broadcastEnvironmentChange({ log });
     return result;
 }
 
@@ -364,4 +409,6 @@ module.exports = {
     getUserPath,
     getUserEnvVariable,
     setUserPath,
+    broadcastEnvironmentChange,
+    refreshProcessPathFromRegistry,
 };

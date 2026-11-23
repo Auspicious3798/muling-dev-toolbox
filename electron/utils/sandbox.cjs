@@ -796,6 +796,8 @@ async function setInjection(tool, enabled) {
         await setUserEnvVariable(meta.envVar, dir);
         const currentPath = await getUserPath();
         await setUserPath(filterAndPrepend(currentPath, injectionRemovePatterns(tool), injectionPathEntries(tool)));
+        // 让当前进程里的 where / 环境体检 也立刻看到这条 PATH（否则会误报「mvn 找不到」）
+        await require('./env.cjs').refreshProcessPathFromRegistry();
     } else {
         const currentPath = await getUserPath();
         const cleaned = currentPath
@@ -803,6 +805,7 @@ async function setInjection(tool, enabled) {
             .filter(p => !injectionRemovePatterns(tool).some(re => re.test(p)))
             .join(';');
         await setUserPath(cleaned);
+        await require('./env.cjs').refreshProcessPathFromRegistry();
 
         // 还原注入前的值；原本没有这个变量才删除
         const backup = state.injectionBackup[tool];
@@ -837,13 +840,17 @@ async function setInjection(tool, enabled) {
             const envProbe = require('./envProbe.cjs');
             const spec = envProbe.PROBES && envProbe.PROBES[tool];
             if (spec) {
-                const own = envProbe.probeExecutable(path.join(dir, 'bin', spec.exe), spec.args);
-                const hits = envProbe.whereAll(spec.command);
+                const exe = path.join(dir, 'bin', spec.exe);
+                const probe = buildProbeEnv(tool, dir);
+                const own = envProbe.probeExecutable(exe, spec.args, {env: probe.env});
+                const hits = envProbe.whereAll(spec.command, probe.env);
                 const effective = (hits && hits[0]) || '';
                 selfCheck = {
-                    exe: path.join(dir, 'bin', spec.exe),
+                    exe,
                     own,
                     effective,
+                    javaHome: probe.javaHome,
+                    needsJava: probe.needsJava,
                     shadowed: Boolean(effective) && !path.resolve(effective).toLowerCase()
                         .startsWith(path.resolve(dir).toLowerCase()),
                 };
@@ -854,6 +861,35 @@ async function setInjection(tool, enabled) {
     }
 
     return {enabled: !!enabled, backup: state.injectionBackup[tool] || null, selfCheck};
+}
+
+/**
+ * 自检用的环境：mvn / gradle 这类脚本自己不会找 java，必须有 JAVA_HOME。
+ * 优先用沙箱里激活的 JDK，其次用当前进程里可用的 JAVA_HOME；
+ * 顺手把工具自己的 bin 和 JDK 的 bin 放到 PATH 最前面，等价于「新终端里的样子」。
+ */
+function buildProbeEnv(tool, dir) {
+    const needsJava = tool === 'maven' || tool === 'gradle';
+    const env = {...process.env};
+    const entries = [];
+    if (needsJava) {
+        const jdk = getActiveDir('jdk');
+        const validJdk = jdk && fs.existsSync(path.join(jdk, 'bin', 'java.exe'));
+        const current = process.env.JAVA_HOME;
+        const javaHome = validJdk ? jdk : (current && fs.existsSync(path.join(current, 'bin', 'java.exe')) ? current : '');
+        if (javaHome) {
+            env.JAVA_HOME = javaHome;
+            entries.push(path.join(javaHome, 'bin'));
+        }
+    }
+    if (dir) entries.push(path.join(dir, 'bin'));
+    const pathKey = Object.keys(env).find((k) => k.toLowerCase() === 'path') || 'Path';
+    env[pathKey] = [...entries, env[pathKey] || ''].filter(Boolean).join(';');
+    return {
+        env,
+        needsJava,
+        javaHome: needsJava ? (env.JAVA_HOME || '') : '',
+    };
 }
 
 async function syncInjection(tool) {
@@ -1588,4 +1624,5 @@ module.exports = {
     resetCache,
     readState,
     writeState,
+    buildProbeEnv,
 };

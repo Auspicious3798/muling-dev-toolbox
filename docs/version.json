@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
-  "notes": "新增端口进程核查器插件：实时看到谁占着端口、一键结束进程；启动页改为亮色企业风并显示真实启动步骤；仪表盘头像优先使用 Windows 账户头像；Web MySQL / Web Redis 数据源改回可手填端口与密码。",
-  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.3.0/MulingEnvBox-Setup-2.3.0.exe",
-  "publishedAt": "2026-11-22"
+  "version": "2.3.1",
+  "notes": "修复 Maven / Gradle 自检误报：调用 mvn.cmd、gradle.bat 时不再因为引号转义直接失败，并自动注入沙箱里激活的 JDK（JAVA_HOME）；注入环境变量后广播系统环境变更并刷新进程 PATH，新开的终端能立刻识别 mvn；打包改用 normal 压缩，规避 7za 最大压缩偶发崩溃。",
+  "url": "https://github.com/Auspicious3798/muling-dev-toolbox/releases/download/v2.3.1/MulingEnvBox-Setup-2.3.1.exe",
+  "publishedAt": "2026-11-23"
 }
